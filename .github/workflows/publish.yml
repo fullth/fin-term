@@ -1,0 +1,41 @@
+name: publish
+
+# v* 태그를 push 하면 빌드 후 npm 에 배포한다.
+#   git tag v0.3.1 && git push origin v0.3.1
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # npm Trusted Publishing(OIDC) + provenance 용
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+
+      - run: npm ci
+
+      - run: npm run build
+
+      # 태그 버전과 package.json 버전이 일치하는지 확인 (불일치 배포 방지)
+      - name: verify version matches tag
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "tag($TAG) != package.json($PKG)"; exit 1
+          fi
+
+      # OIDC(Trusted Publishing) 사용 시 NODE_AUTH_TOKEN 없이도 동작.
+      # 토큰 방식이면 repo Secret NPM_TOKEN 을 등록하면 env 가 채워진다.
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
