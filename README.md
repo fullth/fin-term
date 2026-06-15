@@ -7,7 +7,7 @@
 
 터미널에서 보는 블룸버그 스타일 금융 대시보드. 실시간 시세 + 영문/한글 뉴스 스트림을 한 화면에. **API 키 없이 바로 동작**합니다.
 
-<img width="1392" height="1522" alt="image" src="https://github.com/user-attachments/assets/2377850b-20ff-4f5c-93f9-0c398b4018fa" />
+<img width="1392" height="1522" alt="image" src="https://github.com/user-attachments/assets/16b8f636-d83c-4b3f-9f24-b92eeac872ce" />
 
 - 좌상단: 관심종목 시세 (가격 / 변동% / ▲▼)
 - 우상단: 선택 종목 상세 (시가·고가·저가·전일종가 + 인트라데이 스파크라인)
