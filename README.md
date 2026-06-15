@@ -2,36 +2,14 @@
 
 블룸버그 터미널 스타일 TUI. 실시간 시세 + 뉴스 스트림. 무료 데이터 소스만 사용.
 
-## 결과물
+## 실행 화면 (영문 + 한글 뉴스 동시 표시):
 
-실제 실행 화면 (영문 + 한글 뉴스 동시 표시):
-
-<!-- 스크린샷을 docs/screenshot.png 로 저장하면 아래 줄 주석 해제 -->
-<!-- ![fin-term screenshot](docs/screenshot.png) -->
-
-```
-┌ FIN-TERM  live quotes + news · free data ─────────────────────────────┐
-│ WATCHLIST          │ QUOTE                                            │
-│ ▶ AAPL 291.13 ▼-1.52%  AAPL 291.13 ▼ -4.50 (-1.52%)                   │
-│   TSLA 406.43 ▲+1.82%  O 295.37  H 297.14  L 289.62  PC 295.63        │
-│   NVDA 205.19 ▲+0.16%  ▁▂▄▅▇▆▅▃▂▁ (스파크라인)                         │
-│   MSFT 390.74 ▲+0.10%  updated 11:53                                  │
-├────────────────────┴──────────────────────────────────────────[en]───┤
-│ NEWS STREAM                                                           │
-│ 11:50 [MKT] World leaders welcome U.S.-Iran deal ...      (CNBC)      │
-│ 11:42 [MKT] 국고채 금리 일제히 하락…3년물 장중 연 3.743% (연합경제)  │
-│ 11:37 [MKT] 삼성·한투·타임폴리오 "스페이스X 상장일 매수" (연합경제)  │
-│ 11:24 [MKT] U.S. and Iran reach peace deal ...           (CNBC)       │
-└──────────────────────────────────────────────────────────────────────┘
- ready · :add :rm :news :lang :q · ↑↓ select
-```
+<img width="1392" height="1522" alt="image" src="https://github.com/user-attachments/assets/2377850b-20ff-4f5c-93f9-0c398b4018fa" />
 
 - 좌상단: 관심종목 시세 (가격 / 변동% / ▲▼)
 - 우상단: 선택 종목 상세 (OHLC + 인트라데이 스파크라인)
 - 하단: 영문/한글 뉴스 스트림 (최신순, `[MKT]`/`[종목]` 태그)
 - 영문·한글 RSS 동시 수집. `:lang ko` 로 영문 헤드라인도 한글 번역(DeepL)
-
-> 스크린샷 이미지(`docs/screenshot.png`)는 직접 캡처해 넣으세요.
 
 ## 데이터 소스
 
