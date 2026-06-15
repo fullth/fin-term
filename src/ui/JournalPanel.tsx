@@ -21,12 +21,12 @@ function verdict(e: JournalEntry, current: number | null): { label: string; colo
 export function JournalPanel({ entries, quotes }: Props) {
   const sorted = [...entries].sort((a, b) => b.created_at - a.created_at);
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1}>
+    <Box flexDirection="column" flexGrow={1} borderStyle="round" borderColor="cyan" paddingX={1}>
       <Text bold color="cyan">
-        예측 일지 <Text dimColor>· Esc 닫기 · :predict SYM up|down 근거</Text>
+        예측 일지 <Text dimColor>:predict SYM up|down 근거</Text>
       </Text>
-      {sorted.length === 0 && <Text dimColor>예측 없음 — :predict AAPL up 실적호조</Text>}
-      {sorted.slice(0, 12).map((e) => {
+      {sorted.length === 0 && <Text dimColor>예측 없음 — :predict AAPL up …</Text>}
+      {sorted.slice(0, 5).map((e) => {
         const cur = quotes[e.symbol]?.price ?? null;
         const v = verdict(e, cur);
         return (

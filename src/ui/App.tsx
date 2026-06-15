@@ -75,6 +75,19 @@ export function App({ store, poller }: Props) {
     };
   }, [selected, store]);
 
+  // 상시 패널 데이터: 시작 시 로드 + 핫종목/지수는 60s 주기 갱신. 예측일지는 영속 파일 로드.
+  useEffect(() => {
+    store.setJournal(loadJournal());
+    void loadHot();
+    void loadIndices();
+    const t = setInterval(() => {
+      void loadHot();
+      void loadIndices();
+    }, 60_000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store]);
+
   // 시작 시 새 버전 확인 (하루 1회 캐시, 실패는 무시)
   useEffect(() => {
     void checkForUpdate(Date.now()).then((info) => {
@@ -117,14 +130,14 @@ export function App({ store, poller }: Props) {
     store.setStatus(results.length ? `${results.length} hits · ↑↓ 선택 · Enter 추가` : `no result: ${query}`);
   };
 
-  // AI 시장 브리핑 생성 (Claude). 키 없으면 안내만.
+  // AI 시장 브리핑 (Claude). 키 없으면 안내만. brief 는 일시 오버레이.
   const runBrief = async () => {
     if (!hasBriefKey()) {
       store.setStatus('ANTHROPIC_API_KEY 없음 — :brief 사용하려면 키 설정');
       return;
     }
     const s = store.get();
-    store.setBriefLoading();
+    store.setOverlay({ kind: 'brief', text: null, loading: true });
     store.setStatus('AI 브리핑 생성 중…');
     const text = await generateBrief({
       watchlist: s.watchlist,
@@ -132,38 +145,26 @@ export function App({ store, poller }: Props) {
       quotes: s.quotes,
       news: s.news,
     });
-    store.setBrief(text);
+    store.updateOverlay({ kind: 'brief', text, loading: false });
     store.setStatus(text ? 'AI 브리핑 완료' : 'AI 브리핑 실패');
   };
 
-  // 핫 종목 오버레이 — 거래량 급등 5개 조회.
-  const runHot = async () => {
-    store.setOverlay({ kind: 'hot', items: [], loading: true });
-    store.setStatus('핫 종목 조회 중…');
+  // 핫 종목 — 상시 패널. 거래량 급등 조회 후 store 갱신.
+  const loadHot = async () => {
     const items = await fetchHot();
-    store.updateOverlay({ kind: 'hot', items, loading: false });
-    store.setStatus(`핫 종목 ${items.length}개`);
+    store.setHot(items);
   };
 
-  // 지수 현황 오버레이 — 주요 지수 시세 조회.
-  const runIndices = async () => {
-    store.setOverlay({ kind: 'indices', quotes: [], loading: true });
-    store.setStatus('지수 조회 중…');
+  // 지수 현황 — 상시 패널. 주요 지수 시세 조회.
+  const loadIndices = async () => {
     const quotes = await fetchQuotes(
       INDICES.map((i) => i.symbol),
       process.env.FINNHUB_KEY,
     );
-    store.updateOverlay({ kind: 'indices', quotes, loading: false });
-    store.setStatus('지수 현황');
+    store.setIndices(quotes);
   };
 
-  // 예측 일지 오버레이 — 저장된 예측 표시.
-  const runJournal = () => {
-    store.setOverlay({ kind: 'journal', entries: loadJournal() });
-    store.setStatus('예측 일지');
-  };
-
-  // 용어 풀이 오버레이 — Claude 설명.
+  // 용어 풀이 — Claude 설명 (일시 오버레이).
   const runExplain = async (term: string) => {
     if (!hasAiKey()) {
       store.setStatus('ANTHROPIC_API_KEY 없음 — :explain 사용하려면 키 설정');
@@ -176,7 +177,7 @@ export function App({ store, poller }: Props) {
     store.setStatus(text ? '용어 풀이 완료' : '용어 풀이 실패');
   };
 
-  // 예측 추가 — :predict SYM up|down 근거. 저장 후 AI 평가(키 있으면).
+  // 예측 추가 — :predict SYM up|down 근거. 저장 후 상시 패널 갱신 + AI 평가.
   const runPredict = async (arg: string) => {
     const parts = arg.trim().split(/\s+/);
     const sym = parts[0]?.toUpperCase();
@@ -191,8 +192,8 @@ export function App({ store, poller }: Props) {
     const entries = loadJournal();
     entries.push(entry);
     saveJournal(entries);
+    store.setJournal(entries);
     store.setStatus(`예측 저장: ${sym} ${dir}`);
-    store.setOverlay({ kind: 'journal', entries });
 
     // AI 평가 (키 있으면 비동기로 채움)
     if (hasAiKey()) {
@@ -200,10 +201,7 @@ export function App({ store, poller }: Props) {
       if (feedback) {
         const updated = loadJournal().map((e) => (e.id === entry.id ? { ...e, feedback } : e));
         saveJournal(updated);
-        // 현재 오버레이가 journal 이면 갱신
-        if (store.get().overlay?.kind === 'journal') {
-          store.updateOverlay({ kind: 'journal', entries: updated });
-        }
+        store.setJournal(updated);
       }
     }
   };
@@ -270,14 +268,17 @@ export function App({ store, poller }: Props) {
         void runBrief();
         break;
       case 'hot':
-        void runHot();
+        void loadHot();
+        store.setStatus('핫 종목 새로고침');
         break;
       case 'indices':
       case 'index':
-        void runIndices();
+        void loadIndices();
+        store.setStatus('지수 새로고침');
         break;
       case 'journal':
-        runJournal();
+        store.setJournal(loadJournal());
+        store.setStatus('예측 일지 새로고침');
         break;
       case 'explain':
         if (cmd.arg) void runExplain(cmd.arg);
@@ -329,14 +330,11 @@ export function App({ store, poller }: Props) {
     }
   };
 
-  // Esc: 열린 오버레이 닫기 (overlay → 브리핑 → 검색 순)
+  // Esc: 일시 오버레이(brief/explain) → 검색 순으로 닫기. 상시 패널은 안 닫음.
   const escape = () => {
     if (state.overlay) {
       store.clearOverlay();
       store.setStatus('닫음');
-    } else if (state.brief) {
-      store.clearBrief();
-      store.setStatus('브리핑 닫음');
     } else if (state.searchResults.length) {
       store.clearSearch();
       store.setStatus('search 닫음');
@@ -424,10 +422,9 @@ export function App({ store, poller }: Props) {
               <Text color="yellow">:news</Text> 종목뉴스필터 ·{' '}
               <Text color="yellow">:lang</Text> 한/영 ·{' '}
               <Text color="magenta">:brief</Text> AI브리핑 ·{' '}
-              <Text color="red">:hot</Text> 핫종목 ·{' '}
-              <Text color="blue">:indices</Text> 지수 ·{' '}
-              <Text color="cyan">:journal</Text>/<Text color="cyan">:predict</Text> 예측 ·{' '}
-              <Text color="green">:explain</Text> 용어
+              <Text color="cyan">:predict</Text> 예측기록 ·{' '}
+              <Text color="green">:explain</Text> 용어풀이{'  '}
+              <Text dimColor>(핫종목·지수·예측은 하단 상시)</Text>
             </Text>
           </Box>
         </Box>
@@ -441,6 +438,18 @@ export function App({ store, poller }: Props) {
           />
           <QuotePanel quote={selected ? state.quotes[selected] : undefined} detail={state.detail} />
         </Box>
+        {/* 핫종목 · 지수 · 예측일지 — 가로 3분할 상시 표시 */}
+        <Box>
+          <Box width="34%">
+            <HotPanel items={state.hot} />
+          </Box>
+          <Box width="30%">
+            <IndicesPanel quotes={state.indices} />
+          </Box>
+          <Box flexGrow={1}>
+            <JournalPanel entries={state.journal} quotes={state.quotes} />
+          </Box>
+        </Box>
         {state.searchResults.length > 0 && (
           <SearchPanel
             query={state.searchQuery}
@@ -449,15 +458,8 @@ export function App({ store, poller }: Props) {
             focused={state.focus === 'search'}
           />
         )}
-        {state.brief && <BriefPanel text={state.brief.text} loading={state.brief.loading} />}
-        {state.overlay?.kind === 'hot' && (
-          <HotPanel items={state.overlay.items} loading={state.overlay.loading} />
-        )}
-        {state.overlay?.kind === 'indices' && (
-          <IndicesPanel quotes={state.overlay.quotes} loading={state.overlay.loading} />
-        )}
-        {state.overlay?.kind === 'journal' && (
-          <JournalPanel entries={state.overlay.entries} quotes={state.quotes} />
+        {state.overlay?.kind === 'brief' && (
+          <BriefPanel text={state.overlay.text} loading={state.overlay.loading} />
         )}
         {state.overlay?.kind === 'explain' && (
           <ExplainPanel

@@ -5,17 +5,15 @@ import { fmtPriceCompact, fmtPct, arrow, changeColor } from './format.js';
 
 interface Props {
   items: HotItem[];
-  loading: boolean;
 }
 
-export function HotPanel({ items, loading }: Props) {
+export function HotPanel({ items }: Props) {
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor="red" paddingX={1}>
+    <Box flexDirection="column" flexGrow={1} borderStyle="round" borderColor="red" paddingX={1}>
       <Text bold color="red">
-        🔥 핫 종목 (거래량 급등) <Text dimColor>· Esc 닫기 · :add 로 관심종목 추가</Text>
+        🔥 핫 종목 <Text dimColor>거래량 급등</Text>
       </Text>
-      {loading && <Text dimColor>불러오는 중…</Text>}
-      {!loading && items.length === 0 && <Text dimColor>데이터 없음</Text>}
+      {items.length === 0 && <Text dimColor>불러오는 중…</Text>}
       {items.map((it, i) => (
         <Box key={`${it.symbol}-${i}`}>
           <Box width={14} flexShrink={0}>
