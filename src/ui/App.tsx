@@ -6,6 +6,7 @@ import { Watchlist } from './Watchlist.js';
 import { QuotePanel } from './QuotePanel.js';
 import { NewsStream } from './NewsStream.js';
 import { CommandBar, type Command } from './CommandBar.js';
+import { openUrl } from '../core/open-url.js';
 
 interface Props {
   store: Store;
@@ -35,6 +36,14 @@ export function App({ store, poller }: Props) {
     }
   }, [state.watchlist, selected]);
 
+  // 터미널 높이 기반 뉴스 행 수 + 화면에 실제 보이는 뉴스 목록.
+  // (:open N 의 N 기준과 NewsStream 표시 순서를 동일 목록으로 일치)
+  const rows = stdout?.rows ?? 30;
+  const newsRows = Math.max(5, rows - 16);
+  const visibleNews = (
+    state.newsFilter ? state.news.filter((n) => n.tickers.includes(state.newsFilter!)) : state.news
+  ).slice(0, newsRows);
+
   const handleCommand = (cmd: Command) => {
     switch (cmd.name) {
       case 'add':
@@ -62,6 +71,13 @@ export function App({ store, poller }: Props) {
         void poller.refreshNewsNow();
         break;
       }
+      case 'open': {
+        const n = Number(cmd.arg);
+        const item = Number.isInteger(n) ? visibleNews[n - 1] : undefined;
+        if (item && openUrl(item.url)) store.setStatus(`opened #${n}`);
+        else store.setStatus(`open failed (1~${visibleNews.length})`);
+        break;
+      }
       default:
         store.setStatus(`unknown: ${cmd.name}`);
     }
@@ -75,10 +91,6 @@ export function App({ store, poller }: Props) {
     setSelected(wl[next]);
   };
 
-  // 터미널 높이 기반 뉴스 행 수 (대략)
-  const rows = stdout?.rows ?? 30;
-  const newsRows = Math.max(5, rows - 16);
-
   return (
     <Box flexDirection="column" width="100%">
       <Box paddingX={1}>
@@ -91,7 +103,7 @@ export function App({ store, poller }: Props) {
         <Watchlist watchlist={state.watchlist} quotes={state.quotes} selected={selected} />
         <QuotePanel quote={selected ? state.quotes[selected] : undefined} />
       </Box>
-      <NewsStream news={state.news} filter={state.newsFilter} lang={state.lang} maxRows={newsRows} />
+      <NewsStream visible={visibleNews} filter={state.newsFilter} lang={state.lang} />
       <CommandBar
         status={state.status}
         onCommand={handleCommand}
