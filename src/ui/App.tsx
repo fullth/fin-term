@@ -10,6 +10,7 @@ import { CommandBar, type Command } from './CommandBar.js';
 import { openUrl } from '../core/open-url.js';
 import { searchSymbols } from '../sources/search.js';
 import { useMouse, type MouseClick } from './use-mouse.js';
+import { checkForUpdate } from '../core/update-check.js';
 
 interface Props {
   store: Store;
@@ -46,6 +47,13 @@ export function App({ store, poller }: Props) {
   useEffect(() => {
     setSearchCursor(0);
   }, [state.searchResults]);
+
+  // 시작 시 새 버전 확인 (하루 1회 캐시, 실패는 무시)
+  useEffect(() => {
+    void checkForUpdate(Date.now()).then((info) => {
+      if (info?.hasUpdate) store.setUpdate(info.latest);
+    });
+  }, [store]);
 
   // 화면 절대 행 측정 (1-based). 마우스 클릭 → 항목 매핑, 뉴스 표시 행수 계산에 쓴다.
   // - headerRef: 헤더 + 안내 영역 → WATCHLIST 첫 종목 행 위치
@@ -242,6 +250,11 @@ export function App({ store, poller }: Props) {
               {' '}FIN-TERM{' '}
             </Text>
             <Text dimColor> live quotes + news · free data</Text>
+            {state.update && (
+              <Text color="green">
+                {'  '}⬆ 업데이트 {state.update.latest} · npm i -g fin-term@latest
+              </Text>
+            )}
           </Box>
           {/* 사용법 안내 — 조작과 기능을 상단에 노출 */}
           <Box paddingX={1} flexDirection="column">

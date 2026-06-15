@@ -1,5 +1,10 @@
 # fin-term
 
+[![npm version](https://img.shields.io/npm/v/fin-term.svg)](https://www.npmjs.com/package/fin-term)
+[![npm downloads](https://img.shields.io/npm/dm/fin-term.svg)](https://www.npmjs.com/package/fin-term)
+[![node](https://img.shields.io/node/v/fin-term.svg)](https://www.npmjs.com/package/fin-term)
+[![license](https://img.shields.io/npm/l/fin-term.svg)](https://github.com/fullth/fin-term/blob/master/LICENSE)
+
 터미널에서 보는 블룸버그 스타일 금융 대시보드. 실시간 시세 + 영문/한글 뉴스 스트림을 한 화면에. **API 키 없이 바로 동작**합니다.
 
 <img width="1392" height="1522" alt="image" src="https://github.com/user-attachments/assets/2377850b-20ff-4f5c-93f9-0c398b4018fa" />

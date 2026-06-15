@@ -16,6 +16,7 @@ export interface State {
   focus: Focus; // 키 입력이 향하는 패널 (Tab 으로 전환)
   searchResults: SearchResult[]; // :search 결과 (비어있으면 패널 숨김)
   searchQuery: string; // 검색어 (패널 헤더 표시용)
+  update: { latest: string } | null; // 사용 가능한 새 버전 (없으면 null)
   status: string; // 하단 상태 메시지
 }
 
@@ -38,6 +39,7 @@ export class Store extends EventEmitter {
       focus: 'watchlist',
       searchResults: [],
       searchQuery: '',
+      update: null,
       status: 'ready',
     };
   }
@@ -98,6 +100,10 @@ export class Store extends EventEmitter {
 
   setLang(lang: 'en' | 'ko') {
     this.commit({ lang });
+  }
+
+  setUpdate(latest: string) {
+    this.commit({ update: { latest } });
   }
 
   setFocus(focus: Focus) {
