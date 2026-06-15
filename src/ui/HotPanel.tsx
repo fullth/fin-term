@@ -11,7 +11,7 @@ export function HotPanel({ items }: Props) {
   return (
     <Box flexDirection="column" flexGrow={1} borderStyle="round" borderColor="red" paddingX={1}>
       <Text bold color="red">
-        🔥 핫 종목 <Text dimColor>거래량 급등</Text>
+        핫 종목 <Text dimColor>거래량 급등</Text>
       </Text>
       {items.length === 0 && <Text dimColor>불러오는 중…</Text>}
       {items.map((it, i) => (
