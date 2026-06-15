@@ -387,6 +387,43 @@ export function App({ store, poller }: Props) {
         ? '↑↓ 선택 · Enter 추가 · Esc 닫기'
         : 'Tab 패널 · ↑↓ 종목 · :search :add :news :lang :q';
 
+  // brief/explain 오버레이는 풀스크린 모달로 표시 (다른 패널을 가려 화면 넘침 방지, Esc 로 닫기).
+  if (state.overlay) {
+    return (
+      <Box flexDirection="column" width="100%" minHeight={(stdout?.rows ?? 30) - 1}>
+        <Box paddingX={1}>
+          <Text bold backgroundColor="yellow" color="black">
+            {' '}FIN-TERM{' '}
+          </Text>
+          <Text dimColor> — Esc 로 닫고 메인으로 돌아가기</Text>
+        </Box>
+        <Box flexGrow={1}>
+          {state.overlay.kind === 'brief' ? (
+            <BriefPanel text={state.overlay.text} loading={state.overlay.loading} />
+          ) : (
+            <ExplainPanel
+              term={state.overlay.term}
+              text={state.overlay.text}
+              loading={state.overlay.loading}
+            />
+          )}
+        </Box>
+        <CommandBar
+          status={state.status}
+          hint="Esc 닫기"
+          onCommand={handleCommand}
+          onQuit={() => exit()}
+          onMove={() => {}}
+          onTab={() => {}}
+          onEnter={() => {}}
+          onEscape={escape}
+          onRefresh={() => {}}
+          inputActive={false}
+        />
+      </Box>
+    );
+  }
+
   return (
     <Box flexDirection="column" width="100%">
       {/* 상단 영역: 높이를 측정해 뉴스 첫 행 위치 계산 (마우스 클릭 매핑용) */}
@@ -469,16 +506,7 @@ export function App({ store, poller }: Props) {
             focused={state.focus === 'search'}
           />
         )}
-        {state.overlay?.kind === 'brief' && (
-          <BriefPanel text={state.overlay.text} loading={state.overlay.loading} />
-        )}
-        {state.overlay?.kind === 'explain' && (
-          <ExplainPanel
-            term={state.overlay.term}
-            text={state.overlay.text}
-            loading={state.overlay.loading}
-          />
-        )}
+        {/* brief/explain 은 풀스크린 모달(상단 early-return)에서 렌더 — 여기선 인라인 안 함 */}
       </Box>
       <NewsStream
         visible={visibleNews}
