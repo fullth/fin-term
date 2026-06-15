@@ -47,7 +47,11 @@ export async function fetchNews(
   watchlist: string[],
   opts: FetchOpts = {},
 ): Promise<NewsItem[]> {
-  const batches = await Promise.all(feeds.map((f) => fetchFeed(f, watchlist)));
+  // ko 표시 모드인데 DeepL 키가 없으면 영문 헤드라인을 번역할 수 없으므로
+  // 영문 피드를 아예 제외하고 한글 피드만 가져온다 (영문이 주르륵 나오는 것 방지).
+  const activeFeeds =
+    opts.translateToKo && !opts.deeplKey ? feeds.filter((f) => f.lang === 'ko') : feeds;
+  const batches = await Promise.all(activeFeeds.map((f) => fetchFeed(f, watchlist)));
   const all = batches.flat();
 
   // id 중복제거

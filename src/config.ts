@@ -34,9 +34,11 @@ const DEFAULT_FEEDS: Feed[] = [
   { source: 'CNBC', url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114', lang: 'en' },
   { source: 'MarketWatch', url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories', lang: 'en' },
   // 한글 (원문 한글 → 번역 불필요)
-  { source: '한경', url: 'https://www.hankyung.com/feed/finance', lang: 'ko' },
-  { source: '매경증권', url: 'https://www.mk.co.kr/rss/50200011/', lang: 'ko' },
+  { source: '한경증권', url: 'https://www.hankyung.com/feed/finance', lang: 'ko' },
+  { source: '한경경제', url: 'https://www.hankyung.com/feed/economy', lang: 'ko' },
+  { source: '동아경제', url: 'https://rss.donga.com/economy.xml', lang: 'ko' },
   { source: '연합경제', url: 'https://www.yna.co.kr/rss/economy.xml', lang: 'ko' },
+  { source: '연합시장', url: 'https://www.yna.co.kr/rss/market.xml', lang: 'ko' },
 ];
 
 export function loadConfig(): AppConfig {
