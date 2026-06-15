@@ -7,12 +7,22 @@ import { QuotePanel } from './QuotePanel.js';
 import { NewsStream } from './NewsStream.js';
 import { SearchPanel } from './SearchPanel.js';
 import { BriefPanel } from './BriefPanel.js';
+import { HotPanel } from './HotPanel.js';
+import { IndicesPanel } from './IndicesPanel.js';
+import { JournalPanel } from './JournalPanel.js';
+import { ExplainPanel } from './ExplainPanel.js';
 import { CommandBar, type Command } from './CommandBar.js';
 import { openUrl } from '../core/open-url.js';
 import { searchSymbols } from '../sources/search.js';
 import { useMouse, type MouseClick } from './use-mouse.js';
 import { checkForUpdate } from '../core/update-check.js';
 import { generateBrief, hasBriefKey } from '../sources/brief.js';
+import { fetchHot } from '../sources/hot.js';
+import { fetchDetail } from '../sources/detail.js';
+import { fetchQuotes } from '../sources/quote.js';
+import { explainTerm, evaluatePrediction, hasAiKey } from '../sources/explain.js';
+import { loadJournal, saveJournal, newEntry } from '../core/journal.js';
+import { INDICES } from '../config.js';
 
 interface Props {
   store: Store;
@@ -49,6 +59,21 @@ export function App({ store, poller }: Props) {
   useEffect(() => {
     setSearchCursor(0);
   }, [state.searchResults]);
+
+  // 선택 종목 바뀌면 상세 fetch (chart meta + Finnhub 보강). 캐시 없이 매번 단순 조회.
+  useEffect(() => {
+    if (!selected) {
+      store.setDetail(null);
+      return;
+    }
+    let cancelled = false;
+    void fetchDetail(selected, process.env.FINNHUB_KEY).then((d) => {
+      if (!cancelled) store.setDetail(d);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selected, store]);
 
   // 시작 시 새 버전 확인 (하루 1회 캐시, 실패는 무시)
   useEffect(() => {
@@ -109,6 +134,78 @@ export function App({ store, poller }: Props) {
     });
     store.setBrief(text);
     store.setStatus(text ? 'AI 브리핑 완료' : 'AI 브리핑 실패');
+  };
+
+  // 핫 종목 오버레이 — 거래량 급등 5개 조회.
+  const runHot = async () => {
+    store.setOverlay({ kind: 'hot', items: [], loading: true });
+    store.setStatus('핫 종목 조회 중…');
+    const items = await fetchHot();
+    store.updateOverlay({ kind: 'hot', items, loading: false });
+    store.setStatus(`핫 종목 ${items.length}개`);
+  };
+
+  // 지수 현황 오버레이 — 주요 지수 시세 조회.
+  const runIndices = async () => {
+    store.setOverlay({ kind: 'indices', quotes: [], loading: true });
+    store.setStatus('지수 조회 중…');
+    const quotes = await fetchQuotes(
+      INDICES.map((i) => i.symbol),
+      process.env.FINNHUB_KEY,
+    );
+    store.updateOverlay({ kind: 'indices', quotes, loading: false });
+    store.setStatus('지수 현황');
+  };
+
+  // 예측 일지 오버레이 — 저장된 예측 표시.
+  const runJournal = () => {
+    store.setOverlay({ kind: 'journal', entries: loadJournal() });
+    store.setStatus('예측 일지');
+  };
+
+  // 용어 풀이 오버레이 — Claude 설명.
+  const runExplain = async (term: string) => {
+    if (!hasAiKey()) {
+      store.setStatus('ANTHROPIC_API_KEY 없음 — :explain 사용하려면 키 설정');
+      return;
+    }
+    store.setOverlay({ kind: 'explain', term, text: null, loading: true });
+    store.setStatus(`"${term}" 설명 생성 중…`);
+    const text = await explainTerm(term);
+    store.updateOverlay({ kind: 'explain', term, text, loading: false });
+    store.setStatus(text ? '용어 풀이 완료' : '용어 풀이 실패');
+  };
+
+  // 예측 추가 — :predict SYM up|down 근거. 저장 후 AI 평가(키 있으면).
+  const runPredict = async (arg: string) => {
+    const parts = arg.trim().split(/\s+/);
+    const sym = parts[0]?.toUpperCase();
+    const dir = parts[1]?.toLowerCase();
+    const reason = parts.slice(2).join(' ');
+    if (!sym || (dir !== 'up' && dir !== 'down') || !reason) {
+      store.setStatus('형식: :predict AAPL up 실적호조');
+      return;
+    }
+    const priceAt = store.get().quotes[sym]?.price ?? null;
+    const entry = newEntry(sym, dir, reason, priceAt, Date.now());
+    const entries = loadJournal();
+    entries.push(entry);
+    saveJournal(entries);
+    store.setStatus(`예측 저장: ${sym} ${dir}`);
+    store.setOverlay({ kind: 'journal', entries });
+
+    // AI 평가 (키 있으면 비동기로 채움)
+    if (hasAiKey()) {
+      const feedback = await evaluatePrediction(sym, dir, reason);
+      if (feedback) {
+        const updated = loadJournal().map((e) => (e.id === entry.id ? { ...e, feedback } : e));
+        saveJournal(updated);
+        // 현재 오버레이가 journal 이면 갱신
+        if (store.get().overlay?.kind === 'journal') {
+          store.updateOverlay({ kind: 'journal', entries: updated });
+        }
+      }
+    }
   };
 
   const addSymbol = (sym: string, name?: string) => {
@@ -172,6 +269,24 @@ export function App({ store, poller }: Props) {
       case 'ai':
         void runBrief();
         break;
+      case 'hot':
+        void runHot();
+        break;
+      case 'indices':
+      case 'index':
+        void runIndices();
+        break;
+      case 'journal':
+        runJournal();
+        break;
+      case 'explain':
+        if (cmd.arg) void runExplain(cmd.arg);
+        else store.setStatus('형식: :explain PER');
+        break;
+      case 'predict':
+        if (cmd.arg) void runPredict(cmd.arg);
+        else store.setStatus('형식: :predict AAPL up 실적호조');
+        break;
       default:
         store.setStatus(`unknown: ${cmd.name}`);
     }
@@ -214,9 +329,12 @@ export function App({ store, poller }: Props) {
     }
   };
 
-  // Esc: 열린 오버레이 닫기 (브리핑 우선, 그다음 검색)
+  // Esc: 열린 오버레이 닫기 (overlay → 브리핑 → 검색 순)
   const escape = () => {
-    if (state.brief) {
+    if (state.overlay) {
+      store.clearOverlay();
+      store.setStatus('닫음');
+    } else if (state.brief) {
       store.clearBrief();
       store.setStatus('브리핑 닫음');
     } else if (state.searchResults.length) {
@@ -305,8 +423,11 @@ export function App({ store, poller }: Props) {
               <Text color="yellow">:add</Text>/<Text color="yellow">:rm</Text> 관심종목 ·{' '}
               <Text color="yellow">:news</Text> 종목뉴스필터 ·{' '}
               <Text color="yellow">:lang</Text> 한/영 ·{' '}
-              <Text color="yellow">:refresh</Text> 새로고침 ·{' '}
-              <Text color="magenta">:brief</Text> AI브리핑
+              <Text color="magenta">:brief</Text> AI브리핑 ·{' '}
+              <Text color="red">:hot</Text> 핫종목 ·{' '}
+              <Text color="blue">:indices</Text> 지수 ·{' '}
+              <Text color="cyan">:journal</Text>/<Text color="cyan">:predict</Text> 예측 ·{' '}
+              <Text color="green">:explain</Text> 용어
             </Text>
           </Box>
         </Box>
@@ -318,7 +439,7 @@ export function App({ store, poller }: Props) {
             selected={selected}
             focused={state.focus === 'watchlist'}
           />
-          <QuotePanel quote={selected ? state.quotes[selected] : undefined} />
+          <QuotePanel quote={selected ? state.quotes[selected] : undefined} detail={state.detail} />
         </Box>
         {state.searchResults.length > 0 && (
           <SearchPanel
@@ -329,6 +450,22 @@ export function App({ store, poller }: Props) {
           />
         )}
         {state.brief && <BriefPanel text={state.brief.text} loading={state.brief.loading} />}
+        {state.overlay?.kind === 'hot' && (
+          <HotPanel items={state.overlay.items} loading={state.overlay.loading} />
+        )}
+        {state.overlay?.kind === 'indices' && (
+          <IndicesPanel quotes={state.overlay.quotes} loading={state.overlay.loading} />
+        )}
+        {state.overlay?.kind === 'journal' && (
+          <JournalPanel entries={state.overlay.entries} quotes={state.quotes} />
+        )}
+        {state.overlay?.kind === 'explain' && (
+          <ExplainPanel
+            term={state.overlay.term}
+            text={state.overlay.text}
+            loading={state.overlay.loading}
+          />
+        )}
       </Box>
       <NewsStream
         visible={visibleNews}

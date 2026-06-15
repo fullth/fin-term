@@ -2,9 +2,19 @@
 import { EventEmitter } from 'node:events';
 import type { Quote, QuoteMap, NewsItem } from './types.js';
 import type { SearchResult } from '../sources/search.js';
+import type { HotItem } from '../sources/hot.js';
+import type { Detail } from '../sources/detail.js';
+import type { JournalEntry } from './journal.js';
 import { saveWatchlist } from './persist.js';
 
 export type Focus = 'watchlist' | 'news' | 'search';
+
+// 한 번에 하나만 표시되는 오버레이. brief/search 와 함께 상호 배타.
+export type Overlay =
+  | { kind: 'hot'; items: HotItem[]; loading: boolean }
+  | { kind: 'indices'; quotes: Quote[]; loading: boolean }
+  | { kind: 'journal'; entries: JournalEntry[] }
+  | { kind: 'explain'; term: string; text: string | null; loading: boolean };
 
 export interface State {
   watchlist: string[];
@@ -18,6 +28,8 @@ export interface State {
   searchQuery: string; // 검색어 (패널 헤더 표시용)
   update: { latest: string } | null; // 사용 가능한 새 버전 (없으면 null)
   brief: { text: string | null; loading: boolean } | null; // AI 시장 브리핑 (null이면 패널 숨김)
+  detail: Detail | null; // 선택 종목 상세 (QUOTE 패널 인라인)
+  overlay: Overlay | null; // hot/indices/journal/explain 오버레이 (하나만)
   status: string; // 하단 상태 메시지
 }
 
@@ -42,6 +54,8 @@ export class Store extends EventEmitter {
       searchQuery: '',
       update: null,
       brief: null,
+      detail: null,
+      overlay: null,
       status: 'ready',
     };
   }
@@ -118,6 +132,25 @@ export class Store extends EventEmitter {
 
   clearBrief() {
     this.commit({ brief: null });
+  }
+
+  // 선택 종목 상세 (QUOTE 인라인). 종목 바뀌면 교체.
+  setDetail(detail: Detail | null) {
+    this.commit({ detail });
+  }
+
+  // 오버레이 표시 — 다른 오버레이/검색/브리핑은 닫는다 (하나만 활성).
+  setOverlay(overlay: Overlay) {
+    this.commit({ overlay, brief: null, searchResults: [], searchQuery: '' });
+  }
+
+  // 오버레이 부분 갱신 (로딩→완료 등). 현재 overlay 위에 덮어쓴다.
+  updateOverlay(overlay: Overlay) {
+    this.commit({ overlay });
+  }
+
+  clearOverlay() {
+    this.commit({ overlay: null });
   }
 
   setFocus(focus: Focus) {

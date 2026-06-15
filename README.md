@@ -61,7 +61,14 @@ fin-term
 | `:lang` | 한↔영 전환 |
 | `:open N` | N번째 뉴스를 브라우저로 열기 |
 | `:brief` | AI 시장 브리핑 생성 (Claude, `ANTHROPIC_API_KEY` 필요) |
+| `:hot` | 거래량 급등 핫 종목 5개 |
+| `:indices` | 주요 지수 현황 (S&P / 나스닥 / 다우 / 코스피 / 코스닥) |
+| `:explain PER` | 용어 풀이 (Claude, `ANTHROPIC_API_KEY` 필요) |
+| `:predict AAPL up 실적호조` | 예측 일지에 기록 (방향 up/down + 근거) |
+| `:journal` | 예측 일지 — 과거 예측 vs 현재가 적중 판정 |
 | `:q` | 종료 |
+
+종목을 선택하면 QUOTE 패널에 회사명·52주 고저·거래량이 함께 표시됩니다. `FINNHUB_KEY` 가 있으면 PER·시총·업종도 보강됩니다. `:predict` 로 예측을 기록하면 `ANTHROPIC_API_KEY` 가 있을 때 Claude 가 근거를 한 줄 평가하고, `:journal` 에서 나중에 실제가와 비교해 적중 여부를 봅니다.
 
 `:brief` 는 관심종목 시세와 최근 뉴스를 묶어 Claude 가 "오늘 시장 한 줄 요약 + 주요 테마 + 내 종목 영향" 을 한국어로 생성합니다. `ANTHROPIC_API_KEY` 환경변수가 있어야 동작하며, 호출 비용이 발생합니다. `Esc` 로 닫습니다.
 

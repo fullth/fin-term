@@ -18,6 +18,15 @@ export interface AppConfig {
   initial_lang: 'en' | 'ko'; // 표시 언어 (ko면 영문 헤드라인 번역)
 }
 
+// 주요 지수 (chart API 심볼). 현황판 표시용.
+export const INDICES: { symbol: string; label: string }[] = [
+  { symbol: '^GSPC', label: 'S&P 500' },
+  { symbol: '^IXIC', label: 'NASDAQ' },
+  { symbol: '^DJI', label: 'Dow Jones' },
+  { symbol: '^KS11', label: 'KOSPI' },
+  { symbol: '^KQ11', label: 'KOSDAQ' },
+];
+
 const DEFAULT_FEEDS: Feed[] = [
   // 블룸버그 공식 RSS 폐지됨 → 대체 무료 금융 피드
   // 영문
