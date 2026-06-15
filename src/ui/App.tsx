@@ -104,21 +104,25 @@ export function App({ store, poller }: Props) {
   const [newsFirstRow, setNewsFirstRow] = useState(0);
   const [wlFirstRow, setWlFirstRow] = useState(4);
   useEffect(() => {
+    // 값이 실제로 바뀔 때만 setState — 매 렌더 측정→setState 진동(깜빡임) 방지.
     if (topRef.current) {
-      setNewsFirstRow(measureElement(topRef.current).height + 3);
+      const v = measureElement(topRef.current).height + 3;
+      setNewsFirstRow((prev) => (prev === v ? prev : v));
     }
     if (headerRef.current) {
       // header 다음 줄부터 WATCHLIST 박스. +border(1) +제목(1) +1(1-based) = +3
-      setWlFirstRow(measureElement(headerRef.current).height + 3);
+      const v = measureElement(headerRef.current).height + 3;
+      setWlFirstRow((prev) => (prev === v ? prev : v));
     }
   });
 
   // 뉴스 행 수는 측정된 뉴스 시작 위치(newsFirstRow) 이후 남는 높이로 정한다.
   // 전체 출력이 터미널 높이를 넘으면 ink 가 매 렌더마다 화면을 통째로 다시 그려 깜빡이므로,
   // 보이는 뉴스 개수를 남는 줄 수로 제한해 출력이 화면 안에 들어오게 한다.
-  // (commandbar 1줄 + 뉴스박스 하단 border 1줄을 빼서 여유 확보)
+  // newsFirstRow(뉴스 첫 항목 절대행) 다음에 뉴스 N행 + 하단 border(1) + commandbar(1)
+  // 이 들어가야 하므로, 출력이 터미널을 넘지 않도록 여유 4줄을 빼서 깜빡임을 막는다.
   const rows = stdout?.rows ?? 30;
-  const newsRows = Math.max(3, (newsFirstRow > 0 ? rows - newsFirstRow : rows - 18) - 2);
+  const newsRows = Math.max(3, (newsFirstRow > 0 ? rows - newsFirstRow : rows - 20) - 4);
   const visibleNews = (
     state.newsFilter ? state.news.filter((n) => n.tickers.includes(state.newsFilter!)) : state.news
   ).slice(0, newsRows);
@@ -352,7 +356,21 @@ export function App({ store, poller }: Props) {
   // - WATCHLIST 영역(좌측 패널) 종목 행: WATCHLIST 포커스 + 그 종목 선택.
   // - NEWS 영역 뉴스 행: NEWS 포커스 + 그 행 선택. 같은 행 재클릭이면 기사 열기.
   const onMouseClick = (e: MouseClick) => {
-    // WATCHLIST 먼저 (좌상단, 좁은 폭)
+    // 검색바: WATCHLIST 박스 바로 위(테두리 포함 2~3행). 좌측 절반=종목, 우측=용어.
+    // 검색바 입력 행은 wlFirstRow 직전 영역 (헤더 박스 안 맨 아래).
+    if (e.row < wlFirstRow - 1 && e.row >= wlFirstRow - 4) {
+      const cols = stdout?.columns ?? 100;
+      if (e.col < cols / 2) {
+        store.setFocus('symbolInput');
+        store.setStatus('종목 검색칸 — 입력 후 Enter');
+      } else {
+        store.setFocus('termInput');
+        store.setStatus('용어 검색칸 — 입력 후 Enter');
+      }
+      return;
+    }
+
+    // WATCHLIST (좌상단, 좁은 폭)
     if (e.col <= WL_PANEL_WIDTH) {
       const wi = e.row - wlFirstRow;
       if (wi >= 0 && wi < state.watchlist.length) {
