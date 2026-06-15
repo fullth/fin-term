@@ -23,9 +23,28 @@
 
 키 없어도 전부 동작함. 한글 뉴스는 키 없이 원문 한글 그대로. DeepL 키 있으면 영문 헤드라인도 `:lang ko` 로 번역 표시.
 
-## 실행
+## 설치
 
 ```bash
+# 전역 설치 후 어디서나 실행
+npm install -g fin-term
+fin-term
+
+# 설치 없이 한 번만
+npx fin-term
+```
+
+옵션 키와 함께:
+
+```bash
+DEEPL_KEY=xxx FIN_LANG=ko fin-term
+```
+
+## 개발 실행 (소스에서)
+
+```bash
+git clone https://github.com/fullth/fin-term.git
+cd fin-term
 npm install
 npm run dev          # tsx 로 바로 실행
 # 또는

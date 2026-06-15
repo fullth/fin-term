@@ -1,16 +1,45 @@
 {
   "name": "fin-term",
   "version": "0.1.0",
-  "description": "Bloomberg-style terminal: live quotes + news stream (TUI)",
+  "description": "Bloomberg-style terminal: live quotes + news stream (TUI). Free data, no keys required.",
   "type": "module",
   "bin": {
-    "fin-term": "./dist/index.js"
+    "fin-term": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "tui",
+    "terminal",
+    "finance",
+    "stocks",
+    "quotes",
+    "news",
+    "bloomberg",
+    "cli",
+    "ink"
+  ],
+  "license": "MIT",
+  "author": "fullth <xoghksdla@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fullth/fin-term.git"
+  },
+  "homepage": "https://github.com/fullth/fin-term#readme",
+  "bugs": {
+    "url": "https://github.com/fullth/fin-term/issues"
   },
   "scripts": {
     "dev": "tsx src/index.tsx",
     "build": "tsc",
     "start": "node dist/index.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "ink": "^5.0.1",
