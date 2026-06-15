@@ -16,10 +16,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # registry-url 을 주면 setup-node 가 .npmrc 에 빈 authToken 라인을 박아 OIDC 를 막는다.
+      # OIDC(Trusted Publishing)는 기본 registry 를 쓰므로 registry-url 없이 둔다.
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          registry-url: 'https://registry.npmjs.org'
 
       # OIDC(Trusted Publishing)는 npm 11.5.1+ 필요. runner 기본 npm 이 낮아 최신화한다.
       - run: npm install -g npm@latest
@@ -37,8 +38,5 @@ jobs:
             echo "tag($TAG) != package.json($PKG)"; exit 1
           fi
 
-      # OIDC(Trusted Publishing) 사용 시 NODE_AUTH_TOKEN 없이도 동작.
-      # 토큰 방식이면 repo Secret NPM_TOKEN 을 등록하면 env 가 채워진다.
+      # 인증은 OIDC(Trusted Publishing)로 자동 처리. 토큰 불필요.
       - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
