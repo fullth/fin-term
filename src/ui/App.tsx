@@ -6,11 +6,13 @@ import { Watchlist } from './Watchlist.js';
 import { QuotePanel } from './QuotePanel.js';
 import { NewsStream } from './NewsStream.js';
 import { SearchPanel } from './SearchPanel.js';
+import { BriefPanel } from './BriefPanel.js';
 import { CommandBar, type Command } from './CommandBar.js';
 import { openUrl } from '../core/open-url.js';
 import { searchSymbols } from '../sources/search.js';
 import { useMouse, type MouseClick } from './use-mouse.js';
 import { checkForUpdate } from '../core/update-check.js';
+import { generateBrief, hasBriefKey } from '../sources/brief.js';
 
 interface Props {
   store: Store;
@@ -90,6 +92,25 @@ export function App({ store, poller }: Props) {
     store.setStatus(results.length ? `${results.length} hits · ↑↓ 선택 · Enter 추가` : `no result: ${query}`);
   };
 
+  // AI 시장 브리핑 생성 (Claude). 키 없으면 안내만.
+  const runBrief = async () => {
+    if (!hasBriefKey()) {
+      store.setStatus('ANTHROPIC_API_KEY 없음 — :brief 사용하려면 키 설정');
+      return;
+    }
+    const s = store.get();
+    store.setBriefLoading();
+    store.setStatus('AI 브리핑 생성 중…');
+    const text = await generateBrief({
+      watchlist: s.watchlist,
+      names: s.names,
+      quotes: s.quotes,
+      news: s.news,
+    });
+    store.setBrief(text);
+    store.setStatus(text ? 'AI 브리핑 완료' : 'AI 브리핑 실패');
+  };
+
   const addSymbol = (sym: string, name?: string) => {
     if (store.addSymbol(sym, name)) {
       setSelected(sym.toUpperCase().trim());
@@ -147,6 +168,10 @@ export function App({ store, poller }: Props) {
         else store.setStatus(`open failed (1~${visibleNews.length})`);
         break;
       }
+      case 'brief':
+      case 'ai':
+        void runBrief();
+        break;
       default:
         store.setStatus(`unknown: ${cmd.name}`);
     }
@@ -189,9 +214,12 @@ export function App({ store, poller }: Props) {
     }
   };
 
-  // Esc: 검색 패널 닫기
+  // Esc: 열린 오버레이 닫기 (브리핑 우선, 그다음 검색)
   const escape = () => {
-    if (state.searchResults.length) {
+    if (state.brief) {
+      store.clearBrief();
+      store.setStatus('브리핑 닫음');
+    } else if (state.searchResults.length) {
       store.clearSearch();
       store.setStatus('search 닫음');
     }
@@ -277,7 +305,8 @@ export function App({ store, poller }: Props) {
               <Text color="yellow">:add</Text>/<Text color="yellow">:rm</Text> 관심종목 ·{' '}
               <Text color="yellow">:news</Text> 종목뉴스필터 ·{' '}
               <Text color="yellow">:lang</Text> 한/영 ·{' '}
-              <Text color="yellow">:refresh</Text> 새로고침
+              <Text color="yellow">:refresh</Text> 새로고침 ·{' '}
+              <Text color="magenta">:brief</Text> AI브리핑
             </Text>
           </Box>
         </Box>
@@ -299,6 +328,7 @@ export function App({ store, poller }: Props) {
             focused={state.focus === 'search'}
           />
         )}
+        {state.brief && <BriefPanel text={state.brief.text} loading={state.brief.loading} />}
       </Box>
       <NewsStream
         visible={visibleNews}

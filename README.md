@@ -60,7 +60,10 @@ fin-term
 | `:lang en` | 영문 표시 |
 | `:lang` | 한↔영 전환 |
 | `:open N` | N번째 뉴스를 브라우저로 열기 |
+| `:brief` | AI 시장 브리핑 생성 (Claude, `ANTHROPIC_API_KEY` 필요) |
 | `:q` | 종료 |
+
+`:brief` 는 관심종목 시세와 최근 뉴스를 묶어 Claude 가 "오늘 시장 한 줄 요약 + 주요 테마 + 내 종목 영향" 을 한국어로 생성합니다. `ANTHROPIC_API_KEY` 환경변수가 있어야 동작하며, 호출 비용이 발생합니다. `Esc` 로 닫습니다.
 
 종목 심볼을 모르면 `:search 회사명` (예: `:search tesla`, `:search 005930`) 으로 찾아 추가하세요. 한국 종목은 6자리 코드(`005930`)로 검색됩니다.
 
@@ -81,6 +84,7 @@ FIN_LANG=ko FIN_WATCHLIST=AAPL,TSLA,NVDA fin-term
 | `FIN_LANG` | 시작 표시 언어 `en` 또는 `ko` (기본 `en`) |
 | `FINNHUB_KEY` | 있으면 시세를 [Finnhub](https://finnhub.io) 우선 사용 (무료 가입) |
 | `DEEPL_KEY` | 있으면 `:lang ko` 에서 영문 헤드라인을 한글로 번역 ([DeepL 무료](https://www.deepl.com/pro-api)) |
+| `ANTHROPIC_API_KEY` | 있으면 `:brief` AI 시장 브리핑 활성화 ([Claude API](https://console.anthropic.com), 유료) |
 | `FIN_QUOTE_MS` | 시세 갱신 주기(ms), 기본 10000 |
 | `FIN_NEWS_MS` | 뉴스 갱신 주기(ms), 기본 60000 |
 

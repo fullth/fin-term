@@ -17,6 +17,7 @@ export interface State {
   searchResults: SearchResult[]; // :search 결과 (비어있으면 패널 숨김)
   searchQuery: string; // 검색어 (패널 헤더 표시용)
   update: { latest: string } | null; // 사용 가능한 새 버전 (없으면 null)
+  brief: { text: string | null; loading: boolean } | null; // AI 시장 브리핑 (null이면 패널 숨김)
   status: string; // 하단 상태 메시지
 }
 
@@ -40,6 +41,7 @@ export class Store extends EventEmitter {
       searchResults: [],
       searchQuery: '',
       update: null,
+      brief: null,
       status: 'ready',
     };
   }
@@ -104,6 +106,18 @@ export class Store extends EventEmitter {
 
   setUpdate(latest: string) {
     this.commit({ update: { latest } });
+  }
+
+  setBriefLoading() {
+    this.commit({ brief: { text: null, loading: true } });
+  }
+
+  setBrief(text: string | null) {
+    this.commit({ brief: { text, loading: false } });
+  }
+
+  clearBrief() {
+    this.commit({ brief: null });
   }
 
   setFocus(focus: Focus) {
