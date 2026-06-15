@@ -32,6 +32,11 @@ export class Poller {
     await this.pollQuotes();
   }
 
+  // :lang 토글 시 즉시 뉴스 재조회 (번역 반영)
+  async refreshNewsNow() {
+    await this.pollNews();
+  }
+
   private async pollQuotes() {
     if (this.stopped) return;
     const { watchlist } = this.store.get();
@@ -42,8 +47,11 @@ export class Poller {
 
   private async pollNews() {
     if (this.stopped) return;
-    const { watchlist } = this.store.get();
-    const news = await fetchNews(this.config.rss_feeds, watchlist);
+    const { watchlist, lang } = this.store.get();
+    const news = await fetchNews(this.config.rss_feeds, watchlist, {
+      translateToKo: lang === 'ko',
+      deeplKey: this.config.deepl_key,
+    });
     if (!this.stopped) this.store.setNews(news);
   }
 }

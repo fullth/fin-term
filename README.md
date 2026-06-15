@@ -8,9 +8,11 @@
 |----|----|----|
 | 시세/차트 | Yahoo 공개 chart API | 불필요 |
 | 시세 (우선) | Finnhub | `FINNHUB_KEY` 있으면 |
-| 뉴스 | RSS (Yahoo / CNBC / MarketWatch) | 불필요 |
+| 영문 뉴스 | RSS (Yahoo / CNBC / MarketWatch) | 불필요 |
+| 한글 뉴스 | RSS (한경 / 매경증권 / 연합경제) | 불필요 |
+| 영문→한글 번역 | DeepL | `DEEPL_KEY` 있으면 |
 
-키 없어도 전부 동작함. Finnhub 키는 시세 우선순위만 바꿈.
+키 없어도 전부 동작함. 한글 뉴스는 키 없이 원문 한글 그대로. DeepL 키 있으면 영문 헤드라인도 `:lang ko` 로 번역 표시.
 
 ## 실행
 
@@ -25,7 +27,9 @@ npm run build && npm start
 
 ```bash
 FINNHUB_KEY=xxx          # 있으면 시세 우선
+DEEPL_KEY=xxx            # 있으면 영문 헤드라인 한글 번역 (:lang ko)
 FIN_WATCHLIST=AAPL,TSLA  # 초기 관심종목
+FIN_LANG=ko              # 시작 표시 언어 (en|ko, 기본 en)
 FIN_QUOTE_MS=10000       # 시세 폴링 주기
 FIN_NEWS_MS=60000        # 뉴스 폴링 주기
 ```
@@ -38,6 +42,9 @@ FIN_NEWS_MS=60000        # 뉴스 폴링 주기
 | `:rm NVDA` | 관심종목 제거 |
 | `:news AAPL` | 뉴스 종목 필터 |
 | `:news` | 필터 해제 |
+| `:lang ko` | 한글 표시 (영문 헤드라인 번역, DeepL 키 필요) |
+| `:lang en` | 영문 표시 |
+| `:lang` | en↔ko 토글 |
 | `:q` | 종료 |
 | `↑↓` / `j` `k` | 종목 선택 이동 |
 

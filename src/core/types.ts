@@ -16,7 +16,9 @@ export interface Quote {
 
 export interface NewsItem {
   id: string; // 중복제거 키 (url 해시)
-  title: string;
+  title: string; // 원문 제목
+  title_ko?: string; // 번역된 한글 제목 (DeepL, en 피드만 채워짐)
+  lang: 'en' | 'ko'; // 원문 언어
   url: string;
   source: string;
   published_at: number; // epoch ms

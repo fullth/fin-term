@@ -6,7 +6,7 @@ import { Poller } from './core/poller.js';
 import { App } from './ui/App.js';
 
 const config = loadConfig();
-const store = new Store(config.initial_watchlist);
+const store = new Store(config.initial_watchlist, config.initial_lang);
 const poller = new Poller(store, config);
 poller.start();
 

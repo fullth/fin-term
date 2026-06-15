@@ -1,8 +1,10 @@
-// RSS 금융 뉴스 수집 + ticker 태깅. 키 불필요, 무제한.
+// RSS 금융 뉴스 수집 + ticker 태깅 + (선택) 영문 헤드라인 한글 번역.
 import Parser from 'rss-parser';
 import { createHash } from 'node:crypto';
 import type { NewsItem } from '../core/types.js';
+import type { Feed } from '../config.js';
 import { tagTickers } from '../core/ticker-tag.js';
+import { translateBatch, getTranslation } from '../sources/translate.js';
 
 const parser = new Parser({
   headers: { 'User-Agent': 'Mozilla/5.0 (fin-term)' },
@@ -13,18 +15,19 @@ function idOf(url: string, title: string): string {
   return createHash('sha1').update(url || title).digest('hex').slice(0, 12);
 }
 
-async function fetchFeed(source: string, url: string, watchlist: string[]): Promise<NewsItem[]> {
+async function fetchFeed(feed: Feed, watchlist: string[]): Promise<NewsItem[]> {
   try {
-    const feed = await parser.parseURL(url);
-    return (feed.items ?? []).map((it) => {
+    const parsed = await parser.parseURL(feed.url);
+    return (parsed.items ?? []).map((it) => {
       const title = (it.title ?? '').trim();
       const link = it.link ?? '';
       const published = it.isoDate ? Date.parse(it.isoDate) : Date.now();
       return {
         id: idOf(link, title),
         title,
+        lang: feed.lang,
         url: link,
-        source,
+        source: feed.source,
         published_at: Number.isNaN(published) ? Date.now() : published,
         tickers: tagTickers(title, watchlist),
       };
@@ -34,16 +37,34 @@ async function fetchFeed(source: string, url: string, watchlist: string[]): Prom
   }
 }
 
+interface FetchOpts {
+  translateToKo?: boolean; // lang=ko 표시 모드일 때만 영문 번역
+  deeplKey?: string;
+}
+
 export async function fetchNews(
-  feeds: { source: string; url: string }[],
+  feeds: Feed[],
   watchlist: string[],
+  opts: FetchOpts = {},
 ): Promise<NewsItem[]> {
-  const batches = await Promise.all(feeds.map((f) => fetchFeed(f.source, f.url, watchlist)));
+  const batches = await Promise.all(feeds.map((f) => fetchFeed(f, watchlist)));
   const all = batches.flat();
+
   // id 중복제거
   const seen = new Map<string, NewsItem>();
   for (const item of all) {
     if (!seen.has(item.id)) seen.set(item.id, item);
   }
-  return [...seen.values()].sort((a, b) => b.published_at - a.published_at);
+  const items = [...seen.values()].sort((a, b) => b.published_at - a.published_at);
+
+  // 한글 표시 모드 + DeepL 키 있으면 영문 헤드라인 번역
+  if (opts.translateToKo && opts.deeplKey) {
+    const enTitles = items.filter((n) => n.lang === 'en').map((n) => n.title);
+    await translateBatch(enTitles, opts.deeplKey);
+    for (const n of items) {
+      if (n.lang === 'en') n.title_ko = getTranslation(n.title);
+    }
+  }
+
+  return items;
 }

@@ -55,6 +55,13 @@ export function App({ store, poller }: Props) {
         store.setNewsFilter(cmd.arg ?? null);
         store.setStatus(cmd.arg ? `news: ${cmd.arg.toUpperCase()}` : 'news: all');
         break;
+      case 'lang': {
+        const next = cmd.arg?.toLowerCase() === 'ko' ? 'ko' : cmd.arg?.toLowerCase() === 'en' ? 'en' : state.lang === 'ko' ? 'en' : 'ko';
+        store.setLang(next);
+        store.setStatus(`lang: ${next}${next === 'ko' ? ' (영문 헤드라인 번역)' : ''}`);
+        void poller.refreshNewsNow();
+        break;
+      }
       default:
         store.setStatus(`unknown: ${cmd.name}`);
     }
@@ -84,7 +91,7 @@ export function App({ store, poller }: Props) {
         <Watchlist watchlist={state.watchlist} quotes={state.quotes} selected={selected} />
         <QuotePanel quote={selected ? state.quotes[selected] : undefined} />
       </Box>
-      <NewsStream news={state.news} filter={state.newsFilter} maxRows={newsRows} />
+      <NewsStream news={state.news} filter={state.newsFilter} lang={state.lang} maxRows={newsRows} />
       <CommandBar
         status={state.status}
         onCommand={handleCommand}

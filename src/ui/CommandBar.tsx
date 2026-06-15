@@ -66,7 +66,7 @@ export function CommandBar({ status, onCommand, onQuit, onSelectNext }: Props) {
           <Text color="cyan">{buffer}█</Text>
         ) : (
           <Text dimColor>
-            {status} · <Text color="yellow">:</Text>add :rm :news :q · ↑↓ select
+            {status} · <Text color="yellow">:</Text>add :rm :news :lang :q · ↑↓ select
           </Text>
         )}
       </Text>

@@ -7,19 +7,21 @@ export interface State {
   quotes: QuoteMap;
   news: NewsItem[];
   newsFilter: string | null; // ticker 필터 (:news AAPL)
+  lang: 'en' | 'ko'; // 표시 언어 (ko면 영문 헤드라인 번역 표시)
   status: string; // 하단 상태 메시지
 }
 
 export class Store extends EventEmitter {
   private state: State;
 
-  constructor(initialWatchlist: string[]) {
+  constructor(initialWatchlist: string[], initialLang: 'en' | 'ko' = 'en') {
     super();
     this.state = {
       watchlist: [...initialWatchlist],
       quotes: {},
       news: [],
       newsFilter: null,
+      lang: initialLang,
       status: 'ready',
     };
   }
@@ -65,5 +67,9 @@ export class Store extends EventEmitter {
 
   setNewsFilter(ticker: string | null) {
     this.commit({ newsFilter: ticker ? ticker.toUpperCase() : null });
+  }
+
+  setLang(lang: 'en' | 'ko') {
+    this.commit({ lang });
   }
 }
