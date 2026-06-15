@@ -66,3 +66,14 @@ export function fmtTime(epoch: number): string {
   const d = new Date(epoch);
   return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
+
+// 인쇄 가능한 문자만 통과 (제어문자/이스케이프 시퀀스 거부). 한글 등 멀티바이트는 허용.
+// 마우스 휠/클릭의 SGR 이스케이프 시퀀스가 텍스트 입력으로 흘러드는 것을 막는 데 쓴다.
+export function isPrintable(s: string): boolean {
+  if (!s) return false;
+  for (const c of s) {
+    const n = c.codePointAt(0) ?? 0;
+    if (n < 0x20 || n === 0x7f) return false;
+  }
+  return true;
+}

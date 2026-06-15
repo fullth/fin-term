@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
+import { isPrintable } from './format.js';
+
 
 interface Props {
   symbolFocused: boolean; // 종목 검색칸 포커스
@@ -27,7 +29,9 @@ export function SearchBar({ symbolFocused, termFocused, onSymbolSubmit, onTermSu
         setBuf('');
       } else if (key.backspace || key.delete) {
         setBuf((b) => b.slice(0, -1));
-      } else if (input && !key.ctrl && !key.meta && !key.tab && !key.escape) {
+      } else if (input && !key.ctrl && !key.meta && !key.tab && !key.escape && isPrintable(input)) {
+        // 마우스 휠/클릭의 SGR 이스케이프 시퀀스(\x1b[<…M)가 input 으로 흘러들어와
+        // 버퍼에 박히는 것을 막는다. 제어문자가 섞인 입력은 무시.
         setBuf((b) => b + input);
       }
     },
