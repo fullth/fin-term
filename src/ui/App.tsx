@@ -11,6 +11,7 @@ import { HotPanel } from './HotPanel.js';
 import { IndicesPanel } from './IndicesPanel.js';
 import { JournalPanel } from './JournalPanel.js';
 import { ExplainPanel } from './ExplainPanel.js';
+import { SearchBar } from './SearchBar.js';
 import { CommandBar, type Command } from './CommandBar.js';
 import { openUrl } from '../core/open-url.js';
 import { searchSymbols } from '../sources/search.js';
@@ -293,10 +294,13 @@ export function App({ store, poller }: Props) {
     }
   };
 
-  // Tab: WATCHLIST ↔ NEWS 만 순환. 검색 패널은 Tab 순환에서 빼서(검색 중이어도)
-  // 언제든 두 패널을 자유롭게 오갈 수 있게 한다. (검색 패널은 Esc 로 닫음)
+  // Tab: 종목입력 → 용어입력 → WATCHLIST → NEWS 순환.
   const cycleFocus = () => {
-    store.setFocus(state.focus === 'watchlist' ? 'news' : 'watchlist');
+    const order: State['focus'][] = ['symbolInput', 'termInput', 'watchlist', 'news'];
+    const i = order.indexOf(state.focus);
+    store.setFocus(order[(i + 1) % order.length] ?? 'symbolInput');
+    return;
+    // (아래 옛 코드는 unreachable — 위 return 으로 대체)
   };
 
   // ↑↓: 포커스 패널 커서 이동
@@ -406,7 +410,7 @@ export function App({ store, poller }: Props) {
               <Text color="cyan">클릭</Text>
               <Text dimColor> 패널/항목 선택 (뉴스는 한 번 더 클릭하면 열림) · </Text>
               <Text color="cyan">Tab</Text>
-              <Text dimColor> 패널 전환 · </Text>
+              <Text dimColor> 패널/검색칸 전환 · </Text>
               <Text color="cyan">↑↓</Text>
               <Text dimColor> 이동 · </Text>
               <Text color="cyan">Enter</Text>
@@ -427,6 +431,13 @@ export function App({ store, poller }: Props) {
               <Text dimColor>(핫종목·지수·예측은 하단 상시)</Text>
             </Text>
           </Box>
+          {/* 상단 상시 검색바 — 종목 / 용어. 클릭·Tab 으로 포커스 후 입력 */}
+          <SearchBar
+            symbolFocused={state.focus === 'symbolInput'}
+            termFocused={state.focus === 'termInput'}
+            onSymbolSubmit={(q) => void runSearch(q)}
+            onTermSubmit={(t) => void runExplain(t)}
+          />
         </Box>
         <Box>
           <Watchlist
@@ -486,6 +497,7 @@ export function App({ store, poller }: Props) {
         onEnter={activate}
         onEscape={escape}
         onRefresh={refreshNow}
+        inputActive={state.focus === 'symbolInput' || state.focus === 'termInput'}
       />
     </Box>
   );

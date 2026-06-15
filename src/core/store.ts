@@ -7,7 +7,7 @@ import type { Detail } from '../sources/detail.js';
 import type { JournalEntry } from './journal.js';
 import { saveWatchlist } from './persist.js';
 
-export type Focus = 'watchlist' | 'news' | 'search';
+export type Focus = 'watchlist' | 'news' | 'search' | 'symbolInput' | 'termInput';
 
 // 일시적 오버레이 (Claude 응답 등). brief/search 와 함께 상호 배타.
 export type Overlay =

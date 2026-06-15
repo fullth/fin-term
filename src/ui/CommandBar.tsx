@@ -16,6 +16,7 @@ interface Props {
   onEnter: () => void; // Enter: 포커스 패널 기본 동작 (뉴스 열기 / 검색결과 추가)
   onEscape: () => void; // Esc: 검색 패널 닫기 등
   onRefresh: () => void; // r: 시세·뉴스 즉시 갱신
+  inputActive: boolean; // 검색 입력바 포커스 중이면 글자 단축키(q/r/jk)를 SearchBar 에 양보
 }
 
 // 콜론 명령: :add SYM  :rm SYM  :news SYM  :news(clear)  :q
@@ -36,6 +37,7 @@ export function CommandBar({
   onEnter,
   onEscape,
   onRefresh,
+  inputActive,
 }: Props) {
   const [buffer, setBuffer] = useState('');
   const [editing, setEditing] = useState(false);
@@ -58,6 +60,13 @@ export function CommandBar({
       } else if (input && !key.ctrl && !key.meta) {
         setBuffer((b) => b + input);
       }
+      return;
+    }
+
+    // 검색 입력바 포커스 중에는 Tab(포커스 전환)만 처리하고
+    // 나머지(글자 단축키 q/r/j/k, 콜론 명령)는 SearchBar 가 타이핑으로 받게 양보.
+    if (inputActive) {
+      if (key.tab) onTab();
       return;
     }
 
