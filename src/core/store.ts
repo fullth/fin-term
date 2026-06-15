@@ -2,11 +2,13 @@
 import { EventEmitter } from 'node:events';
 import type { Quote, QuoteMap, NewsItem } from './types.js';
 import type { SearchResult } from '../sources/search.js';
+import { saveWatchlist } from './persist.js';
 
 export type Focus = 'watchlist' | 'news' | 'search';
 
 export interface State {
   watchlist: string[];
+  names: Record<string, string>; // symbol → 회사명 (표시·영속화용)
   quotes: QuoteMap;
   news: NewsItem[];
   newsFilter: string | null; // ticker 필터 (:news AAPL)
@@ -20,10 +22,15 @@ export interface State {
 export class Store extends EventEmitter {
   private state: State;
 
-  constructor(initialWatchlist: string[], initialLang: 'en' | 'ko' = 'en') {
+  constructor(
+    initialWatchlist: string[],
+    initialLang: 'en' | 'ko' = 'en',
+    initialNames: Record<string, string> = {},
+  ) {
     super();
     this.state = {
       watchlist: [...initialWatchlist],
+      names: { ...initialNames },
       quotes: {},
       news: [],
       newsFilter: null,
@@ -33,6 +40,11 @@ export class Store extends EventEmitter {
       searchQuery: '',
       status: 'ready',
     };
+  }
+
+  // 관심종목·종목명만 디스크에 저장 (변경 시마다 호출)
+  private persist() {
+    saveWatchlist({ watchlist: this.state.watchlist, names: this.state.names });
   }
 
   get(): State {
@@ -58,10 +70,13 @@ export class Store extends EventEmitter {
     this.commit({ status });
   }
 
-  addSymbol(symbol: string): boolean {
+  addSymbol(symbol: string, name?: string): boolean {
     const sym = symbol.toUpperCase().trim();
     if (!sym || this.state.watchlist.includes(sym)) return false;
-    this.commit({ watchlist: [...this.state.watchlist, sym] });
+    const names = { ...this.state.names };
+    if (name) names[sym] = name;
+    this.commit({ watchlist: [...this.state.watchlist, sym], names });
+    this.persist();
     return true;
   }
 
@@ -70,7 +85,10 @@ export class Store extends EventEmitter {
     if (!this.state.watchlist.includes(sym)) return false;
     const quotes = { ...this.state.quotes };
     delete quotes[sym];
-    this.commit({ watchlist: this.state.watchlist.filter((s) => s !== sym), quotes });
+    const names = { ...this.state.names };
+    delete names[sym];
+    this.commit({ watchlist: this.state.watchlist.filter((s) => s !== sym), quotes, names });
+    this.persist();
     return true;
   }
 

@@ -2,7 +2,6 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import type { NewsItem } from '../core/types.js';
 import { fmtTime } from './format.js';
-import { hyperlink } from '../core/open-url.js';
 
 interface Props {
   visible: NewsItem[]; // App 에서 filter+slice 적용해 넘긴 화면 표시 목록
@@ -33,7 +32,9 @@ export function NewsStream({ visible, filter, lang, focused, cursor }: Props) {
         </Text>
         <Box>
           {filter && <Text color="cyan">filter: {filter} </Text>}
-          <Text dimColor>[{lang}] · {focused ? '↑↓ 이동 · Enter 열기' : '클릭 또는 :open N'}</Text>
+          <Text dimColor>
+            [{lang}] · {focused ? '↑↓ 이동 · Enter/클릭 열기' : 'Tab 또는 클릭으로 포커스'}
+          </Text>
         </Box>
       </Box>
       {visible.length === 0 && <Text dimColor>no headlines{filter ? ` for ${filter}` : ''}…</Text>}
@@ -52,9 +53,8 @@ export function NewsStream({ visible, filter, lang, focused, cursor }: Props) {
             ) : (
               <Text color="gray">[MKT] </Text>
             )}
-            {/* OSC8 하이퍼링크: 지원 터미널이면 클릭 가능, 아니면 평문. 커서행은 강조 */}
             <Text color={sel ? 'cyan' : undefined} wrap="truncate-end">
-              {hyperlink(n.url, title)}
+              {title}
             </Text>
             <Text dimColor> ({n.source})</Text>
           </Box>

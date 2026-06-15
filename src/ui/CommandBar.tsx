@@ -15,6 +15,7 @@ interface Props {
   onTab: () => void; // Tab: 패널 포커스 전환
   onEnter: () => void; // Enter: 포커스 패널 기본 동작 (뉴스 열기 / 검색결과 추가)
   onEscape: () => void; // Esc: 검색 패널 닫기 등
+  onRefresh: () => void; // r: 시세·뉴스 즉시 갱신
 }
 
 // 콜론 명령: :add SYM  :rm SYM  :news SYM  :news(clear)  :q
@@ -34,6 +35,7 @@ export function CommandBar({
   onTab,
   onEnter,
   onEscape,
+  onRefresh,
 }: Props) {
   const [buffer, setBuffer] = useState('');
   const [editing, setEditing] = useState(false);
@@ -72,6 +74,8 @@ export function CommandBar({
       onEscape();
     } else if (input === 'q') {
       onQuit();
+    } else if (input === 'r') {
+      onRefresh();
     } else if (key.downArrow || input === 'j') {
       onMove(1);
     } else if (key.upArrow || input === 'k') {

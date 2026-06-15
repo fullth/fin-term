@@ -7,6 +7,13 @@ export function fmtPrice(n: number | null): string {
   return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// watchlist 등 좁은 칸용 컴팩트 가격. 큰 값(한국 종목 등)은 소수점 생략해 자릿수 절약.
+export function fmtPriceCompact(n: number | null): string {
+  if (n == null) return '—';
+  const digits = Math.abs(n) >= 1000 ? 0 : 2;
+  return n.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+}
+
 export function fmtPct(n: number | null): string {
   if (n == null) return '—';
   const sign = n > 0 ? '+' : '';

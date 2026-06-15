@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Box, Text, useApp, useStdout } from 'ink';
+import React, { useEffect, useRef, useState } from 'react';
+import { Box, Text, useApp, useStdout, measureElement, type DOMElement } from 'ink';
 import type { Store, State } from '../core/store.js';
 import type { Poller } from '../core/poller.js';
 import { Watchlist } from './Watchlist.js';
@@ -9,6 +9,7 @@ import { SearchPanel } from './SearchPanel.js';
 import { CommandBar, type Command } from './CommandBar.js';
 import { openUrl } from '../core/open-url.js';
 import { searchSymbols } from '../sources/search.js';
+import { useMouse, type MouseClick } from './use-mouse.js';
 
 interface Props {
   store: Store;
@@ -46,10 +47,29 @@ export function App({ store, poller }: Props) {
     setSearchCursor(0);
   }, [state.searchResults]);
 
-  // 터미널 높이 기반 뉴스 행 수 + 화면에 실제 보이는 뉴스 목록.
-  // (:open N 의 N 기준과 NewsStream 표시 순서를 동일 목록으로 일치)
+  // 화면 절대 행 측정 (1-based). 마우스 클릭 → 항목 매핑, 뉴스 표시 행수 계산에 쓴다.
+  // - headerRef: 헤더 + 안내 영역 → WATCHLIST 첫 종목 행 위치
+  // - topRef: 헤더~시세/검색 전체 → 뉴스 첫 행 위치
+  const headerRef = useRef<DOMElement | null>(null);
+  const topRef = useRef<DOMElement | null>(null);
+  const [newsFirstRow, setNewsFirstRow] = useState(0);
+  const [wlFirstRow, setWlFirstRow] = useState(4);
+  useEffect(() => {
+    if (topRef.current) {
+      setNewsFirstRow(measureElement(topRef.current).height + 3);
+    }
+    if (headerRef.current) {
+      // header 다음 줄부터 WATCHLIST 박스. +border(1) +제목(1) +1(1-based) = +3
+      setWlFirstRow(measureElement(headerRef.current).height + 3);
+    }
+  });
+
+  // 뉴스 행 수는 측정된 뉴스 시작 위치(newsFirstRow) 이후 남는 높이로 정한다.
+  // 전체 출력이 터미널 높이를 넘으면 ink 가 매 렌더마다 화면을 통째로 다시 그려 깜빡이므로,
+  // 보이는 뉴스 개수를 남는 줄 수로 제한해 출력이 화면 안에 들어오게 한다.
+  // (commandbar 1줄 + 뉴스박스 하단 border 1줄을 빼서 여유 확보)
   const rows = stdout?.rows ?? 30;
-  const newsRows = Math.max(5, rows - 16);
+  const newsRows = Math.max(3, (newsFirstRow > 0 ? rows - newsFirstRow : rows - 18) - 2);
   const visibleNews = (
     state.newsFilter ? state.news.filter((n) => n.tickers.includes(state.newsFilter!)) : state.news
   ).slice(0, newsRows);
@@ -62,14 +82,22 @@ export function App({ store, poller }: Props) {
     store.setStatus(results.length ? `${results.length} hits · ↑↓ 선택 · Enter 추가` : `no result: ${query}`);
   };
 
-  const addSymbol = (sym: string) => {
-    if (store.addSymbol(sym)) {
+  const addSymbol = (sym: string, name?: string) => {
+    if (store.addSymbol(sym, name)) {
       setSelected(sym.toUpperCase().trim());
       store.setStatus(`added ${sym.toUpperCase()}`);
       void poller.refreshQuotesNow();
     } else {
       store.setStatus(`이미 있음: ${sym.toUpperCase()}`);
     }
+  };
+
+  // 시세·뉴스를 지금 즉시 갱신 (r 키 / :refresh)
+  const refreshNow = () => {
+    store.setStatus('새로고침…');
+    void Promise.all([poller.refreshQuotesNow(), poller.refreshNewsNow()]).then(() =>
+      store.setStatus('새로고침 완료'),
+    );
   };
 
   const handleCommand = (cmd: Command) => {
@@ -100,6 +128,10 @@ export function App({ store, poller }: Props) {
         void poller.refreshNewsNow();
         break;
       }
+      case 'refresh':
+      case 'r':
+        refreshNow();
+        break;
       case 'open': {
         const n = Number(cmd.arg);
         const item = Number.isInteger(n) ? visibleNews[n - 1] : undefined;
@@ -112,13 +144,10 @@ export function App({ store, poller }: Props) {
     }
   };
 
-  // Tab: 검색 패널 열려있으면 search 포함 순환, 아니면 watchlist↔news
+  // Tab: WATCHLIST ↔ NEWS 만 순환. 검색 패널은 Tab 순환에서 빼서(검색 중이어도)
+  // 언제든 두 패널을 자유롭게 오갈 수 있게 한다. (검색 패널은 Esc 로 닫음)
   const cycleFocus = () => {
-    const order: State['focus'][] = state.searchResults.length
-      ? ['watchlist', 'news', 'search']
-      : ['watchlist', 'news'];
-    const idx = order.indexOf(state.focus);
-    store.setFocus(order[(idx + 1) % order.length]);
+    store.setFocus(state.focus === 'watchlist' ? 'news' : 'watchlist');
   };
 
   // ↑↓: 포커스 패널 커서 이동
@@ -146,7 +175,7 @@ export function App({ store, poller }: Props) {
     } else if (state.focus === 'search') {
       const r = state.searchResults[searchCursor];
       if (r) {
-        addSymbol(r.symbol);
+        addSymbol(r.symbol, r.name);
         store.clearSearch();
       }
     }
@@ -160,6 +189,41 @@ export function App({ store, poller }: Props) {
     }
   };
 
+  // WATCHLIST 박스 폭 (Watchlist.tsx width 와 일치). 첫 종목 행은 wlFirstRow(측정값).
+  const WL_PANEL_WIDTH = 44;
+
+  // 마우스 좌클릭 처리. 클릭 위치로 패널을 판정한다.
+  // - WATCHLIST 영역(좌측 패널) 종목 행: WATCHLIST 포커스 + 그 종목 선택.
+  // - NEWS 영역 뉴스 행: NEWS 포커스 + 그 행 선택. 같은 행 재클릭이면 기사 열기.
+  const onMouseClick = (e: MouseClick) => {
+    // WATCHLIST 먼저 (좌상단, 좁은 폭)
+    if (e.col <= WL_PANEL_WIDTH) {
+      const wi = e.row - wlFirstRow;
+      if (wi >= 0 && wi < state.watchlist.length) {
+        store.setFocus('watchlist');
+        setSelected(state.watchlist[wi]);
+        store.setStatus(`선택 ${state.watchlist[wi]}`);
+        return;
+      }
+    }
+
+    // NEWS 행
+    const idx = e.row - newsFirstRow;
+    if (idx < 0 || idx >= visibleNews.length) return;
+    const item = visibleNews[idx];
+    if (!item) return;
+
+    const alreadyOnRow = state.focus === 'news' && newsCursor === idx;
+    if (alreadyOnRow) {
+      if (openUrl(item.url)) store.setStatus(`opened: ${item.title.slice(0, 30)}…`);
+    } else {
+      store.setFocus('news');
+      setNewsCursor(idx);
+      store.setStatus(`선택 #${idx + 1} · 다시 클릭하거나 Enter 로 열기`);
+    }
+  };
+  useMouse(onMouseClick);
+
   const hint =
     state.focus === 'news'
       ? 'Tab 패널 · ↑↓ 뉴스 · Enter 열기 · :search'
@@ -169,29 +233,60 @@ export function App({ store, poller }: Props) {
 
   return (
     <Box flexDirection="column" width="100%">
-      <Box paddingX={1}>
-        <Text bold backgroundColor="yellow" color="black">
-          {' '}FIN-TERM{' '}
-        </Text>
-        <Text dimColor> live quotes + news · free data</Text>
+      {/* 상단 영역: 높이를 측정해 뉴스 첫 행 위치 계산 (마우스 클릭 매핑용) */}
+      <Box flexDirection="column" ref={topRef}>
+        {/* 헤더 + 안내 — 높이를 측정해 WATCHLIST 첫 종목 행 위치 계산 (마우스 매핑용) */}
+        <Box flexDirection="column" ref={headerRef}>
+          <Box paddingX={1}>
+            <Text bold backgroundColor="yellow" color="black">
+              {' '}FIN-TERM{' '}
+            </Text>
+            <Text dimColor> live quotes + news · free data</Text>
+          </Box>
+          {/* 사용법 안내 — 조작과 기능을 상단에 노출 */}
+          <Box paddingX={1} flexDirection="column">
+            <Text>
+              <Text color="cyan">클릭</Text>
+              <Text dimColor> 패널/항목 선택 (뉴스는 한 번 더 클릭하면 열림) · </Text>
+              <Text color="cyan">Tab</Text>
+              <Text dimColor> 패널 전환 · </Text>
+              <Text color="cyan">↑↓</Text>
+              <Text dimColor> 이동 · </Text>
+              <Text color="cyan">Enter</Text>
+              <Text dimColor> 열기/추가 · </Text>
+              <Text color="cyan">r</Text>
+              <Text dimColor> 새로고침 · </Text>
+              <Text color="cyan">q</Text>
+              <Text dimColor> 종료</Text>
+            </Text>
+            <Text dimColor>
+              <Text color="yellow">:search</Text> 종목검색 ·{' '}
+              <Text color="yellow">:add</Text>/<Text color="yellow">:rm</Text> 관심종목 ·{' '}
+              <Text color="yellow">:news</Text> 종목뉴스필터 ·{' '}
+              <Text color="yellow">:lang</Text> 한/영 ·{' '}
+              <Text color="yellow">:refresh</Text> 새로고침
+            </Text>
+          </Box>
+        </Box>
+        <Box>
+          <Watchlist
+            watchlist={state.watchlist}
+            names={state.names}
+            quotes={state.quotes}
+            selected={selected}
+            focused={state.focus === 'watchlist'}
+          />
+          <QuotePanel quote={selected ? state.quotes[selected] : undefined} />
+        </Box>
+        {state.searchResults.length > 0 && (
+          <SearchPanel
+            query={state.searchQuery}
+            results={state.searchResults}
+            cursor={searchCursor}
+            focused={state.focus === 'search'}
+          />
+        )}
       </Box>
-      <Box>
-        <Watchlist
-          watchlist={state.watchlist}
-          quotes={state.quotes}
-          selected={selected}
-          focused={state.focus === 'watchlist'}
-        />
-        <QuotePanel quote={selected ? state.quotes[selected] : undefined} />
-      </Box>
-      {state.searchResults.length > 0 && (
-        <SearchPanel
-          query={state.searchQuery}
-          results={state.searchResults}
-          cursor={searchCursor}
-          focused={state.focus === 'search'}
-        />
-      )}
       <NewsStream
         visible={visibleNews}
         filter={state.newsFilter}
@@ -208,6 +303,7 @@ export function App({ store, poller }: Props) {
         onTab={cycleFocus}
         onEnter={activate}
         onEscape={escape}
+        onRefresh={refreshNow}
       />
     </Box>
   );
