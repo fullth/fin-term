@@ -1,6 +1,9 @@
 // 앱 상태 컨테이너 + 변경 구독. ink 쪽에서 subscribe 해서 re-render.
 import { EventEmitter } from 'node:events';
 import type { Quote, QuoteMap, NewsItem } from './types.js';
+import type { SearchResult } from '../sources/search.js';
+
+export type Focus = 'watchlist' | 'news' | 'search';
 
 export interface State {
   watchlist: string[];
@@ -8,6 +11,9 @@ export interface State {
   news: NewsItem[];
   newsFilter: string | null; // ticker 필터 (:news AAPL)
   lang: 'en' | 'ko'; // 표시 언어 (ko면 영문 헤드라인 번역 표시)
+  focus: Focus; // 키 입력이 향하는 패널 (Tab 으로 전환)
+  searchResults: SearchResult[]; // :search 결과 (비어있으면 패널 숨김)
+  searchQuery: string; // 검색어 (패널 헤더 표시용)
   status: string; // 하단 상태 메시지
 }
 
@@ -22,6 +28,9 @@ export class Store extends EventEmitter {
       news: [],
       newsFilter: null,
       lang: initialLang,
+      focus: 'watchlist',
+      searchResults: [],
+      searchQuery: '',
       status: 'ready',
     };
   }
@@ -71,5 +80,18 @@ export class Store extends EventEmitter {
 
   setLang(lang: 'en' | 'ko') {
     this.commit({ lang });
+  }
+
+  setFocus(focus: Focus) {
+    this.commit({ focus });
+  }
+
+  // 검색 결과 표시 → focus 를 search 로 이동
+  setSearchResults(query: string, results: SearchResult[]) {
+    this.commit({ searchQuery: query, searchResults: results, focus: results.length ? 'search' : this.state.focus });
+  }
+
+  clearSearch() {
+    this.commit({ searchResults: [], searchQuery: '', focus: 'watchlist' });
   }
 }

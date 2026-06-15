@@ -8,9 +8,13 @@ export interface Command {
 
 interface Props {
   status: string;
+  hint: string; // 비편집 모드 우측 안내 (focus 따라 App 이 결정)
   onCommand: (cmd: Command) => void;
   onQuit: () => void;
-  onSelectNext: (dir: 1 | -1) => void;
+  onMove: (dir: 1 | -1) => void; // ↑↓: 포커스된 패널 커서 이동
+  onTab: () => void; // Tab: 패널 포커스 전환
+  onEnter: () => void; // Enter: 포커스 패널 기본 동작 (뉴스 열기 / 검색결과 추가)
+  onEscape: () => void; // Esc: 검색 패널 닫기 등
 }
 
 // 콜론 명령: :add SYM  :rm SYM  :news SYM  :news(clear)  :q
@@ -21,7 +25,16 @@ function parse(input: string): Command | null {
   return { name: name.toLowerCase(), arg: rest.join(' ') || undefined };
 }
 
-export function CommandBar({ status, onCommand, onQuit, onSelectNext }: Props) {
+export function CommandBar({
+  status,
+  hint,
+  onCommand,
+  onQuit,
+  onMove,
+  onTab,
+  onEnter,
+  onEscape,
+}: Props) {
   const [buffer, setBuffer] = useState('');
   const [editing, setEditing] = useState(false);
 
@@ -47,15 +60,22 @@ export function CommandBar({ status, onCommand, onQuit, onSelectNext }: Props) {
     }
 
     // 비편집 모드 단축키
-    if (input === ':') {
+    if (input === ':' || input === '/') {
+      // ':' = 일반 명령, '/' = 빠른 검색 (:search 프리필)
       setEditing(true);
-      setBuffer(':');
+      setBuffer(input === '/' ? ':search ' : ':');
+    } else if (key.tab) {
+      onTab();
+    } else if (key.return) {
+      onEnter();
+    } else if (key.escape) {
+      onEscape();
     } else if (input === 'q') {
       onQuit();
     } else if (key.downArrow || input === 'j') {
-      onSelectNext(1);
+      onMove(1);
     } else if (key.upArrow || input === 'k') {
-      onSelectNext(-1);
+      onMove(-1);
     }
   });
 
@@ -66,7 +86,7 @@ export function CommandBar({ status, onCommand, onQuit, onSelectNext }: Props) {
           <Text color="cyan">{buffer}█</Text>
         ) : (
           <Text dimColor>
-            {status} · <Text color="yellow">:</Text>add :rm :news :lang :open N :q · ↑↓ select
+            {status} · {hint}
           </Text>
         )}
       </Text>

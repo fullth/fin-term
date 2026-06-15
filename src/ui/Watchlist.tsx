@@ -7,13 +7,20 @@ interface Props {
   watchlist: string[];
   quotes: QuoteMap;
   selected: string | null;
+  focused: boolean;
 }
 
-export function Watchlist({ watchlist, quotes, selected }: Props) {
+export function Watchlist({ watchlist, quotes, selected, focused }: Props) {
   return (
-    <Box flexDirection="column" width={28} borderStyle="round" borderColor="gray" paddingX={1}>
+    <Box
+      flexDirection="column"
+      width={28}
+      borderStyle="round"
+      borderColor={focused ? 'cyan' : 'gray'}
+      paddingX={1}
+    >
       <Text bold color="yellow">
-        WATCHLIST
+        WATCHLIST {focused && <Text dimColor>●</Text>}
       </Text>
       {watchlist.length === 0 && <Text dimColor>empty — :add SYM</Text>}
       {watchlist.map((sym) => {
