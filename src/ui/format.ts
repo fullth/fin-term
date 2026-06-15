@@ -69,8 +69,14 @@ export function fmtTime(epoch: number): string {
 
 // 인쇄 가능한 문자만 통과 (제어문자/이스케이프 시퀀스 거부). 한글 등 멀티바이트는 허용.
 // 마우스 휠/클릭의 SGR 이스케이프 시퀀스가 텍스트 입력으로 흘러드는 것을 막는 데 쓴다.
+// ESC 가 제거된 채 input 으로 흘러드는 마우스 SGR 시퀀스(예: [<0;49;6m, <65;49;6M)도 거부.
+const MOUSE_SEQ = /\[?<?\d+;\d+;\d+[Mm]/;
 export function isPrintable(s: string): boolean {
   if (!s) return false;
+  if (MOUSE_SEQ.test(s)) return false;
+  // 마우스 시퀀스가 조각으로 흘러드는 경우 대비: [ 또는 < 로 시작하면 거부
+  // (정상 종목/용어 검색어는 이 문자로 시작하지 않는다)
+  if (s[0] === '[' || s[0] === '<') return false;
   for (const c of s) {
     const n = c.codePointAt(0) ?? 0;
     if (n < 0x20 || n === 0x7f) return false;
