@@ -18,8 +18,11 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           registry-url: 'https://registry.npmjs.org'
+
+      # OIDC(Trusted Publishing)는 npm 11.5.1+ 필요. runner 기본 npm 이 낮아 최신화한다.
+      - run: npm install -g npm@latest
 
       - run: npm ci
 
