@@ -16,7 +16,7 @@ import { SearchBar } from './SearchBar.js';
 import { CommandBar, type Command } from './CommandBar.js';
 import { openUrl } from '../core/open-url.js';
 import { searchSymbols } from '../sources/search.js';
-import { useMouse, type MouseClick } from './use-mouse.js';
+import { useMouse, type MouseClick, type WheelEvent } from './use-mouse.js';
 import { checkForUpdate } from '../core/update-check.js';
 import { generateBrief, hasBriefKey } from '../sources/brief.js';
 import { fetchHot } from '../sources/hot.js';
@@ -124,9 +124,20 @@ export function App({ store, poller }: Props) {
   // 이 들어가야 하므로, 출력이 터미널을 넘지 않도록 여유 4줄을 빼서 깜빡임을 막는다.
   const rows = stdout?.rows ?? 30;
   const newsRows = Math.max(3, (newsFirstRow > 0 ? rows - newsFirstRow : rows - 20) - 4);
-  const visibleNews = (
-    state.newsFilter ? state.news.filter((n) => n.tickers.includes(state.newsFilter!)) : state.news
-  ).slice(0, newsRows);
+  // 필터 적용된 전체 목록. newsCursor 는 이 전체 인덱스를 가리킨다.
+  const filteredNews = state.newsFilter
+    ? state.news.filter((n) => n.tickers.includes(state.newsFilter!))
+    : state.news;
+  // 폴링으로 목록이 줄어 커서가 범위를 벗어나면 마지막 항목으로 보정.
+  useEffect(() => {
+    if (newsCursor > 0 && newsCursor >= filteredNews.length) {
+      setNewsCursor(Math.max(0, filteredNews.length - 1));
+    }
+  }, [filteredNews.length, newsCursor]);
+
+  // 윈도우 스크롤: 커서가 보이도록 시작 오프셋을 잡고 newsRows 개만 잘라 보여준다.
+  const windowStart = Math.max(0, Math.min(newsCursor - Math.floor(newsRows / 2), filteredNews.length - newsRows));
+  const visibleNews = filteredNews.slice(windowStart, windowStart + newsRows);
 
   // 회사명/심볼 검색 → 결과 패널 표시
   const runSearch = async (query: string) => {
@@ -276,10 +287,11 @@ export function App({ store, poller }: Props) {
         break;
       case 'o':
       case 'open': {
+        // 행 번호는 전체 기준(1-based) 이므로 filteredNews 에서 바로 집는다.
         const n = Number(cmd.arg);
-        const item = Number.isInteger(n) ? visibleNews[n - 1] : undefined;
+        const item = Number.isInteger(n) ? filteredNews[n - 1] : undefined;
         if (item && openUrl(item.url)) store.setStatus(`opened #${n}`);
-        else store.setStatus(`open failed (1~${visibleNews.length})`);
+        else store.setStatus(`open failed (1~${filteredNews.length})`);
         break;
       }
       case 'b':
@@ -334,8 +346,9 @@ export function App({ store, poller }: Props) {
   // ↑↓: 포커스 패널 커서 이동
   const move = (dir: 1 | -1) => {
     if (state.focus === 'news') {
-      if (!visibleNews.length) return;
-      setNewsCursor((c) => (c + dir + visibleNews.length) % visibleNews.length);
+      if (!filteredNews.length) return;
+      // 전체 목록 인덱스 기준 이동(끝에서 멈춤). 윈도우는 따라 스크롤됨.
+      setNewsCursor((c) => Math.max(0, Math.min(c + dir, filteredNews.length - 1)));
     } else if (state.focus === 'search') {
       const len = state.searchResults.length;
       if (!len) return;
@@ -351,7 +364,7 @@ export function App({ store, poller }: Props) {
   // Enter: 포커스 패널 기본 동작
   const activate = () => {
     if (state.focus === 'news') {
-      const item = visibleNews[newsCursor];
+      const item = filteredNews[newsCursor];
       if (item && openUrl(item.url)) store.setStatus(`opened: ${item.title.slice(0, 30)}…`);
     } else if (state.focus === 'search') {
       const r = state.searchResults[searchCursor];
@@ -405,11 +418,12 @@ export function App({ store, poller }: Props) {
       }
     }
 
-    // NEWS 행
-    const idx = e.row - newsFirstRow;
-    if (idx < 0 || idx >= visibleNews.length) return;
-    const item = visibleNews[idx];
+    // NEWS 행 — 클릭 행은 윈도우 상대 위치, 전체 인덱스로 환산.
+    const rel = e.row - newsFirstRow;
+    if (rel < 0 || rel >= visibleNews.length) return;
+    const item = visibleNews[rel];
     if (!item) return;
+    const idx = windowStart + rel;
 
     const alreadyOnRow = state.focus === 'news' && newsCursor === idx;
     if (alreadyOnRow) {
@@ -420,7 +434,22 @@ export function App({ store, poller }: Props) {
       store.setStatus(`선택 #${idx + 1} · 다시 클릭하거나 Enter 로 열기`);
     }
   };
-  useMouse(onMouseClick);
+  // 마우스 휠: 커서가 있는 위치의 패널을 스크롤한다.
+  // NEWS 영역(newsFirstRow 이상)이면 뉴스 커서를, 그 위면 WATCHLIST 종목을 이동.
+  const onWheel = (e: WheelEvent) => {
+    if (newsFirstRow > 0 && e.row >= newsFirstRow) {
+      if (!filteredNews.length) return;
+      if (state.focus !== 'news') store.setFocus('news');
+      setNewsCursor((c) => Math.max(0, Math.min(c + e.dir, filteredNews.length - 1)));
+    } else {
+      const wl = state.watchlist;
+      if (!wl.length) return;
+      if (state.focus !== 'watchlist') store.setFocus('watchlist');
+      const i = selected ? wl.indexOf(selected) : 0;
+      setSelected(wl[Math.max(0, Math.min(i + e.dir, wl.length - 1))]);
+    }
+  };
+  useMouse(onMouseClick, onWheel);
 
   const hint =
     state.focus === 'news'
@@ -558,7 +587,12 @@ export function App({ store, poller }: Props) {
         filter={state.newsFilter}
         scope={state.newsScope}
         focused={state.focus === 'news'}
-        cursor={newsCursor}
+        cursor={newsCursor - windowStart}
+        total={filteredNews.length}
+        cursorAbs={filteredNews.length ? newsCursor + 1 : 0}
+        windowStart={windowStart}
+        hasAbove={windowStart > 0}
+        hasBelow={windowStart + newsRows < filteredNews.length}
       />
       <CommandBar
         status={state.status}

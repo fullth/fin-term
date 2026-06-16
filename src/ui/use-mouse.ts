@@ -15,7 +15,13 @@ export interface MouseClick {
   row: number; // 1-based
 }
 
-export function useMouse(onClick: (e: MouseClick) => void): void {
+export interface WheelEvent {
+  dir: 1 | -1; // 1=아래, -1=위
+  col: number;
+  row: number;
+}
+
+export function useMouse(onClick: (e: MouseClick) => void, onWheel?: (e: WheelEvent) => void): void {
   const { stdin, setRawMode, isRawModeSupported } = useStdin();
   const { stdout } = useStdout();
 
@@ -33,6 +39,11 @@ export function useMouse(onClick: (e: MouseClick) => void): void {
         const col = Number(m[2]);
         const row = Number(m[3]);
         const release = m[4] === 'm';
+        // 휠: button 64=위, 65=아래. press(M) 만 오고 release 없음.
+        if (button === 64 || button === 65) {
+          if (m[4] === 'M') onWheel?.({ dir: button === 65 ? 1 : -1, col, row });
+          continue;
+        }
         // button 0 = 좌클릭. release(m) 시점에만 발화해 더블 트리거 방지.
         if (button === 0 && release) onClick({ col, row });
       }
@@ -43,5 +54,5 @@ export function useMouse(onClick: (e: MouseClick) => void): void {
       stdin.off('data', onData);
       stdout.write(DISABLE);
     };
-  }, [stdin, stdout, isRawModeSupported, setRawMode, onClick]);
+  }, [stdin, stdout, isRawModeSupported, setRawMode, onClick, onWheel]);
 }
