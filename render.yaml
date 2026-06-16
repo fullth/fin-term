@@ -1,0 +1,23 @@
+# Render 배포 정의. Docker 로 ttyd + fin-term 을 단일 웹 서비스로 띄운다.
+# 대시보드에서 New > Blueprint 로 이 repo 연결하면 자동 인식.
+services:
+  - type: web
+    name: fin-term-web
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    envVars:
+      # 웹 공개 기본 인증 — 대시보드에서 값 설정 (sync:false = 코드에 안 박힘)
+      - key: FIN_WEB_USER
+        sync: false
+      - key: FIN_WEB_PASS
+        sync: false
+      # 선택 키 — 없어도 동작
+      - key: FINNHUB_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      # 시작 뉴스 범위 (domestic/foreign/all)
+      - key: FIN_NEWS_SCOPE
+        value: all
