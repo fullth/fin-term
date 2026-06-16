@@ -5,16 +5,20 @@
 [![node](https://img.shields.io/node/v/fin-term.svg)](https://www.npmjs.com/package/fin-term)
 [![license](https://img.shields.io/npm/l/fin-term.svg)](https://github.com/fullth/fin-term/blob/master/LICENSE)
 
-터미널에서 보는 블룸버그 스타일 금융 대시보드. 실시간 시세 + 영문/한글 뉴스 스트림을 한 화면에. **API 키 없이 바로 동작**합니다.
+블룸버그 터미널 스타일의 TUI를 구현하였습니다.  
+실시간 시세 + 영문/한글 뉴스 스트림을 한 화면에 확인할 수 있습니다.
 
+## 대시보드 화면
+**API 키 없이 바로 동작**합니다.
 <img width="1392" height="1522" alt="image" src="https://github.com/user-attachments/assets/16b8f636-d83c-4b3f-9f24-b92eeac872ce" />
-
 - 좌상단: 관심종목 시세 (가격 / 변동% / ▲▼)
 - 우상단: 선택 종목 상세 (시가·고가·저가·전일종가 + 인트라데이 스파크라인)
 - 하단: 영문/한글 뉴스 스트림 (최신순, `[MKT]` / `[종목]` 태그)
+## 브리핑 화면
+**요약은 API 키를 필요로 합니다**
+<img width="1392" height="1522" alt="image" src="https://github.com/user-attachments/assets/864a22bd-b6c0-4b7e-90a3-020a48129f3d" />
 
 ## 빠른 시작
-
 Node.js 18 이상 필요. ([설치 안 됐으면 nodejs.org](https://nodejs.org))
 
 ```bash
