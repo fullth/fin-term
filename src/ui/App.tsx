@@ -403,11 +403,23 @@ export function App({ store, poller }: Props) {
   };
   // 마우스 휠: 커서가 있는 위치의 패널을 스크롤한다.
   // NEWS 영역(newsFirstRow 이상)이면 뉴스 커서를, 그 위면 WATCHLIST 종목을 이동.
+  // 휠은 한 번에 이벤트가 여러 개 빠르게 와서 setState 가 연타되면 매번 전체
+  // 재렌더되어 깜빡인다. delta 를 모아 한 프레임에 한 번만 반영(코얼레싱).
+  const wheelAccum = useRef(0);
+  const wheelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onWheel = (e: WheelEvent) => {
-    if (newsFirstRow > 0 && e.row >= newsFirstRow) {
+    const inNews = newsFirstRow > 0 && e.row >= newsFirstRow;
+    if (inNews) {
       if (!filteredNews.length) return;
       if (state.focus !== 'news') store.setFocus('news');
-      setNewsCursor((c) => Math.max(0, Math.min(c + e.dir, filteredNews.length - 1)));
+      wheelAccum.current += e.dir;
+      if (wheelTimer.current) return; // 이미 flush 예약됨 — delta 만 쌓고 대기
+      wheelTimer.current = setTimeout(() => {
+        const d = wheelAccum.current;
+        wheelAccum.current = 0;
+        wheelTimer.current = null;
+        setNewsCursor((c) => Math.max(0, Math.min(c + d, filteredNews.length - 1)));
+      }, 16);
     } else {
       const wl = state.watchlist;
       if (!wl.length) return;
