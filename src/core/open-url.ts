@@ -8,6 +8,9 @@ export function openUrl(url: string): boolean {
   const args = platform === 'win32' ? ['/c', 'start', '', url] : [url];
   try {
     const child = spawn(cmd, args, { stdio: 'ignore', detached: true });
+    // ENOENT(예: 헤드리스 서버에 xdg-open 없음)는 비동기 'error' 이벤트로 오므로
+    // 반드시 핸들러를 달아야 한다. 없으면 unhandled 'error' 로 프로세스가 죽는다.
+    child.on('error', () => {});
     child.unref();
     return true;
   } catch {

@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import type { NewsItem, NewsScope } from '../core/types.js';
 import { fmtTime } from './format.js';
+import { hyperlink } from '../core/open-url.js';
 
 interface Props {
   visible: NewsItem[]; // App 에서 윈도우 슬라이스해 넘긴 화면 표시 목록
@@ -62,7 +63,7 @@ export function NewsStream({ visible, filter, scope, focused, cursor, total, cur
               <Text color="gray">[MKT] </Text>
             )}
             <Text color={sel ? 'cyan' : undefined} wrap="truncate-end">
-              {title}
+              {hyperlink(n.url, title)}
             </Text>
             <Text dimColor> ({n.source})</Text>
           </Box>
