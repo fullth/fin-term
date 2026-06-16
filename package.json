@@ -1,6 +1,6 @@
 {
   "name": "fin-term",
-  "version": "0.8.4",
+  "version": "0.8.5",
   "description": "Bloomberg-style terminal: live quotes + news stream (TUI). Free data, no keys required.",
   "type": "module",
   "bin": {
