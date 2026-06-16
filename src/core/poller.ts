@@ -32,7 +32,7 @@ export class Poller {
     await this.pollQuotes();
   }
 
-  // :lang 토글 시 즉시 뉴스 재조회 (번역 반영)
+  // 뉴스 범위(scope) 토글 시 다음 틱 안 기다리고 즉시 재조회
   async refreshNewsNow() {
     await this.pollNews();
   }
@@ -47,11 +47,8 @@ export class Poller {
 
   private async pollNews() {
     if (this.stopped) return;
-    const { watchlist, lang } = this.store.get();
-    const news = await fetchNews(this.config.rss_feeds, watchlist, {
-      translateToKo: lang === 'ko',
-      deeplKey: this.config.deepl_key,
-    });
+    const { watchlist, newsScope } = this.store.get();
+    const news = await fetchNews(this.config.rss_feeds, watchlist, newsScope);
     if (!this.stopped) this.store.setNews(news);
   }
 }

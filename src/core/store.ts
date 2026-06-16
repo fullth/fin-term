@@ -1,6 +1,6 @@
 // 앱 상태 컨테이너 + 변경 구독. ink 쪽에서 subscribe 해서 re-render.
 import { EventEmitter } from 'node:events';
-import type { Quote, QuoteMap, NewsItem } from './types.js';
+import type { Quote, QuoteMap, NewsItem, NewsScope } from './types.js';
 import type { SearchResult } from '../sources/search.js';
 import type { HotItem } from '../sources/hot.js';
 import type { Detail } from '../sources/detail.js';
@@ -12,7 +12,8 @@ export type Focus = 'watchlist' | 'news' | 'search' | 'symbolInput' | 'termInput
 // 일시적 오버레이 (Claude 응답 등). brief/search 와 함께 상호 배타.
 export type Overlay =
   | { kind: 'brief'; text: string | null; loading: boolean }
-  | { kind: 'explain'; term: string; text: string | null; loading: boolean };
+  | { kind: 'explain'; term: string; text: string | null; loading: boolean }
+  | { kind: 'help' }; // 단축키 도움말 (? 또는 :help)
 
 export interface State {
   watchlist: string[];
@@ -20,7 +21,7 @@ export interface State {
   quotes: QuoteMap;
   news: NewsItem[];
   newsFilter: string | null; // ticker 필터 (:news AAPL)
-  lang: 'en' | 'ko'; // 표시 언어 (ko면 영문 헤드라인 번역 표시)
+  newsScope: NewsScope; // 뉴스 범위 (domestic 국내 / foreign 해외 / all 전체)
   focus: Focus; // 키 입력이 향하는 패널 (Tab 으로 전환)
   searchResults: SearchResult[]; // :search 결과 (비어있으면 패널 숨김)
   searchQuery: string; // 검색어 (패널 헤더 표시용)
@@ -39,7 +40,7 @@ export class Store extends EventEmitter {
 
   constructor(
     initialWatchlist: string[],
-    initialLang: 'en' | 'ko' = 'en',
+    initialScope: NewsScope = 'all',
     initialNames: Record<string, string> = {},
   ) {
     super();
@@ -49,7 +50,7 @@ export class Store extends EventEmitter {
       quotes: {},
       news: [],
       newsFilter: null,
-      lang: initialLang,
+      newsScope: initialScope,
       focus: 'watchlist',
       searchResults: [],
       searchQuery: '',
@@ -117,8 +118,8 @@ export class Store extends EventEmitter {
     this.commit({ newsFilter: ticker ? ticker.toUpperCase() : null });
   }
 
-  setLang(lang: 'en' | 'ko') {
-    this.commit({ lang });
+  setNewsScope(newsScope: NewsScope) {
+    this.commit({ newsScope });
   }
 
   setUpdate(latest: string) {

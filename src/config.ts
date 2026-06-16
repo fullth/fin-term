@@ -1,5 +1,6 @@
 // 환경 설정. 키 없어도 동작하도록 전부 optional.
 import { loadWatchlist } from './core/persist.js';
+import type { NewsScope } from './core/types.js';
 
 export interface Feed {
   source: string;
@@ -9,13 +10,12 @@ export interface Feed {
 
 export interface AppConfig {
   finnhub_key?: string;
-  deepl_key?: string;
   quote_interval_ms: number;
   news_interval_ms: number;
   initial_watchlist: string[];
   initial_names: Record<string, string>; // symbol → 회사명 (영속 로드)
   rss_feeds: Feed[];
-  initial_lang: 'en' | 'ko'; // 표시 언어 (ko면 영문 헤드라인 번역)
+  initial_scope: NewsScope; // 뉴스 범위 (domestic/foreign/all)
 }
 
 // 주요 지수 (chart API 심볼). 현황판 표시용.
@@ -43,7 +43,13 @@ const DEFAULT_FEEDS: Feed[] = [
 
 export function loadConfig(): AppConfig {
   const watchEnv = process.env.FIN_WATCHLIST?.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean);
-  const lang = process.env.FIN_LANG === 'ko' ? 'ko' : 'en';
+  // FIN_NEWS_SCOPE 우선, 없으면 구 FIN_LANG=ko 를 domestic 으로 호환 처리. 기본 all.
+  const scope: NewsScope =
+    process.env.FIN_NEWS_SCOPE === 'domestic' || process.env.FIN_NEWS_SCOPE === 'foreign'
+      ? process.env.FIN_NEWS_SCOPE
+      : process.env.FIN_LANG === 'ko'
+        ? 'domestic'
+        : 'all';
   const saved = loadWatchlist();
 
   // 우선순위: 환경변수 > 저장 파일 > 기본값. (FIN_WATCHLIST 로 명시하면 그게 최우선)
@@ -55,12 +61,11 @@ export function loadConfig(): AppConfig {
 
   return {
     finnhub_key: process.env.FINNHUB_KEY,
-    deepl_key: process.env.DEEPL_KEY,
     quote_interval_ms: Number(process.env.FIN_QUOTE_MS ?? 10_000),
     news_interval_ms: Number(process.env.FIN_NEWS_MS ?? 60_000),
     initial_watchlist: watchlist,
     initial_names: saved?.names ?? {},
     rss_feeds: DEFAULT_FEEDS,
-    initial_lang: lang,
+    initial_scope: scope,
   };
 }

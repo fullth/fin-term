@@ -1,10 +1,9 @@
-// RSS 금융 뉴스 수집 + ticker 태깅 + (선택) 영문 헤드라인 한글 번역.
+// RSS 금융 뉴스 수집 + ticker 태깅. scope 에 따라 국내/해외 피드 선택. 번역 없음.
 import Parser from 'rss-parser';
 import { createHash } from 'node:crypto';
-import type { NewsItem } from '../core/types.js';
+import type { NewsItem, NewsScope } from '../core/types.js';
 import type { Feed } from '../config.js';
 import { tagTickers } from '../core/ticker-tag.js';
-import { translateBatch, getTranslation } from '../sources/translate.js';
 
 const parser = new Parser({
   headers: { 'User-Agent': 'Mozilla/5.0 (fin-term)' },
@@ -37,38 +36,26 @@ async function fetchFeed(feed: Feed, watchlist: string[]): Promise<NewsItem[]> {
   }
 }
 
-interface FetchOpts {
-  translateToKo?: boolean; // lang=ko 표시 모드일 때만 영문 번역
-  deeplKey?: string;
+// scope 에 맞는 피드만 추림. domestic=ko, foreign=en, all=둘 다.
+function feedsForScope(feeds: Feed[], scope: NewsScope): Feed[] {
+  if (scope === 'all') return feeds;
+  const target = scope === 'domestic' ? 'ko' : 'en';
+  return feeds.filter((f) => f.lang === target);
 }
 
 export async function fetchNews(
   feeds: Feed[],
   watchlist: string[],
-  opts: FetchOpts = {},
+  scope: NewsScope = 'all',
 ): Promise<NewsItem[]> {
-  // ko 표시 모드인데 DeepL 키가 없으면 영문 헤드라인을 번역할 수 없으므로
-  // 영문 피드를 아예 제외하고 한글 피드만 가져온다 (영문이 주르륵 나오는 것 방지).
-  const activeFeeds =
-    opts.translateToKo && !opts.deeplKey ? feeds.filter((f) => f.lang === 'ko') : feeds;
+  const activeFeeds = feedsForScope(feeds, scope);
   const batches = await Promise.all(activeFeeds.map((f) => fetchFeed(f, watchlist)));
   const all = batches.flat();
 
-  // id 중복제거
+  // id 중복제거 후 최신순 정렬
   const seen = new Map<string, NewsItem>();
   for (const item of all) {
     if (!seen.has(item.id)) seen.set(item.id, item);
   }
-  const items = [...seen.values()].sort((a, b) => b.published_at - a.published_at);
-
-  // 한글 표시 모드 + DeepL 키 있으면 영문 헤드라인 번역
-  if (opts.translateToKo && opts.deeplKey) {
-    const enTitles = items.filter((n) => n.lang === 'en').map((n) => n.title);
-    await translateBatch(enTitles, opts.deeplKey);
-    for (const n of items) {
-      if (n.lang === 'en') n.title_ko = getTranslation(n.title);
-    }
-  }
-
-  return items;
+  return [...seen.values()].sort((a, b) => b.published_at - a.published_at);
 }

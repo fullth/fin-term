@@ -16,13 +16,15 @@ export interface Quote {
 
 export interface NewsItem {
   id: string; // 중복제거 키 (url 해시)
-  title: string; // 원문 제목
-  title_ko?: string; // 번역된 한글 제목 (DeepL, en 피드만 채워짐)
-  lang: 'en' | 'ko'; // 원문 언어
+  title: string; // 원문 제목 (번역 없음)
+  lang: 'en' | 'ko'; // 원문 언어 (domestic=ko, foreign=en)
   url: string;
   source: string;
   published_at: number; // epoch ms
   tickers: string[]; // watchlist 매칭 결과
 }
+
+// 뉴스 범위 토글. domestic=국내(한글) 피드, foreign=해외(영문) 피드, all=둘 다.
+export type NewsScope = 'domestic' | 'foreign' | 'all';
 
 export type QuoteMap = Record<string, Quote>;
