@@ -19,8 +19,6 @@ const COMMANDS: Cmd[] = [
   { short: ':o', full: ':open', desc: 'N번째 뉴스 열기' },
   { short: ':b', full: ':brief', desc: 'AI 시장 브리핑' },
   { short: ':e', full: ':explain', desc: '용어 풀이' },
-  { short: ':p', full: ':predict', desc: '예측 일지 기록' },
-  { short: ':j', full: ':journal', desc: '예측 일지 새로고침' },
   { short: ':h', full: ':hot', desc: '핫 종목 새로고침' },
   { short: ':i', full: ':indices', desc: '지수 새로고침' },
   { short: ':r', full: ':refresh', desc: '시세·뉴스 즉시 새로고침' },

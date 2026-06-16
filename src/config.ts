@@ -27,6 +27,15 @@ export const INDICES: { symbol: string; label: string }[] = [
   { symbol: '^KQ11', label: 'KOSDAQ' },
 ];
 
+// 환율·원자재·암호화폐 (chart API 심볼). 키 없이 조회. 하단 패널 표시용.
+export const MARKETS: { symbol: string; label: string }[] = [
+  { symbol: 'KRW=X', label: '달러/원' },
+  { symbol: 'DX-Y.NYB', label: '달러인덱스' },
+  { symbol: 'CL=F', label: 'WTI 유가' },
+  { symbol: 'GC=F', label: '금' },
+  { symbol: 'BTC-USD', label: '비트코인' },
+];
+
 const DEFAULT_FEEDS: Feed[] = [
   // 블룸버그 공식 RSS 폐지됨 → 대체 무료 금융 피드
   // 영문

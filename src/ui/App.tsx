@@ -9,7 +9,7 @@ import { SearchPanel } from './SearchPanel.js';
 import { BriefPanel } from './BriefPanel.js';
 import { HotPanel } from './HotPanel.js';
 import { IndicesPanel } from './IndicesPanel.js';
-import { JournalPanel } from './JournalPanel.js';
+import { MarketsPanel } from './MarketsPanel.js';
 import { ExplainPanel } from './ExplainPanel.js';
 import { HelpPanel } from './HelpPanel.js';
 import { SearchBar } from './SearchBar.js';
@@ -22,9 +22,8 @@ import { generateBrief, hasBriefKey } from '../sources/brief.js';
 import { fetchHot } from '../sources/hot.js';
 import { fetchDetail } from '../sources/detail.js';
 import { fetchQuotes } from '../sources/quote.js';
-import { explainTerm, evaluatePrediction, hasAiKey } from '../sources/explain.js';
-import { loadJournal, saveJournal, newEntry } from '../core/journal.js';
-import { INDICES } from '../config.js';
+import { explainTerm, hasAiKey } from '../sources/explain.js';
+import { INDICES, MARKETS } from '../config.js';
 
 interface Props {
   store: Store;
@@ -77,14 +76,15 @@ export function App({ store, poller }: Props) {
     };
   }, [selected, store]);
 
-  // 상시 패널 데이터: 시작 시 로드 + 핫종목/지수는 60s 주기 갱신. 예측일지는 영속 파일 로드.
+  // 상시 패널 데이터: 시작 시 로드 + 핫종목/지수/환율은 60s 주기 갱신.
   useEffect(() => {
-    store.setJournal(loadJournal());
     void loadHot();
     void loadIndices();
+    void loadMarkets();
     const t = setInterval(() => {
       void loadHot();
       void loadIndices();
+      void loadMarkets();
     }, 60_000);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -181,6 +181,12 @@ export function App({ store, poller }: Props) {
     store.setIndices(quotes);
   };
 
+  // 환율·원자재·암호화폐 — Yahoo chart API (Finnhub 무료론 안 되므로 키 미전달).
+  const loadMarkets = async () => {
+    const quotes = await fetchQuotes(MARKETS.map((m) => m.symbol));
+    store.setMarkets(quotes);
+  };
+
   // 용어 풀이 — Claude 설명 (일시 오버레이).
   const runExplain = async (term: string) => {
     if (!hasAiKey()) {
@@ -192,35 +198,6 @@ export function App({ store, poller }: Props) {
     const text = await explainTerm(term);
     store.updateOverlay({ kind: 'explain', term, text, loading: false });
     store.setStatus(text ? '용어 풀이 완료' : '용어 풀이 실패');
-  };
-
-  // 예측 추가 — :predict SYM up|down 근거. 저장 후 상시 패널 갱신 + AI 평가.
-  const runPredict = async (arg: string) => {
-    const parts = arg.trim().split(/\s+/);
-    const sym = parts[0]?.toUpperCase();
-    const dir = parts[1]?.toLowerCase();
-    const reason = parts.slice(2).join(' ');
-    if (!sym || (dir !== 'up' && dir !== 'down') || !reason) {
-      store.setStatus('형식: :predict AAPL up 실적호조');
-      return;
-    }
-    const priceAt = store.get().quotes[sym]?.price ?? null;
-    const entry = newEntry(sym, dir, reason, priceAt, Date.now());
-    const entries = loadJournal();
-    entries.push(entry);
-    saveJournal(entries);
-    store.setJournal(entries);
-    store.setStatus(`예측 저장: ${sym} ${dir}`);
-
-    // AI 평가 (키 있으면 비동기로 채움)
-    if (hasAiKey()) {
-      const feedback = await evaluatePrediction(sym, dir, reason);
-      if (feedback) {
-        const updated = loadJournal().map((e) => (e.id === entry.id ? { ...e, feedback } : e));
-        saveJournal(updated);
-        store.setJournal(updated);
-      }
-    }
   };
 
   const addSymbol = (sym: string, name?: string) => {
@@ -310,20 +287,10 @@ export function App({ store, poller }: Props) {
         void loadIndices();
         store.setStatus('지수 새로고침');
         break;
-      case 'j':
-      case 'journal':
-        store.setJournal(loadJournal());
-        store.setStatus('예측 일지 새로고침');
-        break;
       case 'e':
       case 'explain':
         if (cmd.arg) void runExplain(cmd.arg);
         else store.setStatus('형식: :e PER');
-        break;
-      case 'p':
-      case 'predict':
-        if (cmd.arg) void runPredict(cmd.arg);
-        else store.setStatus('형식: :p AAPL up 실적호조');
         break;
       case '?':
       case 'help':
@@ -537,9 +504,9 @@ export function App({ store, poller }: Props) {
               <Text color="yellow">:n</Text> 종목뉴스필터 ·{' '}
               <Text color="yellow">:sc</Text> 국내/해외/전체 ·{' '}
               <Text color="magenta">:b</Text> AI브리핑 ·{' '}
-              <Text color="cyan">:p</Text> 예측기록 ·{' '}
-              <Text color="green">:e</Text> 용어풀이{'  '}
-              <Text dimColor>(핫종목·지수·예측은 하단 상시)</Text>
+              <Text color="green">:e</Text> 용어풀이 ·{' '}
+              <Text color="gray">?</Text> 도움말{'  '}
+              <Text dimColor>(핫종목·지수·환율은 하단 상시)</Text>
             </Text>
           </Box>
           {/* 상단 상시 검색바 — 종목 / 용어. 클릭·Tab 으로 포커스 후 입력 */}
@@ -560,7 +527,7 @@ export function App({ store, poller }: Props) {
           />
           <QuotePanel quote={selected ? state.quotes[selected] : undefined} detail={state.detail} />
         </Box>
-        {/* 핫종목 · 지수 · 예측일지 — 가로 3분할 상시 표시 */}
+        {/* 핫종목 · 지수 · 환율/원자재 — 가로 3분할 상시 표시 */}
         <Box>
           <Box width="34%">
             <HotPanel items={state.hot} />
@@ -569,7 +536,7 @@ export function App({ store, poller }: Props) {
             <IndicesPanel quotes={state.indices} />
           </Box>
           <Box flexGrow={1}>
-            <JournalPanel entries={state.journal} quotes={state.quotes} />
+            <MarketsPanel quotes={state.markets} />
           </Box>
         </Box>
         {state.searchResults.length > 0 && (

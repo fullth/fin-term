@@ -4,7 +4,6 @@ import type { Quote, QuoteMap, NewsItem, NewsScope } from './types.js';
 import type { SearchResult } from '../sources/search.js';
 import type { HotItem } from '../sources/hot.js';
 import type { Detail } from '../sources/detail.js';
-import type { JournalEntry } from './journal.js';
 import { saveWatchlist } from './persist.js';
 
 export type Focus = 'watchlist' | 'news' | 'search' | 'symbolInput' | 'termInput';
@@ -30,7 +29,7 @@ export interface State {
   // 상시 표시 패널 (가로 3분할)
   hot: HotItem[]; // 핫 종목 (거래량 급등)
   indices: Quote[]; // 주요 지수 시세
-  journal: JournalEntry[]; // 예측 일지
+  markets: Quote[]; // 환율·원자재·암호화폐 시세
   overlay: Overlay | null; // brief/explain 일시 오버레이 (Claude 응답)
   status: string; // 하단 상태 메시지
 }
@@ -58,7 +57,7 @@ export class Store extends EventEmitter {
       detail: null,
       hot: [],
       indices: [],
-      journal: [],
+      markets: [],
       overlay: null,
       status: 'ready',
     };
@@ -131,7 +130,7 @@ export class Store extends EventEmitter {
     this.commit({ detail });
   }
 
-  // 상시 패널 — 핫종목/지수/예측일지.
+  // 상시 패널 — 핫종목/지수/환율.
   setHot(hot: HotItem[]) {
     this.commit({ hot });
   }
@@ -140,8 +139,8 @@ export class Store extends EventEmitter {
     this.commit({ indices });
   }
 
-  setJournal(journal: JournalEntry[]) {
-    this.commit({ journal });
+  setMarkets(markets: Quote[]) {
+    this.commit({ markets });
   }
 
   // 일시 오버레이 표시 (brief/explain) — 검색은 닫는다.
