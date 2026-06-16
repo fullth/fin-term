@@ -53,24 +53,26 @@ fin-term
 
 ### 명령
 
-| 명령 | 동작 |
-|----|----|
-| `:search apple` | 회사명/심볼로 종목 검색 → 결과에서 ↑↓ 선택 후 Enter 로 추가 |
-| `:add NVDA` | 심볼 직접 추가 |
-| `:rm NVDA` | 관심종목 제거 |
-| `:news AAPL` | 특정 종목 뉴스만 필터 |
-| `:news` | 필터 해제 (전체 뉴스) |
-| `:lang ko` | 한글 표시 (영문 헤드라인도 번역, DeepL 키 필요) |
-| `:lang en` | 영문 표시 |
-| `:lang` | 한↔영 전환 |
-| `:open N` | N번째 뉴스를 브라우저로 열기 |
-| `:brief` | AI 시장 브리핑 생성 (Claude, `ANTHROPIC_API_KEY` 필요) |
-| `:hot` | 핫 종목 패널 새로고침 (거래량 급등, 하단 상시 표시) |
-| `:indices` | 지수 패널 새로고침 (S&P / 나스닥 / 다우 / 코스피 / 코스닥, 하단 상시) |
-| `:explain PER` | 용어 풀이 (Claude, `ANTHROPIC_API_KEY` 필요) |
-| `:predict AAPL up 실적호조` | 예측 일지에 기록 (방향 up/down + 근거) |
-| `:journal` | 예측 일지 패널 새로고침 (하단 상시) |
-| `:q` | 종료 |
+약어(첫 글자)와 전체 명령 둘 다 동작합니다. 예: `:b` = `:brief`.
+
+| 약어 | 전체 | 동작 |
+|----|----|----|
+| `:s apple` | `:search` | 회사명/심볼로 종목 검색 → 결과에서 ↑↓ 선택 후 Enter 로 추가 |
+| `:a NVDA` | `:add` | 심볼 직접 추가 |
+| `:rm NVDA` | `:remove` | 관심종목 제거 |
+| `:n AAPL` | `:news` | 특정 종목 뉴스만 필터 (`:n` 만 치면 해제) |
+| `:sc` | `:scope` | 국내→해외→전체 순환 (`:sc domestic`/`foreign`/`all` 직접 지정) |
+| `:o N` | `:open` | N번째 뉴스를 브라우저로 열기 |
+| `:b` | `:brief` | AI 시장 브리핑 생성 (Claude, `ANTHROPIC_API_KEY` 필요) |
+| `:h` | `:hot` | 핫 종목 패널 새로고침 (거래량 급등, 하단 상시 표시) |
+| `:i` | `:indices` | 지수 패널 새로고침 (S&P / 나스닥 / 다우 / 코스피 / 코스닥, 하단 상시) |
+| `:e PER` | `:explain` | 용어 풀이 (Claude, `ANTHROPIC_API_KEY` 필요) |
+| `:p AAPL up 실적호조` | `:predict` | 예측 일지에 기록 (방향 up/down + 근거) |
+| `:j` | `:journal` | 예측 일지 패널 새로고침 (하단 상시) |
+| `:r` | `:refresh` | 시세·뉴스 즉시 새로고침 |
+| `:q` | `:quit` | 종료 |
+
+해외(영문) 뉴스는 번역 없이 원문 그대로 표시됩니다.
 
 핫 종목·지수 현황·예측 일지는 **화면 하단에 가로 3분할로 상시 표시**됩니다 (핫종목/지수는 60초마다 자동 갱신). 뉴스 스트림은 그 아래로 스크롤해서 봅니다.
 
@@ -87,16 +89,15 @@ fin-term
 키 없이도 동작하지만, 넣으면 기능이 늘어납니다.
 
 ```bash
-# 예: 한글 모드로 시작 + 관심종목 지정
-FIN_LANG=ko FIN_WATCHLIST=AAPL,TSLA,NVDA fin-term
+# 예: 국내 뉴스만 보기 + 관심종목 지정
+FIN_NEWS_SCOPE=domestic FIN_WATCHLIST=AAPL,TSLA,NVDA fin-term
 ```
 
 | 환경변수 | 효과 |
 |----|----|
 | `FIN_WATCHLIST` | 시작 관심종목 (쉼표 구분, 예: `AAPL,TSLA`). 기본 `AAPL,TSLA,NVDA,MSFT` |
-| `FIN_LANG` | 시작 표시 언어 `en` 또는 `ko` (기본 `en`) |
+| `FIN_NEWS_SCOPE` | 시작 뉴스 범위 `domestic` / `foreign` / `all` (기본 `all`) |
 | `FINNHUB_KEY` | 있으면 시세를 [Finnhub](https://finnhub.io) 우선 사용 (무료 가입) |
-| `DEEPL_KEY` | 있으면 `:lang ko` 에서 영문 헤드라인을 한글로 번역 ([DeepL 무료](https://www.deepl.com/pro-api)) |
 | `ANTHROPIC_API_KEY` | 있으면 `:brief` AI 시장 브리핑 활성화 ([Claude API](https://console.anthropic.com), 유료) |
 | `FIN_QUOTE_MS` | 시세 갱신 주기(ms), 기본 10000 |
 | `FIN_NEWS_MS` | 뉴스 갱신 주기(ms), 기본 60000 |
@@ -107,11 +108,10 @@ FIN_LANG=ko FIN_WATCHLIST=AAPL,TSLA,NVDA fin-term
 |----|----|----|
 | 시세 / 차트 | Yahoo 공개 chart API | 불필요 |
 | 시세 (우선) | Finnhub | `FINNHUB_KEY` 있을 때 |
-| 영문 뉴스 | RSS (Yahoo / CNBC / MarketWatch) | 불필요 |
-| 한글 뉴스 | RSS (한경 / 매경증권 / 연합경제) | 불필요 |
-| 영문→한글 번역 | DeepL | `DEEPL_KEY` 있을 때 |
+| 해외 뉴스 | RSS (Yahoo / CNBC / MarketWatch) | 불필요 |
+| 국내 뉴스 | RSS (한경 / 동아경제 / 연합경제) | 불필요 |
 
-한글 뉴스는 키 없이 원문 그대로 나옵니다. 영문 헤드라인까지 한글로 보려면 DeepL 키를 넣고 `:lang ko`.
+뉴스는 모두 원문 그대로 나옵니다 (번역 없음). `:scope` 로 국내·해외·전체를 즉시 전환합니다.
 
 > 참고: 무료 공개 데이터라 블룸버그 대비 분 단위 지연이 있고, 채권·파생 등은 다루지 않습니다.
 
@@ -132,7 +132,7 @@ npm run build && npm start
 
 ```
 src/
-  sources/   quote.ts (Yahoo/Finnhub), rss.ts (뉴스), translate.ts (DeepL)
+  sources/   quote.ts (Yahoo/Finnhub), rss.ts (뉴스)
   core/      store.ts (상태), poller.ts (폴링), ticker-tag.ts (종목 매칭), open-url.ts, types.ts
   ui/        App.tsx + Watchlist / QuotePanel / NewsStream / CommandBar
   config.ts  환경변수 로딩

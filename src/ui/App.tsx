@@ -11,6 +11,7 @@ import { HotPanel } from './HotPanel.js';
 import { IndicesPanel } from './IndicesPanel.js';
 import { JournalPanel } from './JournalPanel.js';
 import { ExplainPanel } from './ExplainPanel.js';
+import { HelpPanel } from './HelpPanel.js';
 import { SearchBar } from './SearchBar.js';
 import { CommandBar, type Command } from './CommandBar.js';
 import { openUrl } from '../core/open-url.js';
@@ -231,29 +232,41 @@ export function App({ store, poller }: Props) {
 
   const handleCommand = (cmd: Command) => {
     switch (cmd.name) {
+      case 'a':
       case 'add':
         if (cmd.arg) addSymbol(cmd.arg);
         else store.setStatus('add failed');
         break;
+      case 's':
       case 'search':
       case 'find':
         if (cmd.arg) void runSearch(cmd.arg);
-        else store.setStatus('검색어 입력: :search apple');
+        else store.setStatus('검색어 입력: :s apple');
         break;
       case 'rm':
       case 'remove':
         if (cmd.arg && store.removeSymbol(cmd.arg)) store.setStatus(`removed ${cmd.arg.toUpperCase()}`);
         else store.setStatus('rm failed');
         break;
+      case 'n':
       case 'news':
         store.setNewsFilter(cmd.arg ?? null);
         setNewsCursor(0);
         store.setStatus(cmd.arg ? `news: ${cmd.arg.toUpperCase()}` : 'news: all');
         break;
-      case 'lang': {
-        const next = cmd.arg?.toLowerCase() === 'ko' ? 'ko' : cmd.arg?.toLowerCase() === 'en' ? 'en' : state.lang === 'ko' ? 'en' : 'ko';
-        store.setLang(next);
-        store.setStatus(`lang: ${next}${next === 'ko' ? ' (영문 헤드라인 번역)' : ''}`);
+      case 'sc':
+      case 'lang': // 구 명령 별칭 — 뉴스 범위 토글로 흡수
+      case 'news-scope':
+      case 'scope': {
+        const SCOPES = ['domestic', 'foreign', 'all'] as const;
+        const arg = cmd.arg?.toLowerCase();
+        const explicit = SCOPES.find((s) => s === arg);
+        // 인자 있으면 그 값, 없으면 domestic→foreign→all 순환
+        const next =
+          explicit ?? SCOPES[(SCOPES.indexOf(state.newsScope) + 1) % SCOPES.length];
+        const label = next === 'domestic' ? '국내' : next === 'foreign' ? '해외' : '전체';
+        store.setNewsScope(next);
+        store.setStatus(`뉴스 범위: ${label}`);
         void poller.refreshNewsNow();
         break;
       }
@@ -261,6 +274,7 @@ export function App({ store, poller }: Props) {
       case 'r':
         refreshNow();
         break;
+      case 'o':
       case 'open': {
         const n = Number(cmd.arg);
         const item = Number.isInteger(n) ? visibleNews[n - 1] : undefined;
@@ -268,30 +282,40 @@ export function App({ store, poller }: Props) {
         else store.setStatus(`open failed (1~${visibleNews.length})`);
         break;
       }
+      case 'b':
       case 'brief':
       case 'ai':
         void runBrief();
         break;
+      case 'h':
       case 'hot':
         void loadHot();
         store.setStatus('핫 종목 새로고침');
         break;
+      case 'i':
       case 'indices':
       case 'index':
         void loadIndices();
         store.setStatus('지수 새로고침');
         break;
+      case 'j':
       case 'journal':
         store.setJournal(loadJournal());
         store.setStatus('예측 일지 새로고침');
         break;
+      case 'e':
       case 'explain':
         if (cmd.arg) void runExplain(cmd.arg);
-        else store.setStatus('형식: :explain PER');
+        else store.setStatus('형식: :e PER');
         break;
+      case 'p':
       case 'predict':
         if (cmd.arg) void runPredict(cmd.arg);
-        else store.setStatus('형식: :predict AAPL up 실적호조');
+        else store.setStatus('형식: :p AAPL up 실적호조');
+        break;
+      case '?':
+      case 'help':
+        store.setOverlay({ kind: 'help' });
         break;
       default:
         store.setStatus(`unknown: ${cmd.name}`);
@@ -400,10 +424,10 @@ export function App({ store, poller }: Props) {
 
   const hint =
     state.focus === 'news'
-      ? 'Tab 패널 · ↑↓ 뉴스 · Enter 열기 · :search'
+      ? 'Tab 패널 · ↑↓ 뉴스 · Enter 열기 · :s 검색'
       : state.focus === 'search'
         ? '↑↓ 선택 · Enter 추가 · Esc 닫기'
-        : 'Tab 패널 · ↑↓ 종목 · :search :add :news :lang :q';
+        : 'Tab 패널 · ↑↓ 종목 · :s 검색 :sc 범위 · ? 단축키도움말 · :q 종료';
 
   // brief/explain 오버레이는 풀스크린 모달로 표시 (다른 패널을 가려 화면 넘침 방지, Esc 로 닫기).
   if (state.overlay) {
@@ -418,12 +442,14 @@ export function App({ store, poller }: Props) {
         <Box flexGrow={1}>
           {state.overlay.kind === 'brief' ? (
             <BriefPanel text={state.overlay.text} loading={state.overlay.loading} />
-          ) : (
+          ) : state.overlay.kind === 'explain' ? (
             <ExplainPanel
               term={state.overlay.term}
               text={state.overlay.text}
               loading={state.overlay.loading}
             />
+          ) : (
+            <HelpPanel />
           )}
         </Box>
         <CommandBar
@@ -436,6 +462,7 @@ export function App({ store, poller }: Props) {
           onEnter={() => {}}
           onEscape={escape}
           onRefresh={() => {}}
+          onHelp={() => {}}
           inputActive={false}
         />
       </Box>
@@ -476,13 +503,13 @@ export function App({ store, poller }: Props) {
               <Text dimColor> 종료</Text>
             </Text>
             <Text dimColor>
-              <Text color="yellow">:search</Text> 종목검색 ·{' '}
-              <Text color="yellow">:add</Text>/<Text color="yellow">:rm</Text> 관심종목 ·{' '}
-              <Text color="yellow">:news</Text> 종목뉴스필터 ·{' '}
-              <Text color="yellow">:lang</Text> 한/영 ·{' '}
-              <Text color="magenta">:brief</Text> AI브리핑 ·{' '}
-              <Text color="cyan">:predict</Text> 예측기록 ·{' '}
-              <Text color="green">:explain</Text> 용어풀이{'  '}
+              <Text color="yellow">:s</Text> 종목검색 ·{' '}
+              <Text color="yellow">:a</Text>/<Text color="yellow">:rm</Text> 관심종목 ·{' '}
+              <Text color="yellow">:n</Text> 종목뉴스필터 ·{' '}
+              <Text color="yellow">:sc</Text> 국내/해외/전체 ·{' '}
+              <Text color="magenta">:b</Text> AI브리핑 ·{' '}
+              <Text color="cyan">:p</Text> 예측기록 ·{' '}
+              <Text color="green">:e</Text> 용어풀이{'  '}
               <Text dimColor>(핫종목·지수·예측은 하단 상시)</Text>
             </Text>
           </Box>
@@ -529,7 +556,7 @@ export function App({ store, poller }: Props) {
       <NewsStream
         visible={visibleNews}
         filter={state.newsFilter}
-        lang={state.lang}
+        scope={state.newsScope}
         focused={state.focus === 'news'}
         cursor={newsCursor}
       />
@@ -543,6 +570,7 @@ export function App({ store, poller }: Props) {
         onEnter={activate}
         onEscape={escape}
         onRefresh={refreshNow}
+        onHelp={() => store.setOverlay({ kind: 'help' })}
         inputActive={state.focus === 'symbolInput' || state.focus === 'termInput'}
       />
     </Box>
