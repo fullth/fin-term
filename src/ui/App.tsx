@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Box, Text, useApp, useStdout, measureElement, type DOMElement } from 'ink';
+import { Box, Text, useStdout, measureElement, type DOMElement } from 'ink';
 import type { Store, State } from '../core/store.js';
 import type { Poller } from '../core/poller.js';
 import { Watchlist } from './Watchlist.js';
@@ -24,14 +24,13 @@ import { fetchDetail } from '../sources/detail.js';
 import { fetchQuotes } from '../sources/quote.js';
 import { explainTerm, hasAiKey } from '../sources/explain.js';
 import { INDICES, MARKETS } from '../config.js';
-
 interface Props {
   store: Store;
   poller: Poller;
+  onEnterCrypto: () => void; // 코인 모드 진입 요청 (index 가 blessed 화면으로 교체)
 }
 
-export function App({ store, poller }: Props) {
-  const { exit } = useApp();
+export function App({ store, poller, onEnterCrypto }: Props) {
   const { stdout } = useStdout();
   const [state, setState] = useState<State>(store.get());
   const [selected, setSelected] = useState<string | null>(store.get().watchlist[0] ?? null);
@@ -39,11 +38,28 @@ export function App({ store, poller }: Props) {
   const [newsCursor, setNewsCursor] = useState(0);
   const [searchCursor, setSearchCursor] = useState(0);
 
+  // store 변경 → setState. 단, 업비트 웹소켓 티커는 초당 수십 건 commit 하므로
+  // 매번 즉시 setState 하면 전체 재렌더가 폭주해 (특히 ttyd 웹 송출에서) 깜빡인다.
+  // 마지막 상태를 모아 ~120ms 마다 한 번만 반영(throttle)해 재렌더 빈도를 묶는다.
   useEffect(() => {
-    const onChange = (s: State) => setState({ ...s });
+    let pending: State | null = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const flush = () => {
+      timer = null;
+      if (pending) {
+        setState(pending);
+        pending = null;
+      }
+    };
+    const onChange = (s: State) => {
+      pending = { ...s };
+      if (timer) return; // 이미 flush 예약됨 — 최신 상태만 갱신하고 대기
+      timer = setTimeout(flush, 120);
+    };
     store.on('change', onChange);
     return () => {
       store.off('change', onChange);
+      if (timer) clearTimeout(timer);
     };
   }, [store]);
 
@@ -123,7 +139,9 @@ export function App({ store, poller }: Props) {
   // newsFirstRow(뉴스 첫 항목 절대행) 다음에 뉴스 N행 + 하단 border(1) + commandbar(1)
   // 이 들어가야 하므로, 출력이 터미널을 넘지 않도록 여유 4줄을 빼서 깜빡임을 막는다.
   const rows = stdout?.rows ?? 30;
-  const newsRows = Math.max(3, (newsFirstRow > 0 ? rows - newsFirstRow : rows - 20) - 4);
+  // 여유 6줄: 전체 출력이 터미널 높이를 절대 넘지 않게 한다. 1줄이라도 넘치면 ink 가
+  // 맨 윗줄을 스크롤로 밀어올려 이전 프레임 한 줄이 상단에 잔상으로 남는다.
+  const newsRows = Math.max(3, (newsFirstRow > 0 ? rows - newsFirstRow : rows - 20) - 6);
   // 필터 적용된 전체 목록. newsCursor 는 이 전체 인덱스를 가리킨다.
   const filteredNews = state.newsFilter
     ? state.news.filter((n) => n.tickers.includes(state.newsFilter!))
@@ -292,6 +310,12 @@ export function App({ store, poller }: Props) {
         if (cmd.arg) void runExplain(cmd.arg);
         else store.setStatus('형식: :e PER');
         break;
+      case 'crypto':
+      case 'coin':
+      case 'coins':
+      case 'hold':
+        onEnterCrypto(); // 코인 모드(blessed 화면)로 전환
+        break;
       case '?':
       case 'help':
         store.setOverlay({ kind: 'help' });
@@ -306,8 +330,6 @@ export function App({ store, poller }: Props) {
     const order: State['focus'][] = ['symbolInput', 'termInput', 'watchlist', 'news'];
     const i = order.indexOf(state.focus);
     store.setFocus(order[(i + 1) % order.length] ?? 'symbolInput');
-    return;
-    // (아래 옛 코드는 unreachable — 위 return 으로 대체)
   };
 
   // ↑↓: 포커스 패널 커서 이동
@@ -360,6 +382,13 @@ export function App({ store, poller }: Props) {
   // - WATCHLIST 영역(좌측 패널) 종목 행: WATCHLIST 포커스 + 그 종목 선택.
   // - NEWS 영역 뉴스 행: NEWS 포커스 + 그 행 선택. 같은 행 재클릭이면 기사 열기.
   const onMouseClick = (e: MouseClick) => {
+    // 좌상단 모드 탭 박스(테두리 포함 3행) 클릭. 내용 행(row 2)의 [코인] 영역 → 코인 모드.
+    // 박스 border(1) + paddingX(1) 이후: [주식](col 2~9) 공백 [코인](col 11~18).
+    if (e.row <= 3) {
+      if (e.col >= 10 && e.col <= 19) onEnterCrypto(); // [코인] 탭 클릭
+      return; // 주식 탭/박스 다른 곳 클릭은 무시(이미 주식 모드)
+    }
+
     // 검색바: WATCHLIST 박스 바로 위(테두리 포함 2~3행). 좌측 절반=종목, 우측=용어.
     // 검색바 입력 행은 wlFirstRow 직전 영역 (헤더 박스 안 맨 아래).
     if (e.row < wlFirstRow - 1 && e.row >= wlFirstRow - 4) {
@@ -464,11 +493,13 @@ export function App({ store, poller }: Props) {
           status={state.status}
           hint="Esc 닫기"
           onCommand={handleCommand}
-          onQuit={() => exit()}
+          onQuit={() => process.exit(0)}
           onMove={() => {}}
           onTab={() => {}}
           onEnter={() => {}}
           onEscape={escape}
+          onMode={() => {}}
+          onHorizontal={() => {}}
           onRefresh={() => {}}
           onHelp={() => {}}
           inputActive={false}
@@ -477,39 +508,63 @@ export function App({ store, poller }: Props) {
     );
   }
 
+  // 좌상단 모드 탭 (크게). [주식] 활성 · [코인] 클릭/m 으로 코인 모드(blessed) 진입.
+  // 박스 테두리 1행 + 내용 1행 + 테두리 1행 = 3행. 마우스 매핑은 onMouseClick 참조.
+  const ModeTabs = (
+    <Box>
+      <Box borderStyle="round" borderColor="yellow" paddingX={1}>
+        <Text bold backgroundColor="cyan" color="black">
+          {'  주식  '}
+        </Text>
+        <Text> </Text>
+        <Text color="gray">{'  코인  '}</Text>
+      </Box>
+      <Box paddingX={1} flexDirection="column" justifyContent="center">
+        <Text bold backgroundColor="yellow" color="black">
+          {' FIN-TERM '}
+        </Text>
+        <Text dimColor>m 또는 [코인] 클릭 → 코인 모드</Text>
+      </Box>
+      {state.update && (
+        <Box justifyContent="center" flexDirection="column">
+          <Text color="green">⬆ {state.update.latest} · npm i -g fin-term@latest</Text>
+        </Box>
+      )}
+    </Box>
+  );
+
+  const commandBar = (
+    <CommandBar
+      status={state.status}
+      hint={hint}
+      onCommand={handleCommand}
+      onQuit={() => process.exit(0)}
+      onMove={move}
+      onTab={cycleFocus}
+      onEnter={activate}
+      onEscape={escape}
+      onRefresh={refreshNow}
+      onHelp={() => store.setOverlay({ kind: 'help' })}
+      onMode={onEnterCrypto}
+      onHorizontal={() => {}}
+      inputActive={state.focus === 'symbolInput' || state.focus === 'termInput'}
+    />
+  );
+
+  // 주식 모드 대시보드. (코인 모드는 index 에서 blessed 화면으로 교체)
+  // 최상위 박스 높이를 터미널 높이로 고정. 출력이 높이를 넘으면 ink 가 스크롤로 맨
+  // 윗줄을 밀어올려 잔상이 남으므로, 높이를 고정해 그 안에 들어오게 한다.
+  // (overflow=hidden 은 OSC8 하이퍼링크 시퀀스까지 잘라 제목·테두리가 깨지므로 안 씀.
+  //  대신 newsRows 여유로 콘텐츠가 높이를 넘지 않게 맞춘다.)
   return (
-    <Box flexDirection="column" width="100%">
+    <Box flexDirection="column" width="100%" height={rows - 1}>
       {/* 상단 영역: 높이를 측정해 뉴스 첫 행 위치 계산 (마우스 클릭 매핑용) */}
       <Box flexDirection="column" ref={topRef}>
         {/* 헤더 + 안내 — 높이를 측정해 WATCHLIST 첫 종목 행 위치 계산 (마우스 매핑용) */}
         <Box flexDirection="column" ref={headerRef}>
-          <Box paddingX={1}>
-            <Text bold backgroundColor="yellow" color="black">
-              {' '}FIN-TERM{' '}
-            </Text>
-            <Text dimColor> live quotes + news · free data</Text>
-            {state.update && (
-              <Text color="green">
-                {'  '}⬆ 업데이트 {state.update.latest} · npm i -g fin-term@latest
-              </Text>
-            )}
-          </Box>
+          {ModeTabs}
           {/* 사용법 안내 — 조작과 기능을 상단에 노출 */}
           <Box paddingX={1} flexDirection="column">
-            <Text>
-              <Text color="cyan">클릭</Text>
-              <Text dimColor> 패널/항목 선택 (뉴스는 한 번 더 클릭하면 열림) · </Text>
-              <Text color="cyan">Tab</Text>
-              <Text dimColor> 패널/검색칸 전환 · </Text>
-              <Text color="cyan">↑↓</Text>
-              <Text dimColor> 이동 · </Text>
-              <Text color="cyan">Enter</Text>
-              <Text dimColor> 열기/추가 · </Text>
-              <Text color="cyan">r</Text>
-              <Text dimColor> 새로고침 · </Text>
-              <Text color="cyan">q</Text>
-              <Text dimColor> 종료</Text>
-            </Text>
             <Text dimColor>
               <Text color="yellow">:s</Text> 종목검색 ·{' '}
               <Text color="yellow">:a</Text>/<Text color="yellow">:rm</Text> 관심종목 ·{' '}
@@ -517,8 +572,7 @@ export function App({ store, poller }: Props) {
               <Text color="yellow">:sc</Text> 국내/해외/전체 ·{' '}
               <Text color="magenta">:b</Text> AI브리핑 ·{' '}
               <Text color="green">:e</Text> 용어풀이 ·{' '}
-              <Text color="gray">?</Text> 도움말{'  '}
-              <Text dimColor>(핫종목·지수·환율은 하단 상시)</Text>
+              <Text color="gray">?</Text> 도움말
             </Text>
           </Box>
           {/* 상단 상시 검색바 — 종목 / 용어. 클릭·Tab 으로 포커스 후 입력 */}
@@ -573,19 +627,7 @@ export function App({ store, poller }: Props) {
         hasAbove={windowStart > 0}
         hasBelow={windowStart + newsRows < filteredNews.length}
       />
-      <CommandBar
-        status={state.status}
-        hint={hint}
-        onCommand={handleCommand}
-        onQuit={() => exit()}
-        onMove={move}
-        onTab={cycleFocus}
-        onEnter={activate}
-        onEscape={escape}
-        onRefresh={refreshNow}
-        onHelp={() => store.setOverlay({ kind: 'help' })}
-        inputActive={state.focus === 'symbolInput' || state.focus === 'termInput'}
-      />
+      {commandBar}
     </Box>
   );
 }

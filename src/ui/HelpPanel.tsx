@@ -22,10 +22,12 @@ const COMMANDS: Cmd[] = [
   { short: ':h', full: ':hot', desc: '핫 종목 새로고침' },
   { short: ':i', full: ':indices', desc: '지수 새로고침' },
   { short: ':r', full: ':refresh', desc: '시세·뉴스 즉시 새로고침' },
+  { short: '', full: ':crypto', desc: '코인 모드 진입 (업비트 KRW · m 키/탭 클릭도)' },
   { short: ':q', full: ':quit', desc: '종료' },
 ];
 
 const KEYS: { key: string; desc: string }[] = [
+  { key: 'm', desc: '코인 모드 진입 (좌상단 [코인] 탭 클릭도 가능)' },
   { key: 'Tab', desc: '패널 포커스 전환 (검색칸→용어칸→WATCHLIST→NEWS)' },
   { key: '↑ ↓ / j k', desc: '포커스 패널에서 커서 이동' },
   { key: 'Enter', desc: '뉴스 열기 · 검색 결과 종목 추가' },

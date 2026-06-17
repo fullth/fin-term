@@ -5,7 +5,9 @@ import { useStdin, useStdout } from 'ink';
 
 // 1000: 클릭 트래킹, 1006: SGR 확장 좌표(넓은 화면/큰 좌표 대응)
 const ENABLE = '\x1b[?1000h\x1b[?1006h';
-const DISABLE = '\x1b[?1000l\x1b[?1006l';
+// 해제 시 blessed 가 켰을 수 있는 1002(드래그)·1003(모션)·1015 까지 모두 끈다.
+// 안 그러면 마우스 이동 SGR 이 입력 스트림에 텍스트로 새어 화면을 오염시킨다.
+const DISABLE = '\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1005l\x1b[?1006l\x1b[?1015l';
 
 // SGR: ESC [ < b ; col ; row (M=press, m=release)
 const SGR_RE = /\x1b\[<(\d+);(\d+);(\d+)([Mm])/g;

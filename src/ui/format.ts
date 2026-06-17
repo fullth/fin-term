@@ -25,6 +25,22 @@ export function fmtBig(n: number | null): string {
   return String(n);
 }
 
+// 원화 표기. 큰 금액은 정수, 작은 값은 소수 허용. null/NaN 은 대시.
+export function fmtKrw(n: number | null): string {
+  if (n == null || Number.isNaN(n)) return '—';
+  const digits = Math.abs(n) >= 100 ? 0 : 2;
+  return `₩${n.toLocaleString('ko-KR', { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
+}
+
+// 원화 컴팩트 표기 (만/억 단위). 차트 라벨·요약용.
+export function fmtKrwCompact(n: number | null): string {
+  if (n == null || Number.isNaN(n)) return '—';
+  const abs = Math.abs(n);
+  if (abs >= 1e8) return `${(n / 1e8).toFixed(2)}억`;
+  if (abs >= 1e4) return `${(n / 1e4).toFixed(1)}만`;
+  return `${Math.round(n).toLocaleString('ko-KR')}`;
+}
+
 export function fmtPct(n: number | null): string {
   if (n == null) return '—';
   const sign = n > 0 ? '+' : '';

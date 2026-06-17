@@ -68,6 +68,7 @@ fin-term
 | `:i` | `:indices` | 지수 패널 새로고침 (S&P / 나스닥 / 다우 / 코스피 / 코스닥, 하단 상시) |
 | `:e PER` | `:explain` | 용어 풀이 (Claude, `ANTHROPIC_API_KEY` 필요) |
 | `:r` | `:refresh` | 시세·뉴스 즉시 새로고침 |
+| `:crypto` | `:coin` | 코인 모드 진입 (`m` 키 / 좌상단 `[코인]` 탭 클릭도 가능) |
 | `:q` | `:quit` | 종료 |
 
 해외(영문) 뉴스는 번역 없이 원문 그대로 표시됩니다.
@@ -81,6 +82,35 @@ fin-term
 종목 심볼을 모르면 `:search 회사명` (예: `:search tesla`, `:search 005930`) 으로 찾아 추가하세요. 한국 종목은 한글 회사명(예: `삼성`, `카카오`)이나 6자리 코드(`005930`)로도 검색됩니다.
 
 뉴스 헤드라인은 **클릭하면 바로 기사로 이동**합니다 (iTerm2 / WezTerm / 최신 macOS 터미널 등 하이퍼링크 지원 터미널). 클릭이 안 되는 터미널이면 NEWS 패널에서 `Tab` → `↑↓` → `Enter`, 또는 왼쪽 번호로 `:open 3`.
+
+## 코인 모드 (업비트 KRW)
+
+좌상단 **`[코인]` 탭**(클릭 또는 `m` 키, `:crypto` 명령)을 누르면 화면 전체가 코인 모니터로 바뀝니다. 코인목록 · 시세상세 · 캔들차트 · 보유요약 · 알림 · 코인뉴스를 한 화면에 보여주며, 업비트 웹소켓으로 BTC·ETH·XRP·BCH 원화 시세를 실시간 수신합니다. 키 불필요.
+
+코인 모드 키:
+
+| 키 | 동작 |
+|----|----|
+| `↑` `↓` | 코인 선택 |
+| `←` `→` | 차트 기간 (1분 / 1시간 / 24시간 / 7일 / 1달) |
+| `1`~`4` | 코인 바로가기 |
+| `r` | 새로고침 · `s` 금액 마스킹 |
+| `q` 또는 `m` | 주식 모드로 복귀 |
+
+보유 내역은 `~/.fin-term/holdings.json` 에 둡니다 (없으면 시세만, 손익 없이 동작):
+
+```json
+[
+  { "id": "bitcoin",      "symbol": "BTC", "quantity": 0.1234, "avg_buy_krw": 110000000, "buy_amount_krw": 13580246 },
+  { "id": "ethereum",     "symbol": "ETH", "quantity": 1.2345, "avg_buy_krw": 3500000,   "buy_amount_krw": 4320988 },
+  { "id": "ripple",       "symbol": "XRP", "quantity": 1234.5,  "avg_buy_krw": 2300 },
+  { "id": "bitcoin-cash", "symbol": "BCH", "quantity": 4.5678,  "avg_buy_krw": 550000 }
+]
+```
+
+- `id` 는 업비트 마켓 매핑 키 (`bitcoin`/`ethereum`/`ripple`/`bitcoin-cash`)
+- `buy_amount_krw` 를 생략하면 `quantity × avg_buy_krw` 로 자동 계산
+- 보유 수익률이 5% 단위(±5%, ±10%, …)를 돌파하면 macOS 데스크톱 알림 + 패널 알림 로그. macOS 외 환경은 알림 로그만.
 
 ## 옵션 (환경변수, 전부 선택)
 
@@ -99,6 +129,7 @@ FIN_NEWS_SCOPE=domestic FIN_WATCHLIST=AAPL,TSLA,NVDA fin-term
 | `ANTHROPIC_API_KEY` | 있으면 `:brief` AI 시장 브리핑 활성화 ([Claude API](https://console.anthropic.com), 유료) |
 | `FIN_QUOTE_MS` | 시세 갱신 주기(ms), 기본 10000 |
 | `FIN_NEWS_MS` | 뉴스 갱신 주기(ms), 기본 60000 |
+| `FIN_MODE` | `crypto` 면 코인 모드로 바로 시작 (기본 `stock`) |
 
 ## 데이터 출처
 
@@ -108,6 +139,9 @@ FIN_NEWS_SCOPE=domestic FIN_WATCHLIST=AAPL,TSLA,NVDA fin-term
 | 시세 (우선) | Finnhub | `FINNHUB_KEY` 있을 때 |
 | 해외 뉴스 | RSS (Yahoo / CNBC / MarketWatch) | 불필요 |
 | 국내 뉴스 | RSS (한경 / 동아경제 / 연합경제) | 불필요 |
+| 코인 KRW 시세 / 캔들 | 업비트 (웹소켓 실시간 + REST 캔들) | 불필요 |
+| 코인 시총·ATH | CoinGecko | 불필요 |
+| 코인 뉴스 | 구글 뉴스 RSS (한국어) | 불필요 |
 
 뉴스는 모두 원문 그대로 나옵니다 (번역 없음). `:scope` 로 국내·해외·전체를 즉시 전환합니다.
 
@@ -130,12 +164,16 @@ npm run build && npm start
 
 ```
 src/
-  sources/   quote.ts (Yahoo/Finnhub), rss.ts (뉴스)
-  core/      store.ts (상태), poller.ts (폴링), ticker-tag.ts (종목 매칭), open-url.ts, types.ts
-  ui/        App.tsx + Watchlist / QuotePanel / NewsStream / CommandBar
-  config.ts  환경변수 로딩
-  index.tsx  진입점
+  sources/        quote.ts (Yahoo/Finnhub), rss.ts (뉴스)
+  core/           store.ts (상태), poller.ts (폴링), ticker-tag.ts, open-url.ts, types.ts
+  ui/             App.tsx + Watchlist / QuotePanel / NewsStream / CommandBar (주식 모드, Ink)
+  crypto-monitor/ index.ts (코인 모드 — 업비트 실시간·캔들·보유·알림·뉴스, blessed)
+  config.ts       환경변수 로딩
+  index.tsx       진입점 — 주식(Ink)↔코인(blessed) 화면 전환 오케스트레이션
 ```
+
+> 주식 모드는 Ink(React), 코인 모드는 blessed 로 그립니다. 두 렌더러가 stdin 을 동시에
+> 잡지 않도록, 모드 전환 시 한쪽을 완전히 내린 뒤 다른 쪽을 띄웁니다.
 
 ## 라이선스
 

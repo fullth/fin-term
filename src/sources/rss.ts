@@ -20,14 +20,17 @@ async function fetchFeed(feed: Feed, watchlist: string[]): Promise<NewsItem[]> {
     return (parsed.items ?? []).map((it) => {
       const title = (it.title ?? '').trim();
       const link = it.link ?? '';
-      const published = it.isoDate ? Date.parse(it.isoDate) : Date.now();
+      // pubDate(isoDate) 우선, 없으면 RSS pubDate 원문 파싱. 둘 다 실패면 0(맨 뒤).
+      // Date.now() 폴백은 날짜 없는 기사를 매 폴링마다 상단으로 끌어올려 정렬을 망친다.
+      const rawDate = it.isoDate ?? (it as { pubDate?: string }).pubDate;
+      const parsed = rawDate ? Date.parse(rawDate) : NaN;
       return {
         id: idOf(link, title),
         title,
         lang: feed.lang,
         url: link,
         source: feed.source,
-        published_at: Number.isNaN(published) ? Date.now() : published,
+        published_at: Number.isNaN(parsed) ? 0 : parsed,
         tickers: tagTickers(title, watchlist),
       };
     });

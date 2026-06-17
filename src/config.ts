@@ -16,6 +16,7 @@ export interface AppConfig {
   initial_names: Record<string, string>; // symbol → 회사명 (영속 로드)
   rss_feeds: Feed[];
   initial_scope: NewsScope; // 뉴스 범위 (domestic/foreign/all)
+  initial_mode: 'stock' | 'crypto'; // 시작 화면 모드 (FIN_MODE)
 }
 
 // 주요 지수 (chart API 심볼). 현황판 표시용.
@@ -76,5 +77,6 @@ export function loadConfig(): AppConfig {
     initial_names: saved?.names ?? {},
     rss_feeds: DEFAULT_FEEDS,
     initial_scope: scope,
+    initial_mode: process.env.FIN_MODE === 'crypto' ? 'crypto' : 'stock',
   };
 }
