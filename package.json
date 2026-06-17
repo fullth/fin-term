@@ -43,12 +43,15 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.104.1",
+    "blessed": "^0.1.81",
+    "blessed-contrib": "^4.11.0",
     "ink": "^5.0.1",
     "react": "^18.3.1",
     "rss-parser": "^3.13.0",
     "ws": "^8.21.0"
   },
   "devDependencies": {
+    "@types/blessed": "^0.1.27",
     "@types/node": "^20.17.6",
     "@types/react": "^18.3.12",
     "@types/ws": "^8.18.1",

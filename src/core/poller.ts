@@ -2,7 +2,6 @@
 import type { AppConfig } from '../config.js';
 import { fetchQuotes } from '../sources/quote.js';
 import { fetchNews } from '../sources/rss.js';
-import { fetchCryptoNews } from '../sources/crypto-news.js';
 import type { Store } from './store.js';
 
 export class Poller {
@@ -18,12 +17,8 @@ export class Poller {
   start() {
     void this.pollQuotes();
     void this.pollNews();
-    void this.pollCryptoNews();
     this.quoteTimer = setInterval(() => void this.pollQuotes(), this.config.quote_interval_ms);
-    this.newsTimer = setInterval(() => {
-      void this.pollNews();
-      void this.pollCryptoNews();
-    }, this.config.news_interval_ms);
+    this.newsTimer = setInterval(() => void this.pollNews(), this.config.news_interval_ms);
   }
 
   stop() {
@@ -55,11 +50,5 @@ export class Poller {
     const { watchlist, newsScope } = this.store.get();
     const news = await fetchNews(this.config.rss_feeds, watchlist, newsScope);
     if (!this.stopped) this.store.setNews(news);
-  }
-
-  private async pollCryptoNews() {
-    if (this.stopped) return;
-    const news = await fetchCryptoNews();
-    if (!this.stopped && news.length) this.store.setCryptoNews(news);
   }
 }

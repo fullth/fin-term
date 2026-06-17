@@ -6,45 +6,61 @@ process.removeAllListeners('warning');
 process.on('warning', () => {});
 
 import React from 'react';
-import { render } from 'ink';
+import { render, type Instance } from 'ink';
 import { loadConfig } from './config.js';
 import { Store } from './core/store.js';
 import { Poller } from './core/poller.js';
-import { CryptoFeed } from './core/crypto-feed.js';
-import { loadHoldings } from './core/holdings.js';
 import { App } from './ui/App.js';
+import { startCryptoMonitor, type CryptoMonitorHandle } from './crypto-monitor/index.js';
 
 // alternate screen 버퍼로 진입 + 화면 초기화.
-// node 경고(stderr)나 셸 잔상이 ink 출력 위에 남아 레이아웃·마우스 좌표가
-// 밀리는 것을 막는다 (특히 ttyd 등 웹 터미널에서 두드러짐).
 const ALT_ENTER = '\x1b[?1049h\x1b[2J\x1b[H';
 const ALT_EXIT = '\x1b[?1049l';
 process.stdout.write(ALT_ENTER);
 
 const config = loadConfig();
-const holdings = loadHoldings();
-const store = new Store(config.initial_watchlist, config.initial_scope, config.initial_names, holdings);
+const store = new Store(config.initial_watchlist, config.initial_scope, config.initial_names);
 const poller = new Poller(store, config);
 poller.start();
 
-// 보유 코인이 있으면 실시간 KRW 피드 시동 (보유 없으면 웹소켓 안 띄움).
-const cryptoFeed = new CryptoFeed(store);
-if (holdings.length) cryptoFeed.start();
+// Ink(주식) 화면과 blessed(코인) 화면을 번갈아 띄운다. 두 렌더러가 동시에 stdin/
+// raw mode 를 잡으면 충돌하므로, 전환 시 한쪽을 완전히 내린 뒤 다른 쪽을 올린다.
+let inkApp: Instance | null = null;
+let cryptoMonitor: CryptoMonitorHandle | null = null;
 
-const { waitUntilExit } = render(<App store={store} poller={poller} />);
+function showStock() {
+  // 화면 초기화 후 Ink 마운트. App 의 onEnterCrypto 로 코인 모드 요청을 받는다.
+  process.stdout.write('\x1b[2J\x1b[H');
+  inkApp = render(<App store={store} poller={poller} onEnterCrypto={showCrypto} />);
+}
 
-const cleanup = () => {
+function showCrypto() {
+  // Ink 를 완전히 내리고(입력·raw mode 해제) blessed 화면을 띄운다.
+  if (inkApp) {
+    inkApp.unmount();
+    inkApp.cleanup();
+    inkApp = null;
+  }
+  process.stdout.write('\x1b[2J\x1b[H');
+  // blessed 모니터. q/m → showStock 으로 복귀.
+  cryptoMonitor = startCryptoMonitor(() => {
+    cryptoMonitor = null;
+    showStock();
+  });
+}
+
+const quit = () => {
   poller.stop();
-  cryptoFeed.stop();
+  cryptoMonitor?.destroy();
+  inkApp?.unmount();
   process.stdout.write(ALT_EXIT);
+  process.exit(0);
 };
 
-waitUntilExit().then(() => {
-  cleanup();
-  process.exit(0);
-});
+// 초기 모드.
+if (config.initial_mode === 'crypto') showCrypto();
+else showStock();
 
-// 비정상 종료(Ctrl+C, SIGTERM)에도 메인 화면으로 복귀.
-process.on('SIGINT', () => process.exit(0));
-process.on('SIGTERM', () => process.exit(0));
+process.on('SIGINT', quit);
+process.on('SIGTERM', quit);
 process.on('exit', () => process.stdout.write(ALT_EXIT));

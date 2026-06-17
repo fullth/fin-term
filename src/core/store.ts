@@ -1,17 +1,6 @@
 // 앱 상태 컨테이너 + 변경 구독. ink 쪽에서 subscribe 해서 re-render.
 import { EventEmitter } from 'node:events';
-import type {
-  Quote,
-  QuoteMap,
-  NewsItem,
-  NewsScope,
-  Holding,
-  CryptoTicker,
-  CryptoTickerMap,
-  Candle,
-  ChartTimeframe,
-  FeedStatus,
-} from './types.js';
+import type { Quote, QuoteMap, NewsItem, NewsScope } from './types.js';
 import type { SearchResult } from '../sources/search.js';
 import type { HotItem } from '../sources/hot.js';
 import type { Detail } from '../sources/detail.js';
@@ -43,22 +32,7 @@ export interface State {
   markets: Quote[]; // 환율·원자재·암호화폐 시세
   overlay: Overlay | null; // brief/explain 일시 오버레이 (Claude 응답)
   status: string; // 하단 상태 메시지
-  // 화면 모드. stock=기존 주식 대시보드, crypto=업비트 코인 모니터 (좌상단 탭 전환).
-  mode: ViewMode;
-  // --- 코인 모니터 (업비트 KRW) ---
-  holdings: Holding[]; // 보유 내역 (~/.fin-term/holdings.json). 없어도 시세는 표시.
-  cryptoTickers: CryptoTickerMap; // 실시간 KRW 시세 (코인 id → 티커)
-  cryptoSelected: string | null; // 차트·상세 대상 코인 id
-  chartTimeframe: ChartTimeframe; // 차트 기간
-  candles: Candle[]; // 선택 코인·기간 캔들
-  feedStatus: FeedStatus; // 웹소켓 피드 상태
-  alerts: string[]; // 코인 수익률/변동 알림 로그 (최신 우선)
-  cryptoNews: NewsItem[]; // 코인 뉴스 (crypto 모드 하단)
 }
-
-export type ViewMode = 'stock' | 'crypto';
-
-const ALERT_LIMIT = 12;
 
 export class Store extends EventEmitter {
   private state: State;
@@ -67,7 +41,6 @@ export class Store extends EventEmitter {
     initialWatchlist: string[],
     initialScope: NewsScope = 'all',
     initialNames: Record<string, string> = {},
-    initialHoldings: Holding[] = [],
   ) {
     super();
     this.state = {
@@ -87,15 +60,6 @@ export class Store extends EventEmitter {
       markets: [],
       overlay: null,
       status: 'ready',
-      mode: 'stock',
-      holdings: [...initialHoldings],
-      cryptoTickers: {},
-      cryptoSelected: initialHoldings[0]?.id ?? 'bitcoin',
-      chartTimeframe: 'day-7',
-      candles: [],
-      feedStatus: 'polling',
-      alerts: [],
-      cryptoNews: [],
     };
   }
 
@@ -203,54 +167,5 @@ export class Store extends EventEmitter {
 
   clearSearch() {
     this.commit({ searchResults: [], searchQuery: '', focus: 'watchlist' });
-  }
-
-  // --- 코인 모니터 ---
-
-  // 실시간 티커 1건 갱신 (코인 id 키로 머지).
-  setCryptoTicker(ticker: CryptoTicker) {
-    this.commit({ cryptoTickers: { ...this.state.cryptoTickers, [ticker.id]: ticker } });
-  }
-
-  setFeedStatus(feedStatus: FeedStatus) {
-    if (this.state.feedStatus === feedStatus) return; // 동일 상태 재커밋 방지 (불필요 렌더)
-    this.commit({ feedStatus });
-  }
-
-  setCandles(candles: Candle[]) {
-    this.commit({ candles });
-  }
-
-  setCryptoSelected(id: string) {
-    this.commit({ cryptoSelected: id });
-  }
-
-  setChartTimeframe(chartTimeframe: ChartTimeframe) {
-    this.commit({ chartTimeframe });
-  }
-
-  setMode(mode: ViewMode) {
-    if (this.state.mode === mode) return;
-    this.commit({ mode });
-  }
-
-  toggleMode() {
-    this.commit({ mode: this.state.mode === 'stock' ? 'crypto' : 'stock' });
-  }
-
-  setCryptoNews(cryptoNews: NewsItem[]) {
-    this.commit({ cryptoNews });
-  }
-
-  // 알림 로그에 타임스탬프 붙여 최신 우선으로 적재 (최대 ALERT_LIMIT).
-  pushAlert(message: string) {
-    const ts = new Date().toLocaleTimeString('ko-KR', {
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-    const alerts = [`[${ts}] ${message}`, ...this.state.alerts].slice(0, ALERT_LIMIT);
-    this.commit({ alerts });
   }
 }
