@@ -24,8 +24,7 @@ import { fetchDetail } from '../sources/detail.js';
 import { fetchQuotes } from '../sources/quote.js';
 import { explainTerm, hasAiKey } from '../sources/explain.js';
 import { INDICES, MARKETS } from '../config.js';
-import { HoldingsPanel } from './HoldingsPanel.js';
-import { CandleChart } from './CandleChart.js';
+import { CryptoView } from './CryptoView.js';
 import { fetchCandles, coinById, timeframe, TIMEFRAMES, COINS } from '../sources/upbit.js';
 import type { ChartTimeframe } from '../core/types.js';
 
@@ -111,9 +110,9 @@ export function App({ store, poller }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store]);
 
-  // 코인 차트 캔들: 패널 켜졌을 때만 선택 코인·기간으로 fetch + 30s 주기 갱신.
+  // 코인 차트 캔들: 코인 모드일 때만 선택 코인·기간으로 fetch + 30s 주기 갱신.
   useEffect(() => {
-    if (!state.showCrypto) return;
+    if (state.mode !== 'crypto') return;
     const coin = coinById(state.cryptoSelected ?? '');
     if (!coin) return;
     let cancelled = false;
@@ -127,7 +126,7 @@ export function App({ store, poller }: Props) {
       cancelled = true;
       clearInterval(t);
     };
-  }, [state.showCrypto, state.cryptoSelected, state.chartTimeframe, store]);
+  }, [state.mode, state.cryptoSelected, state.chartTimeframe, store]);
 
   // 시작 시 새 버전 확인 (하루 1회 캐시, 실패는 무시)
   useEffect(() => {
@@ -263,9 +262,24 @@ export function App({ store, poller }: Props) {
     return coinById(key) ?? COINS.find((c) => c.symbol.toLowerCase() === key);
   };
 
-  // 차트 기간 전환: 인자 있으면 그 키로, 없으면 다음 기간으로 순환.
+  // 코인 목록 커서 이동 (코인 모드, ↑↓).
+  const moveCoin = (dir: 1 | -1) => {
+    const i = COINS.findIndex((c) => c.id === state.cryptoSelected);
+    const next = COINS[(i + dir + COINS.length) % COINS.length];
+    store.setCryptoSelected(next.id);
+  };
+
+  // 차트 기간 한 칸 이동 (←→). dir +1 다음, -1 이전.
+  const stepTimeframe = (dir: 1 | -1) => {
+    const keys = TIMEFRAMES.map((t) => t.key);
+    const i = keys.indexOf(state.chartTimeframe);
+    const next = keys[(i + dir + keys.length) % keys.length];
+    store.setChartTimeframe(next);
+    store.setStatus(`차트 기간: ${timeframe(next).label}`);
+  };
+
+  // 차트 기간 전환(명령용): 인자 있으면 그 키로, 없으면 다음 기간으로 순환.
   const cycleTimeframe = (arg?: string) => {
-    store.toggleCrypto(true);
     const keys = TIMEFRAMES.map((t) => t.key);
     let next: ChartTimeframe;
     const matched = arg ? TIMEFRAMES.find((t) => t.key === arg || t.label === arg) : undefined;
@@ -277,6 +291,13 @@ export function App({ store, poller }: Props) {
     }
     store.setChartTimeframe(next);
     store.setStatus(`차트 기간: ${timeframe(next).label}`);
+  };
+
+  // 모드 전환 (좌상단 탭 클릭 / m 키 / :mode).
+  const switchMode = (next?: 'stock' | 'crypto') => {
+    const target = next ?? (state.mode === 'stock' ? 'crypto' : 'stock');
+    store.setMode(target);
+    store.setStatus(target === 'crypto' ? '코인 모드' : '주식 모드');
   };
 
   const handleCommand = (cmd: Command) => {
@@ -353,19 +374,22 @@ export function App({ store, poller }: Props) {
         if (cmd.arg) void runExplain(cmd.arg);
         else store.setStatus('형식: :e PER');
         break;
+      case 'mode':
+        switchMode(cmd.arg === 'stock' || cmd.arg === 'crypto' ? cmd.arg : undefined);
+        break;
+      case 'stock':
+        switchMode('stock');
+        break;
       case 'crypto':
       case 'coins':
-      case 'hold': {
-        const show = !state.showCrypto;
-        store.toggleCrypto(show);
-        store.setStatus(show ? '코인 패널 표시' : '코인 패널 숨김');
+      case 'hold':
+        switchMode('crypto');
         break;
-      }
       case 'coin': {
-        // :coin BTC — 차트·상세 대상 코인 선택 (심볼 또는 id)
+        // :coin BTC — 코인 모드로 전환하며 차트·상세 대상 선택 (심볼 또는 id)
         const coin = cmd.arg ? findCoin(cmd.arg) : undefined;
         if (coin) {
-          store.toggleCrypto(true);
+          switchMode('crypto');
           store.setCryptoSelected(coin.id);
           store.setStatus(`코인 선택: ${coin.symbol}`);
         } else {
@@ -375,7 +399,8 @@ export function App({ store, poller }: Props) {
       }
       case 'chart':
       case 'tf': {
-        // :chart 1h 등 기간 지정, 인자 없으면 순환
+        // :chart 1h 등 기간 지정, 인자 없으면 순환 (코인 모드 전환)
+        switchMode('crypto');
         cycleTimeframe(cmd.arg);
         break;
       }
@@ -397,8 +422,12 @@ export function App({ store, poller }: Props) {
     // (아래 옛 코드는 unreachable — 위 return 으로 대체)
   };
 
-  // ↑↓: 포커스 패널 커서 이동
+  // ↑↓: 포커스 패널 커서 이동. 코인 모드면 코인 목록 이동.
   const move = (dir: 1 | -1) => {
+    if (state.mode === 'crypto') {
+      moveCoin(dir);
+      return;
+    }
     if (state.focus === 'news') {
       if (!filteredNews.length) return;
       // 전체 목록 인덱스 기준 이동(끝에서 멈춤). 윈도우는 따라 스크롤됨.
@@ -447,6 +476,15 @@ export function App({ store, poller }: Props) {
   // - WATCHLIST 영역(좌측 패널) 종목 행: WATCHLIST 포커스 + 그 종목 선택.
   // - NEWS 영역 뉴스 행: NEWS 포커스 + 그 행 선택. 같은 행 재클릭이면 기사 열기.
   const onMouseClick = (e: MouseClick) => {
+    // 헤더 첫 줄(모드 탭) 클릭 → 주식↔코인 전환. col 으로 탭 구분.
+    if (e.row <= 1) {
+      // " FIN-TERM "(10) + 공백(1) = 11 이후가 [주식][코인] 탭 영역.
+      if (e.col >= 11 && e.col <= 15) switchMode('stock');
+      else if (e.col >= 16 && e.col <= 20) switchMode('crypto');
+      else switchMode(); // 헤더 첫줄 다른 곳 클릭도 토글
+      return;
+    }
+
     // 검색바: WATCHLIST 박스 바로 위(테두리 포함 2~3행). 좌측 절반=종목, 우측=용어.
     // 검색바 입력 행은 wlFirstRow 직전 영역 (헤더 박스 안 맨 아래).
     if (e.row < wlFirstRow - 1 && e.row >= wlFirstRow - 4) {
@@ -556,6 +594,8 @@ export function App({ store, poller }: Props) {
           onTab={() => {}}
           onEnter={() => {}}
           onEscape={escape}
+          onMode={() => {}}
+          onHorizontal={() => {}}
           onRefresh={() => {}}
           onHelp={() => {}}
           inputActive={false}
@@ -564,39 +604,91 @@ export function App({ store, poller }: Props) {
     );
   }
 
+  // 코인 모드 뉴스 줄 수 — 상단 고정 패널(헤더+목록/상세+차트/요약·알림 ≈ 19행) 이후 남는 높이.
+  const cryptoNewsRows = Math.max(3, rows - 22);
+
+  // 좌상단 모드 탭. 두 모드 공통 헤더.
+  const ModeTabs = (
+    <Box paddingX={1}>
+      <Text bold backgroundColor="yellow" color="black">
+        {' '}FIN-TERM{' '}
+      </Text>
+      <Text> </Text>
+      <Text
+        bold={state.mode === 'stock'}
+        backgroundColor={state.mode === 'stock' ? 'cyan' : undefined}
+        color={state.mode === 'stock' ? 'black' : 'gray'}
+      >
+        {' '}주식{' '}
+      </Text>
+      <Text
+        bold={state.mode === 'crypto'}
+        backgroundColor={state.mode === 'crypto' ? 'cyan' : undefined}
+        color={state.mode === 'crypto' ? 'black' : 'gray'}
+      >
+        {' '}코인{' '}
+      </Text>
+      <Text dimColor> · m 또는 클릭으로 전환</Text>
+      {state.update && (
+        <Text color="green">
+          {'  '}⬆ {state.update.latest} · npm i -g fin-term@latest
+        </Text>
+      )}
+    </Box>
+  );
+
+  const commandBar = (
+    <CommandBar
+      status={state.status}
+      hint={hint}
+      onCommand={handleCommand}
+      onQuit={() => exit()}
+      onMove={move}
+      onTab={cycleFocus}
+      onEnter={activate}
+      onEscape={escape}
+      onRefresh={refreshNow}
+      onHelp={() => store.setOverlay({ kind: 'help' })}
+      onMode={() => switchMode()}
+      onHorizontal={(dir) => {
+        if (state.mode === 'crypto') stepTimeframe(dir);
+      }}
+      inputActive={state.focus === 'symbolInput' || state.focus === 'termInput'}
+    />
+  );
+
+  // 코인 모드 — bitcoin-monitor 레이아웃 전체 화면.
+  if (state.mode === 'crypto') {
+    return (
+      <Box flexDirection="column" width="100%">
+        {ModeTabs}
+        <CryptoView
+          tickers={state.cryptoTickers}
+          holdings={state.holdings}
+          selected={state.cryptoSelected}
+          chartTimeframe={state.chartTimeframe}
+          candles={state.candles}
+          feedStatus={state.feedStatus}
+          alerts={state.alerts}
+          news={state.cryptoNews}
+          newsRows={cryptoNewsRows}
+          selectedFocused
+        />
+        {commandBar}
+      </Box>
+    );
+  }
+
+  // 주식 모드 — 기존 대시보드.
   return (
     <Box flexDirection="column" width="100%">
       {/* 상단 영역: 높이를 측정해 뉴스 첫 행 위치 계산 (마우스 클릭 매핑용) */}
       <Box flexDirection="column" ref={topRef}>
         {/* 헤더 + 안내 — 높이를 측정해 WATCHLIST 첫 종목 행 위치 계산 (마우스 매핑용) */}
         <Box flexDirection="column" ref={headerRef}>
-          <Box paddingX={1}>
-            <Text bold backgroundColor="yellow" color="black">
-              {' '}FIN-TERM{' '}
-            </Text>
-            <Text dimColor> live quotes + news · free data</Text>
-            {state.update && (
-              <Text color="green">
-                {'  '}⬆ 업데이트 {state.update.latest} · npm i -g fin-term@latest
-              </Text>
-            )}
-          </Box>
+          {ModeTabs}
           {/* 사용법 안내 — 조작과 기능을 상단에 노출 */}
           <Box paddingX={1} flexDirection="column">
-            <Text>
-              <Text color="cyan">클릭</Text>
-              <Text dimColor> 패널/항목 선택 (뉴스는 한 번 더 클릭하면 열림) · </Text>
-              <Text color="cyan">Tab</Text>
-              <Text dimColor> 패널/검색칸 전환 · </Text>
-              <Text color="cyan">↑↓</Text>
-              <Text dimColor> 이동 · </Text>
-              <Text color="cyan">Enter</Text>
-              <Text dimColor> 열기/추가 · </Text>
-              <Text color="cyan">r</Text>
-              <Text dimColor> 새로고침 · </Text>
-              <Text color="cyan">q</Text>
-              <Text dimColor> 종료</Text>
-            </Text>
             <Text dimColor>
               <Text color="yellow">:s</Text> 종목검색 ·{' '}
               <Text color="yellow">:a</Text>/<Text color="yellow">:rm</Text> 관심종목 ·{' '}
@@ -604,7 +696,6 @@ export function App({ store, poller }: Props) {
               <Text color="yellow">:sc</Text> 국내/해외/전체 ·{' '}
               <Text color="magenta">:b</Text> AI브리핑 ·{' '}
               <Text color="green">:e</Text> 용어풀이 ·{' '}
-              <Text color="cyan">:crypto</Text> 코인 ·{' '}
               <Text color="gray">?</Text> 도움말
             </Text>
           </Box>
@@ -638,31 +729,6 @@ export function App({ store, poller }: Props) {
             <MarketsPanel quotes={state.markets} />
           </Box>
         </Box>
-        {/* 코인 모니터 — :crypto 토글 시에만 표시 (평소 화면 높이 유지 → 깜빡임 억제) */}
-        {state.showCrypto && (
-          <Box>
-            <HoldingsPanel
-              holdings={state.holdings}
-              tickers={state.cryptoTickers}
-              selected={state.cryptoSelected}
-              feedStatus={state.feedStatus}
-              focused={false}
-            />
-            <Box flexGrow={1}>
-              <CandleChart
-                symbol={coinById(state.cryptoSelected ?? '')?.symbol ?? '—'}
-                timeframeLabel={timeframe(state.chartTimeframe).label}
-                candles={state.candles}
-                avgBuyKrw={
-                  state.holdings.find((h) => h.id === state.cryptoSelected)?.avg_buy_krw ?? null
-                }
-                width={48}
-                height={8}
-                focused={false}
-              />
-            </Box>
-          </Box>
-        )}
         {state.searchResults.length > 0 && (
           <SearchPanel
             query={state.searchQuery}
@@ -685,19 +751,7 @@ export function App({ store, poller }: Props) {
         hasAbove={windowStart > 0}
         hasBelow={windowStart + newsRows < filteredNews.length}
       />
-      <CommandBar
-        status={state.status}
-        hint={hint}
-        onCommand={handleCommand}
-        onQuit={() => exit()}
-        onMove={move}
-        onTab={cycleFocus}
-        onEnter={activate}
-        onEscape={escape}
-        onRefresh={refreshNow}
-        onHelp={() => store.setOverlay({ kind: 'help' })}
-        inputActive={state.focus === 'symbolInput' || state.focus === 'termInput'}
-      />
+      {commandBar}
     </Box>
   );
 }

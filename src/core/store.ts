@@ -43,16 +43,20 @@ export interface State {
   markets: Quote[]; // 환율·원자재·암호화폐 시세
   overlay: Overlay | null; // brief/explain 일시 오버레이 (Claude 응답)
   status: string; // 하단 상태 메시지
+  // 화면 모드. stock=기존 주식 대시보드, crypto=업비트 코인 모니터 (좌상단 탭 전환).
+  mode: ViewMode;
   // --- 코인 모니터 (업비트 KRW) ---
-  holdings: Holding[]; // 보유 내역 (~/.fin-term/holdings.json)
+  holdings: Holding[]; // 보유 내역 (~/.fin-term/holdings.json). 없어도 시세는 표시.
   cryptoTickers: CryptoTickerMap; // 실시간 KRW 시세 (코인 id → 티커)
   cryptoSelected: string | null; // 차트·상세 대상 코인 id
   chartTimeframe: ChartTimeframe; // 차트 기간
   candles: Candle[]; // 선택 코인·기간 캔들
   feedStatus: FeedStatus; // 웹소켓 피드 상태
   alerts: string[]; // 코인 수익률/변동 알림 로그 (최신 우선)
-  showCrypto: boolean; // 코인 패널(보유·차트) 표시 토글 (:crypto)
+  cryptoNews: NewsItem[]; // 코인 뉴스 (crypto 모드 하단)
 }
+
+export type ViewMode = 'stock' | 'crypto';
 
 const ALERT_LIMIT = 12;
 
@@ -83,6 +87,7 @@ export class Store extends EventEmitter {
       markets: [],
       overlay: null,
       status: 'ready',
+      mode: 'stock',
       holdings: [...initialHoldings],
       cryptoTickers: {},
       cryptoSelected: initialHoldings[0]?.id ?? 'bitcoin',
@@ -90,7 +95,7 @@ export class Store extends EventEmitter {
       candles: [],
       feedStatus: 'polling',
       alerts: [],
-      showCrypto: false,
+      cryptoNews: [],
     };
   }
 
@@ -224,8 +229,17 @@ export class Store extends EventEmitter {
     this.commit({ chartTimeframe });
   }
 
-  toggleCrypto(show?: boolean) {
-    this.commit({ showCrypto: show ?? !this.state.showCrypto });
+  setMode(mode: ViewMode) {
+    if (this.state.mode === mode) return;
+    this.commit({ mode });
+  }
+
+  toggleMode() {
+    this.commit({ mode: this.state.mode === 'stock' ? 'crypto' : 'stock' });
+  }
+
+  setCryptoNews(cryptoNews: NewsItem[]) {
+    this.commit({ cryptoNews });
   }
 
   // 알림 로그에 타임스탬프 붙여 최신 우선으로 적재 (최대 ALERT_LIMIT).

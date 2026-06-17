@@ -18,6 +18,8 @@ interface Props {
   onEscape: () => void; // Esc: 검색 패널 닫기 등
   onRefresh: () => void; // r: 시세·뉴스 즉시 갱신
   onHelp: () => void; // ?: 단축키 도움말 모달 열기
+  onMode: () => void; // m: 주식↔코인 모드 토글
+  onHorizontal: (dir: 1 | -1) => void; // ←→: 코인 모드 차트 기간 전환
   inputActive: boolean; // 검색 입력바 포커스 중이면 글자 단축키(q/r/jk)를 SearchBar 에 양보
 }
 
@@ -40,6 +42,8 @@ export function CommandBar({
   onEscape,
   onRefresh,
   onHelp,
+  onMode,
+  onHorizontal,
   inputActive,
 }: Props) {
   const [buffer, setBuffer] = useState('');
@@ -90,10 +94,16 @@ export function CommandBar({
       onRefresh();
     } else if (input === '?') {
       onHelp();
+    } else if (input === 'm') {
+      onMode();
     } else if (key.downArrow || input === 'j') {
       onMove(1);
     } else if (key.upArrow || input === 'k') {
       onMove(-1);
+    } else if (key.rightArrow || input === 'l') {
+      onHorizontal(1);
+    } else if (key.leftArrow || input === 'h') {
+      onHorizontal(-1);
     }
   });
 

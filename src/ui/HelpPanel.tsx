@@ -22,15 +22,18 @@ const COMMANDS: Cmd[] = [
   { short: ':h', full: ':hot', desc: '핫 종목 새로고침' },
   { short: ':i', full: ':indices', desc: '지수 새로고침' },
   { short: ':r', full: ':refresh', desc: '시세·뉴스 즉시 새로고침' },
-  { short: '', full: ':crypto', desc: '코인 보유·차트 패널 토글' },
-  { short: '', full: ':coin', desc: '차트 코인 선택 (:coin BTC)' },
-  { short: '', full: ':chart', desc: '차트 기간 전환 (1분~1달)' },
+  { short: '', full: ':crypto', desc: '코인 모드로 전환 (m 키 / 탭 클릭도 가능)' },
+  { short: '', full: ':stock', desc: '주식 모드로 전환' },
+  { short: '', full: ':coin', desc: '코인 모드 + 차트 코인 선택 (:coin BTC)' },
+  { short: '', full: ':chart', desc: '차트 기간 전환 (1분~1달, ←→ 도 가능)' },
   { short: ':q', full: ':quit', desc: '종료' },
 ];
 
 const KEYS: { key: string; desc: string }[] = [
+  { key: 'm', desc: '주식 ↔ 코인 모드 전환 (좌상단 탭 클릭도 가능)' },
   { key: 'Tab', desc: '패널 포커스 전환 (검색칸→용어칸→WATCHLIST→NEWS)' },
-  { key: '↑ ↓ / j k', desc: '포커스 패널에서 커서 이동' },
+  { key: '↑ ↓ / j k', desc: '포커스 패널 커서 이동 (코인 모드: 코인 선택)' },
+  { key: '← → / h l', desc: '코인 모드: 차트 기간 전환' },
   { key: 'Enter', desc: '뉴스 열기 · 검색 결과 종목 추가' },
   { key: '/', desc: '빠른 종목 검색' },
   { key: '?', desc: '이 도움말 열기' },
