@@ -24,4 +24,6 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # node 경고가 화면 맨 위에 박히는 것 방지 (ttyd 가 stderr 도 머지)
 ENV NODE_NO_WARNINGS=1
+# UTF-8 로케일. 없으면(기본 C 로케일) Node·ttyd 가 한글 등 멀티바이트를 '?' 로 떨군다.
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8 LANGUAGE=C.UTF-8
 ENTRYPOINT ["docker-entrypoint.sh"]
