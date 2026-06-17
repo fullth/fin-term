@@ -85,15 +85,60 @@ export function startCryptoMonitor(onExit: () => void): CryptoMonitorHandle {
     title: '비트코인 모니터링 패널',
     fullUnicode: true,
   });
+  // blessed 는 기본적으로 자체 alt-screen 버퍼에 그린다. index 가 소유한 alt-screen 과
+  // 중첩되면 반복 전환 시 잔상이 누적되므로, blessed 를 메인(=index alt) 버퍼로 끌어내려
+  // 같은 버퍼를 공유하게 한다. 그 뒤 전 화면을 비우고 강제 재그리기.
+  try {
+    (screen.program as any).normalBuffer();
+  } catch {
+    /* noop */
+  }
+  screen.program.clear();
+  (screen as any).alloc();
 
   const grid = new contrib.grid({ rows: 18, cols: 12, screen });
 
   const header = grid.set(0, 0, 3, 12, blessed.box, {
-    label: ' 코인 모니터 ',
     tags: true,
     border: 'line',
     style: { border: { fg: 'cyan' } },
   });
+
+  // 좌상단 모드 탭 (크게). [주식] 클릭 시 주식 모드로 복귀, [코인] 은 현재 활성.
+  const modeTabs = blessed.box({
+    parent: screen,
+    top: 0,
+    left: 2,
+    width: 28,
+    height: 3,
+    tags: true,
+    mouse: true,
+    border: 'line',
+    style: { border: { fg: 'yellow' } },
+  });
+  const stockTab = blessed.box({
+    parent: modeTabs,
+    top: 0,
+    left: 0,
+    width: 12,
+    height: 1,
+    tags: true,
+    mouse: true,
+    clickable: true,
+    content: '{gray-fg}  주식  {/gray-fg}',
+  });
+  const coinTab = blessed.box({
+    parent: modeTabs,
+    top: 0,
+    left: 13,
+    width: 12,
+    height: 1,
+    tags: true,
+    content: '{black-fg}{cyan-bg}  코인  {/cyan-bg}{/black-fg}',
+  });
+  // 클릭으로 주식 모드 복귀.
+  stockTab.on('click', () => exitToStock());
+  modeTabs.on('click', () => exitToStock());
 
   const watchlistTable = grid.set(3, 0, 5, 4, blessed.box, {
     label: ' 관심 코인 ',
@@ -509,10 +554,11 @@ export function startCryptoMonitor(onExit: () => void): CryptoMonitorHandle {
     const portfolio = getPortfolioSummary();
     header.setContent(
       [
-        '{bold}실시간 코인 시세 + 한국어 뉴스{/bold}',
+        // 첫 줄 왼쪽은 모드 탭(약 28칸)이 덮으므로 그만큼 띄운다.
+        '                              {bold}실시간 코인 시세 + 한국어 뉴스{/bold}',
         `선택: {cyan-fg}${selected.symbol}{/cyan-fg} ${selected.name}  |  시세: {white-fg}${feedStatusLabel(state.feedStatus)}{/white-fg}  |  갱신: {white-fg}${state.lastUpdated}{/white-fg}`,
         `총 평가금액: ${fmtSensitive(portfolio.currentValueKrw, fmtKrw)}  |  손익 ${fmtSensitive(portfolio.pnlKrw, fmtKrw)} (${colorizeSensitivePercent(portfolio.returnPct as number)})`,
-        `키: {yellow-fg}Up/Down{/yellow-fg} 코인 이동  {yellow-fg}Left/Right{/yellow-fg} 차트 기간  {yellow-fg}1-4{/yellow-fg} 바로가기  {yellow-fg}m{/yellow-fg} 마스킹  {yellow-fg}r{/yellow-fg} 새로고침  {yellow-fg}q{/yellow-fg} 주식 모드`,
+        `키: {yellow-fg}↑↓{/yellow-fg} 코인  {yellow-fg}←→{/yellow-fg} 기간  {yellow-fg}1-4{/yellow-fg} 바로가기  {yellow-fg}s{/yellow-fg} 마스킹  {yellow-fg}r{/yellow-fg} 새로고침  {yellow-fg}q{/yellow-fg}/{yellow-fg}m{/yellow-fg}/탭클릭 주식 모드`,
       ].join('\n'),
     );
   }
@@ -757,6 +803,9 @@ export function startCryptoMonitor(onExit: () => void): CryptoMonitorHandle {
     } catch {
       /* noop */
     }
+    // destroy 가 alt-screen 잔상을 완전히 안 지워 다음 Ink 화면이 한 줄 밀린다.
+    // 스크롤백(3J)까지 비우고 커서를 홈으로 보내 잔상을 제거한다.
+    process.stdout.write('\x1b[3J\x1b[2J\x1b[H');
   }
 
   function bindKeys() {

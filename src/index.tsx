@@ -13,9 +13,9 @@ import { Poller } from './core/poller.js';
 import { App } from './ui/App.js';
 import { startCryptoMonitor, type CryptoMonitorHandle } from './crypto-monitor/index.js';
 
-// alternate screen 버퍼로 진입 + 화면 초기화.
-const ALT_ENTER = '\x1b[?1049h\x1b[2J\x1b[H';
-const ALT_EXIT = '\x1b[?1049l';
+// index 가 단일 alt-screen 을 소유한다. Ink·blessed 모두 이 한 버퍼 안에 그리고
+// (blessed 는 normalBuffer 로 끌어내려 공유), 전환 시 버퍼를 완전히 비운다.
+const ALT_ENTER = '\x1b[?1049h';
 process.stdout.write(ALT_ENTER);
 
 const config = loadConfig();
@@ -28,32 +28,40 @@ poller.start();
 let inkApp: Instance | null = null;
 let cryptoMonitor: CryptoMonitorHandle | null = null;
 
+// 전환마다: 모든 마우스 트래킹 모드 해제(SGR 시퀀스가 입력으로 새지 않게) +
+// alt-screen 재진입 + 스크롤백 비우고 커서 홈.
+// 마우스 모드: 1000(클릭) 1002(드래그) 1003(모션) 1006(SGR) 1015 1005 전부 끈다.
+const MOUSE_OFF = '\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1005l\x1b[?1006l\x1b[?1015l';
+const CLEAR = `${MOUSE_OFF}\x1b[?1049h\x1b[3J\x1b[2J\x1b[H`;
+
 function showStock() {
-  // 화면 초기화 후 Ink 마운트. App 의 onEnterCrypto 로 코인 모드 요청을 받는다.
-  process.stdout.write('\x1b[2J\x1b[H');
-  inkApp = render(<App store={store} poller={poller} onEnterCrypto={showCrypto} />);
+  // blessed destroy 후 한 틱 뒤에 버퍼를 비우고 Ink 를 마운트.
+  setImmediate(() => {
+    process.stdout.write(CLEAR);
+    inkApp = render(<App store={store} poller={poller} onEnterCrypto={showCrypto} />);
+  });
 }
 
 function showCrypto() {
-  // Ink 를 완전히 내리고(입력·raw mode 해제) blessed 화면을 띄운다.
   if (inkApp) {
     inkApp.unmount();
-    inkApp.cleanup();
     inkApp = null;
   }
-  process.stdout.write('\x1b[2J\x1b[H');
-  // blessed 모니터. q/m → showStock 으로 복귀.
-  cryptoMonitor = startCryptoMonitor(() => {
-    cryptoMonitor = null;
-    showStock();
+  setImmediate(() => {
+    process.stdout.write(CLEAR);
+    cryptoMonitor = startCryptoMonitor(() => {
+      cryptoMonitor = null;
+      showStock();
+    });
   });
 }
 
 const quit = () => {
   poller.stop();
-  cryptoMonitor?.destroy();
+  cryptoMonitor?.destroy(); // blessed alt-screen 정리 포함
   inkApp?.unmount();
-  process.stdout.write(ALT_EXIT);
+  // 마우스 트래킹 해제 + alt-screen 탈출 (프롬프트 복귀 후 SGR 누수 방지)
+  process.stdout.write(`${MOUSE_OFF}\x1b[?1049l`);
   process.exit(0);
 };
 
@@ -63,4 +71,4 @@ else showStock();
 
 process.on('SIGINT', quit);
 process.on('SIGTERM', quit);
-process.on('exit', () => process.stdout.write(ALT_EXIT));
+process.on('exit', () => process.stdout.write(`${MOUSE_OFF}\x1b[?1049l`));

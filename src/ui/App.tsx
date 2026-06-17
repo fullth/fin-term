@@ -139,7 +139,9 @@ export function App({ store, poller, onEnterCrypto }: Props) {
   // newsFirstRow(뉴스 첫 항목 절대행) 다음에 뉴스 N행 + 하단 border(1) + commandbar(1)
   // 이 들어가야 하므로, 출력이 터미널을 넘지 않도록 여유 4줄을 빼서 깜빡임을 막는다.
   const rows = stdout?.rows ?? 30;
-  const newsRows = Math.max(3, (newsFirstRow > 0 ? rows - newsFirstRow : rows - 20) - 4);
+  // 여유 6줄: 전체 출력이 터미널 높이를 절대 넘지 않게 한다. 1줄이라도 넘치면 ink 가
+  // 맨 윗줄을 스크롤로 밀어올려 이전 프레임 한 줄이 상단에 잔상으로 남는다.
+  const newsRows = Math.max(3, (newsFirstRow > 0 ? rows - newsFirstRow : rows - 20) - 6);
   // 필터 적용된 전체 목록. newsCursor 는 이 전체 인덱스를 가리킨다.
   const filteredNews = state.newsFilter
     ? state.news.filter((n) => n.tickers.includes(state.newsFilter!))
@@ -380,10 +382,11 @@ export function App({ store, poller, onEnterCrypto }: Props) {
   // - WATCHLIST 영역(좌측 패널) 종목 행: WATCHLIST 포커스 + 그 종목 선택.
   // - NEWS 영역 뉴스 행: NEWS 포커스 + 그 행 선택. 같은 행 재클릭이면 기사 열기.
   const onMouseClick = (e: MouseClick) => {
-    // 헤더 첫 줄 [코인] 탭 클릭 → 코인 모드. " FIN-TERM "(10)+공백+[주식] 뒤.
-    if (e.row <= 1) {
-      if (e.col >= 16 && e.col <= 20) onEnterCrypto(); // [코인] 탭 영역
-      return;
+    // 좌상단 모드 탭 박스(테두리 포함 3행) 클릭. 내용 행(row 2)의 [코인] 영역 → 코인 모드.
+    // 박스 border(1) + paddingX(1) 이후: [주식](col 2~9) 공백 [코인](col 11~18).
+    if (e.row <= 3) {
+      if (e.col >= 10 && e.col <= 19) onEnterCrypto(); // [코인] 탭 클릭
+      return; // 주식 탭/박스 다른 곳 클릭은 무시(이미 주식 모드)
     }
 
     // 검색바: WATCHLIST 박스 바로 위(테두리 포함 2~3행). 좌측 절반=종목, 우측=용어.
@@ -505,22 +508,27 @@ export function App({ store, poller, onEnterCrypto }: Props) {
     );
   }
 
-  // 좌상단 모드 탭. [주식] 활성 · [코인] 클릭/m 으로 코인 모드(blessed) 진입.
+  // 좌상단 모드 탭 (크게). [주식] 활성 · [코인] 클릭/m 으로 코인 모드(blessed) 진입.
+  // 박스 테두리 1행 + 내용 1행 + 테두리 1행 = 3행. 마우스 매핑은 onMouseClick 참조.
   const ModeTabs = (
-    <Box paddingX={1}>
-      <Text bold backgroundColor="yellow" color="black">
-        {' '}FIN-TERM{' '}
-      </Text>
-      <Text> </Text>
-      <Text bold backgroundColor="cyan" color="black">
-        {' '}주식{' '}
-      </Text>
-      <Text color="gray">{' '}코인{' '}</Text>
-      <Text dimColor> · m/클릭으로 코인 모드</Text>
-      {state.update && (
-        <Text color="green">
-          {'  '}⬆ {state.update.latest} · npm i -g fin-term@latest
+    <Box>
+      <Box borderStyle="round" borderColor="yellow" paddingX={1}>
+        <Text bold backgroundColor="cyan" color="black">
+          {'  주식  '}
         </Text>
+        <Text> </Text>
+        <Text color="gray">{'  코인  '}</Text>
+      </Box>
+      <Box paddingX={1} flexDirection="column" justifyContent="center">
+        <Text bold backgroundColor="yellow" color="black">
+          {' FIN-TERM '}
+        </Text>
+        <Text dimColor>m 또는 [코인] 클릭 → 코인 모드</Text>
+      </Box>
+      {state.update && (
+        <Box justifyContent="center" flexDirection="column">
+          <Text color="green">⬆ {state.update.latest} · npm i -g fin-term@latest</Text>
+        </Box>
       )}
     </Box>
   );
@@ -544,8 +552,12 @@ export function App({ store, poller, onEnterCrypto }: Props) {
   );
 
   // 주식 모드 대시보드. (코인 모드는 index 에서 blessed 화면으로 교체)
+  // 최상위 박스 높이를 터미널 높이로 고정. 출력이 높이를 넘으면 ink 가 스크롤로 맨
+  // 윗줄을 밀어올려 잔상이 남으므로, 높이를 고정해 그 안에 들어오게 한다.
+  // (overflow=hidden 은 OSC8 하이퍼링크 시퀀스까지 잘라 제목·테두리가 깨지므로 안 씀.
+  //  대신 newsRows 여유로 콘텐츠가 높이를 넘지 않게 맞춘다.)
   return (
-    <Box flexDirection="column" width="100%">
+    <Box flexDirection="column" width="100%" height={rows - 1}>
       {/* 상단 영역: 높이를 측정해 뉴스 첫 행 위치 계산 (마우스 클릭 매핑용) */}
       <Box flexDirection="column" ref={topRef}>
         {/* 헤더 + 안내 — 높이를 측정해 WATCHLIST 첫 종목 행 위치 계산 (마우스 매핑용) */}
