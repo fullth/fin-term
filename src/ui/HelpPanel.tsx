@@ -22,6 +22,9 @@ const COMMANDS: Cmd[] = [
   { short: ':h', full: ':hot', desc: '핫 종목 새로고침' },
   { short: ':i', full: ':indices', desc: '지수 새로고침' },
   { short: ':r', full: ':refresh', desc: '시세·뉴스 즉시 새로고침' },
+  { short: '', full: ':crypto', desc: '코인 보유·차트 패널 토글' },
+  { short: '', full: ':coin', desc: '차트 코인 선택 (:coin BTC)' },
+  { short: '', full: ':chart', desc: '차트 기간 전환 (1분~1달)' },
   { short: ':q', full: ':quit', desc: '종료' },
 ];
 

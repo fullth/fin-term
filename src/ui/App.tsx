@@ -24,6 +24,10 @@ import { fetchDetail } from '../sources/detail.js';
 import { fetchQuotes } from '../sources/quote.js';
 import { explainTerm, hasAiKey } from '../sources/explain.js';
 import { INDICES, MARKETS } from '../config.js';
+import { HoldingsPanel } from './HoldingsPanel.js';
+import { CandleChart } from './CandleChart.js';
+import { fetchCandles, coinById, timeframe, TIMEFRAMES, COINS } from '../sources/upbit.js';
+import type { ChartTimeframe } from '../core/types.js';
 
 interface Props {
   store: Store;
@@ -39,11 +43,28 @@ export function App({ store, poller }: Props) {
   const [newsCursor, setNewsCursor] = useState(0);
   const [searchCursor, setSearchCursor] = useState(0);
 
+  // store 변경 → setState. 단, 업비트 웹소켓 티커는 초당 수십 건 commit 하므로
+  // 매번 즉시 setState 하면 전체 재렌더가 폭주해 (특히 ttyd 웹 송출에서) 깜빡인다.
+  // 마지막 상태를 모아 ~120ms 마다 한 번만 반영(throttle)해 재렌더 빈도를 묶는다.
   useEffect(() => {
-    const onChange = (s: State) => setState({ ...s });
+    let pending: State | null = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const flush = () => {
+      timer = null;
+      if (pending) {
+        setState(pending);
+        pending = null;
+      }
+    };
+    const onChange = (s: State) => {
+      pending = { ...s };
+      if (timer) return; // 이미 flush 예약됨 — 최신 상태만 갱신하고 대기
+      timer = setTimeout(flush, 120);
+    };
     store.on('change', onChange);
     return () => {
       store.off('change', onChange);
+      if (timer) clearTimeout(timer);
     };
   }, [store]);
 
@@ -89,6 +110,24 @@ export function App({ store, poller }: Props) {
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store]);
+
+  // 코인 차트 캔들: 패널 켜졌을 때만 선택 코인·기간으로 fetch + 30s 주기 갱신.
+  useEffect(() => {
+    if (!state.showCrypto) return;
+    const coin = coinById(state.cryptoSelected ?? '');
+    if (!coin) return;
+    let cancelled = false;
+    const load = async () => {
+      const candles = await fetchCandles(coin.market, state.chartTimeframe);
+      if (!cancelled) store.setCandles(candles);
+    };
+    void load();
+    const t = setInterval(load, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [state.showCrypto, state.cryptoSelected, state.chartTimeframe, store]);
 
   // 시작 시 새 버전 확인 (하루 1회 캐시, 실패는 무시)
   useEffect(() => {
@@ -218,6 +257,28 @@ export function App({ store, poller }: Props) {
     );
   };
 
+  // 코인 검색: id(bitcoin) 또는 심볼(BTC) 둘 다 허용.
+  const findCoin = (q: string) => {
+    const key = q.toLowerCase().trim();
+    return coinById(key) ?? COINS.find((c) => c.symbol.toLowerCase() === key);
+  };
+
+  // 차트 기간 전환: 인자 있으면 그 키로, 없으면 다음 기간으로 순환.
+  const cycleTimeframe = (arg?: string) => {
+    store.toggleCrypto(true);
+    const keys = TIMEFRAMES.map((t) => t.key);
+    let next: ChartTimeframe;
+    const matched = arg ? TIMEFRAMES.find((t) => t.key === arg || t.label === arg) : undefined;
+    if (matched) {
+      next = matched.key;
+    } else {
+      const i = keys.indexOf(state.chartTimeframe);
+      next = keys[(i + 1) % keys.length];
+    }
+    store.setChartTimeframe(next);
+    store.setStatus(`차트 기간: ${timeframe(next).label}`);
+  };
+
   const handleCommand = (cmd: Command) => {
     switch (cmd.name) {
       case 'a':
@@ -292,6 +353,32 @@ export function App({ store, poller }: Props) {
         if (cmd.arg) void runExplain(cmd.arg);
         else store.setStatus('형식: :e PER');
         break;
+      case 'crypto':
+      case 'coins':
+      case 'hold': {
+        const show = !state.showCrypto;
+        store.toggleCrypto(show);
+        store.setStatus(show ? '코인 패널 표시' : '코인 패널 숨김');
+        break;
+      }
+      case 'coin': {
+        // :coin BTC — 차트·상세 대상 코인 선택 (심볼 또는 id)
+        const coin = cmd.arg ? findCoin(cmd.arg) : undefined;
+        if (coin) {
+          store.toggleCrypto(true);
+          store.setCryptoSelected(coin.id);
+          store.setStatus(`코인 선택: ${coin.symbol}`);
+        } else {
+          store.setStatus('형식: :coin BTC');
+        }
+        break;
+      }
+      case 'chart':
+      case 'tf': {
+        // :chart 1h 등 기간 지정, 인자 없으면 순환
+        cycleTimeframe(cmd.arg);
+        break;
+      }
       case '?':
       case 'help':
         store.setOverlay({ kind: 'help' });
@@ -517,8 +604,8 @@ export function App({ store, poller }: Props) {
               <Text color="yellow">:sc</Text> 국내/해외/전체 ·{' '}
               <Text color="magenta">:b</Text> AI브리핑 ·{' '}
               <Text color="green">:e</Text> 용어풀이 ·{' '}
-              <Text color="gray">?</Text> 도움말{'  '}
-              <Text dimColor>(핫종목·지수·환율은 하단 상시)</Text>
+              <Text color="cyan">:crypto</Text> 코인 ·{' '}
+              <Text color="gray">?</Text> 도움말
             </Text>
           </Box>
           {/* 상단 상시 검색바 — 종목 / 용어. 클릭·Tab 으로 포커스 후 입력 */}
@@ -551,6 +638,31 @@ export function App({ store, poller }: Props) {
             <MarketsPanel quotes={state.markets} />
           </Box>
         </Box>
+        {/* 코인 모니터 — :crypto 토글 시에만 표시 (평소 화면 높이 유지 → 깜빡임 억제) */}
+        {state.showCrypto && (
+          <Box>
+            <HoldingsPanel
+              holdings={state.holdings}
+              tickers={state.cryptoTickers}
+              selected={state.cryptoSelected}
+              feedStatus={state.feedStatus}
+              focused={false}
+            />
+            <Box flexGrow={1}>
+              <CandleChart
+                symbol={coinById(state.cryptoSelected ?? '')?.symbol ?? '—'}
+                timeframeLabel={timeframe(state.chartTimeframe).label}
+                candles={state.candles}
+                avgBuyKrw={
+                  state.holdings.find((h) => h.id === state.cryptoSelected)?.avg_buy_krw ?? null
+                }
+                width={48}
+                height={8}
+                focused={false}
+              />
+            </Box>
+          </Box>
+        )}
         {state.searchResults.length > 0 && (
           <SearchPanel
             query={state.searchQuery}
