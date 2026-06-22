@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 import { fmtPct, arrow, changeClass, fmtTime } from '../lib/format';
 import { Sparkline } from './Sparkline';
 import { CoinSearchBar } from './CoinSearchBar';
+import { loadAlertSettings, saveAlertSettings, requestNotifyPermission, fireAlert } from '../lib/alerts';
 
 function fmtKrw(n: number | null): string {
   if (n == null) return '—';
@@ -22,6 +23,15 @@ export function CryptoView({ coins: coinList, onAdd, onRemove }: Props) {
   const [live, setLive] = useState<Record<string, UpbitTick>>({});
   const [news, setNews] = useState<CoinNewsItem[]>([]);
   const [selected, setSelected] = useState<string | null>(coinList[0]?.symbol ?? null);
+
+  // 가격 알림 — localStorage 설정, 만료 없음. 세션 기준가 대비 ±threshold% 시 알림.
+  const [alerts, setAlerts] = useState(loadAlertSettings);
+  const [toast, setToast] = useState<string | null>(null);
+  const basePriceRef = useRef<Record<string, number>>({}); // market → 기준가
+  const alertsRef = useRef(alerts);
+  alertsRef.current = alerts;
+
+  useEffect(() => saveAlertSettings(alerts), [alerts]);
 
   // CoinGecko 대시보드 폴링 — coinList 바뀌면 재조회
   useEffect(() => {
@@ -54,9 +64,42 @@ export function CryptoView({ coins: coinList, onAdd, onRemove }: Props) {
     es.addEventListener('tick', (e) => {
       const tick = JSON.parse((e as MessageEvent).data) as UpbitTick;
       setLive((prev) => ({ ...prev, [tick.market]: tick }));
+      checkAlert(tick);
     });
     return () => es.close();
   }, [coinList]);
+
+  // 알림 감지 — 기준가 대비 ±threshold% 도달 시 알림 후 기준가 리셋(반복 방지)
+  const checkAlert = (tick: UpbitTick) => {
+    const { enabled, threshold } = alertsRef.current;
+    const base = basePriceRef.current[tick.market];
+    if (base == null) {
+      basePriceRef.current[tick.market] = tick.trade_price; // 첫 수신 = 세션 기준가
+      return;
+    }
+    if (!enabled) {
+      basePriceRef.current[tick.market] = tick.trade_price; // 꺼져 있으면 기준만 따라감
+      return;
+    }
+    const pct = ((tick.trade_price - base) / base) * 100;
+    if (Math.abs(pct) >= threshold) {
+      const sym = coinList.find((c) => c.upbitMarket === tick.market)?.symbol ?? tick.market;
+      const dir = pct > 0 ? '▲ 상승' : '▼ 하락';
+      const msg = `${sym} ${dir} ${pct > 0 ? '+' : ''}${pct.toFixed(1)}% (₩${tick.trade_price.toLocaleString('ko-KR')})`;
+      fireAlert(`${sym} ${threshold}% ${pct > 0 ? '급등' : '급락'}`, msg);
+      setToast(msg);
+      setTimeout(() => setToast(null), 6000);
+      basePriceRef.current[tick.market] = tick.trade_price; // 기준 리셋
+    }
+  };
+
+  const toggleAlerts = async () => {
+    if (!alerts.enabled) {
+      await requestNotifyPermission(); // 켤 때 권한 요청 (거부돼도 토스트·소리는 동작)
+      basePriceRef.current = {}; // 기준가 초기화 → 켠 시점 가격 기준
+    }
+    setAlerts((a) => ({ ...a, enabled: !a.enabled }));
+  };
 
   // 코인 뉴스 폴링
   useEffect(() => {
@@ -183,6 +226,30 @@ export function CryptoView({ coins: coinList, onAdd, onRemove }: Props) {
             <div className="dim" style={{ fontSize: 11, marginTop: 4 }}>1h · 24h · 7d</div>
           </div>
           <div className="panel">
+            <div className="ptitle t-red" style={{ justifyContent: 'space-between' }}>
+              <span>가격 알림</span>
+              <button className={`mode-btn${alerts.enabled ? ' active' : ''}`} style={{ padding: '2px 8px' }} onClick={toggleAlerts}>
+                {alerts.enabled ? '켜짐' : '꺼짐'}
+              </button>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+              <span className="dim">기준가 대비 ±</span>
+              <input
+                className="aikey-input"
+                style={{ width: 56, padding: '3px 6px', textAlign: 'right' }}
+                type="number"
+                min={1}
+                step={1}
+                value={alerts.threshold}
+                onChange={(e) => setAlerts((a) => ({ ...a, threshold: Math.max(1, Number(e.target.value) || 1) }))}
+              />
+              <span className="dim">% 변동 시</span>
+            </div>
+            <div className="dim" style={{ fontSize: 11, marginTop: 6 }}>
+              {alerts.enabled ? '켠 시점 가격 기준 · 알림 후 기준 갱신' : '켜면 브라우저 알림·소리로 알려줍니다'}
+            </div>
+          </div>
+          <div className="panel">
             <div className="ptitle t-magenta">실시간 피드</div>
             <div className="dim" style={{ fontSize: 12 }}>
               {Object.keys(live).length > 0 ? `업비트 WS 연결됨 · ${Object.keys(live).length}종 수신` : '연결 중…'}
@@ -190,6 +257,11 @@ export function CryptoView({ coins: coinList, onAdd, onRemove }: Props) {
           </div>
         </div>
       </div>
+      {toast && (
+        <div className="alert-toast" onClick={() => setToast(null)}>
+          🔔 {toast}
+        </div>
+      )}
     </>
   );
 }
