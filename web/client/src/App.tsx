@@ -7,7 +7,7 @@ import { QuotePanel } from './components/QuotePanel';
 import { NewsStream } from './components/NewsStream';
 import { IndicesPanel, MarketsPanel, HotPanel } from './components/SidePanels';
 import { BriefPanel, ExplainPanel } from './components/AiPanels';
-import { AlertPanel } from './components/AlertPanel';
+import { AlertButton } from './components/AlertButton';
 import { usePriceAlerts } from './lib/alerts';
 import { fmtPrice } from './lib/format';
 import { AiKeyManager } from './components/AiKeyManager';
@@ -185,6 +185,17 @@ export function App() {
           fin-term <span className="ver">v0.9.1 · web</span>
         </div>
         <div className="modes">
+          {mode === 'stock' && (
+            <AlertButton
+              settings={stockAlerts.settings}
+              bases={stockAlerts.bases}
+              rows={watchlist.map((sym) => ({ key: sym, label: sym, price: quotes[sym]?.price ?? null }))}
+              fmt={fmtPrice}
+              onToggle={stockAlerts.toggle}
+              onThreshold={stockAlerts.setThreshold}
+              onSetBase={stockAlerts.setBase}
+            />
+          )}
           <button
             className="mode-btn"
             onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
@@ -208,23 +219,17 @@ export function App() {
             <SearchBar onAdd={addSymbol} />
             <ExplainPanel hasServerKey={hasServerKey} onNeedKey={onNeedKey} compact />
           </div>
-          {/* 상단 정보 띠: 브리핑 · 지수 · 환율 · 급상승 */}
-          <div className="inforow">
-            <BriefPanel
-              watchlist={watchlist}
-              names={names}
-              quotes={quotes}
-              news={news}
-              hasServerKey={hasServerKey}
-              onNeedKey={onNeedKey}
-            />
-            <IndicesPanel quotes={indices} labels={labels.indices} />
-            <MarketsPanel quotes={markets} labels={labels.markets} />
-            <HotPanel items={hot} onSelect={(sym) => addSymbol(sym, '')} />
-          </div>
-          {/* 메인: WATCHLIST · QUOTE · NEWS */}
-          <div className="grid2">
-            <div className="g2-watch">
+          {/* 3열: 좌(브리핑+WATCHLIST) · 중앙(지수·환율+QUOTE+NEWS) · 우(급상승) */}
+          <div className="layout3">
+            <div className="col-left">
+              <BriefPanel
+                watchlist={watchlist}
+                names={names}
+                quotes={quotes}
+                news={news}
+                hasServerKey={hasServerKey}
+                onNeedKey={onNeedKey}
+              />
               <Watchlist
                 watchlist={watchlist}
                 names={names}
@@ -235,24 +240,24 @@ export function App() {
                 onRemove={removeSymbol}
                 onFilterNews={(sym) => setNewsFilter((f) => (f === sym ? null : sym))}
               />
-              <AlertPanel
-                settings={stockAlerts.settings}
-                bases={stockAlerts.bases}
-                rows={watchlist.map((sym) => ({ key: sym, label: sym, price: quotes[sym]?.price ?? null }))}
-                fmt={fmtPrice}
-                onToggle={stockAlerts.toggle}
-                onThreshold={stockAlerts.setThreshold}
-                onSetBase={stockAlerts.setBase}
+            </div>
+            <div className="col-mid">
+              <div className="mid-info">
+                <IndicesPanel quotes={indices} labels={labels.indices} />
+                <MarketsPanel quotes={markets} labels={labels.markets} />
+              </div>
+              <QuotePanel quote={selected ? quotes[selected] : undefined} detail={detail} />
+              <NewsStream
+                news={news}
+                scope={scope}
+                onScopeChange={setScope}
+                filter={newsFilter}
+                onClearFilter={() => setNewsFilter(null)}
               />
             </div>
-            <QuotePanel quote={selected ? quotes[selected] : undefined} detail={detail} />
-            <NewsStream
-              news={news}
-              scope={scope}
-              onScopeChange={setScope}
-              filter={newsFilter}
-              onClearFilter={() => setNewsFilter(null)}
-            />
+            <div className="col-right">
+              <HotPanel items={hot} onSelect={(sym) => addSymbol(sym, '')} />
+            </div>
           </div>
         </>
       ) : (

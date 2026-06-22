@@ -201,6 +201,16 @@ body {
     grid-template-areas: "watch" "quote" "side" "news"; height: auto;
   }
   .area-side { flex-direction: column; }
+
+  /* 모바일: 뉴스는 제목 위주로 — 출처 숨기고 제목 전체 노출 */
+  .news-row { flex-wrap: wrap; row-gap: 1px; padding: 5px 6px 5px 0; }
+  .news-row .num { display: none; }
+  .news-row .src { display: none; }
+  .news-row .title {
+    flex-basis: 100%; order: 2; white-space: normal; overflow: visible;
+    text-overflow: clip; line-height: 1.4;
+  }
+  .news-row .time, .news-row .tag { order: 1; font-size: 11px; }
 }
 
 /* 재배치 레이아웃: 검색줄 + 정보띠 + 메인 */
@@ -216,20 +226,54 @@ body {
 .inforow { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 10px; padding: 10px 10px 0; align-items: start; }
 .inforow .panel { max-height: 230px; }
 
-/* 메인: WATCHLIST · QUOTE · NEWS */
-.grid2 {
+/* 3열: 좌(브리핑+WATCHLIST) · 중앙(지수·환율+QUOTE+NEWS) · 우(급상승) */
+.layout3 {
   display: grid;
-  grid-template-columns: minmax(300px, 1fr) 2fr minmax(300px, 1.2fr);
-  grid-template-areas: "watch quote news";
-  gap: 10px; padding: 10px; height: calc(100vh - 340px); min-height: 420px;
+  grid-template-columns: minmax(300px, 1fr) 2.4fr minmax(220px, 0.9fr);
+  gap: 10px; padding: 10px; height: calc(100vh - 200px); min-height: 420px;
 }
-.g2-watch { grid-area: watch; display: flex; flex-direction: column; gap: 10px; overflow: auto; }
-.grid2 > .area-quote { grid-area: quote; }
-.grid2 > .area-news { grid-area: news; }
+.col-left { display: flex; flex-direction: column; gap: 10px; min-width: 0; overflow: hidden; }
+.col-left > .brief-panel { flex: none; height: var(--info-h, 190px); overflow: hidden; display: flex; flex-direction: column; }
+.brief-panel > .ptitle { flex: none; }
+.brief-panel > .brief-body { flex: 1; min-height: 0; overflow: auto; }
+.col-left > .area-watch { flex: 1; min-height: 0; overflow: auto; }
+.col-mid { display: flex; flex-direction: column; gap: 10px; min-width: 0; overflow: hidden; }
+.col-right { display: flex; flex-direction: column; gap: 10px; min-width: 0; overflow: hidden; }
+.col-right > .panel { flex: 1; min-height: 0; overflow: auto; }
+
+/* 급상승 종목: 1줄 시세 + 2줄 근거(시장·업종·거래량) */
+.hot-row { padding: 5px 6px; border-radius: 6px; cursor: pointer; border-left: 2px solid transparent; }
+.hot-row:hover { background: var(--accent-bg); border-left-color: var(--cyan); }
+.hot-main { display: flex; gap: 6px; align-items: baseline; }
+.hot-main .sym { white-space: nowrap; }
+.hot-main .name { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--dim); }
+.hot-main .val { white-space: nowrap; }
+.hot-mkt { font-size: 10px; font-weight: 700; padding: 0 4px; border-radius: 3px; line-height: 16px; }
+.mkt-kr { background: rgba(56,139,253,.18); color: var(--blue); }
+.mkt-us { background: rgba(63,185,80,.18); color: var(--green); }
+.hot-meta { display: flex; gap: 8px; margin-top: 3px; padding-left: 24px; font-size: 12px; color: var(--dim); }
+.hot-sector { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.hot-vol { white-space: nowrap; flex: none; }
+/* 관련 기사 — 제목 위주 1줄 */
+.hot-news { list-style: none; margin: 4px 0 2px; padding: 0 0 0 24px; }
+.hot-news li { display: flex; gap: 5px; align-items: baseline; font-size: 12.5px; line-height: 1.6; color: var(--txt); opacity: .82; cursor: pointer; }
+.hot-news li:hover { opacity: 1; }
+.hot-news li:hover .hot-news-title { color: var(--cyan); }
+.hot-news-dot { color: var(--cyan); flex: none; }
+.hot-news-title { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.mid-info { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: stretch; }
+.mid-info > .panel { display: flex; flex-direction: column; height: var(--info-h, 190px); overflow: auto; }
+.col-mid > .area-quote { flex: none; }
+.col-mid > .area-news { flex: 1; overflow: auto; }
+
+/* 상단바 알림 팝오버 */
+.alert-pop { position: absolute; right: 0; top: 34px; z-index: 50; width: 320px; }
+.alert-pop .panel { box-shadow: 0 4px 16px rgba(0,0,0,.4); }
 
 @media (max-width: 980px) {
   .inforow { grid-template-columns: 1fr 1fr; }
-  .grid2 { grid-template-columns: 1fr; grid-template-areas: "watch" "quote" "news"; height: auto; }
+  .layout3 { grid-template-columns: 1fr; height: auto; }
+  .mid-info { grid-template-columns: 1fr 1fr; }
   .topbars { flex-direction: column; }
   .explain-compact .aikey-input { width: 100%; flex: 1; }
 }

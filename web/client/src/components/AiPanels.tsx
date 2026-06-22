@@ -43,20 +43,22 @@ export function BriefPanel({ watchlist, names, quotes, news, hasServerKey, onNee
   };
 
   return (
-    <div className="panel">
+    <div className="panel brief-panel">
       <div className="ptitle t-magenta" style={{ justifyContent: 'space-between' }}>
-        <span>AI 시장 브리핑 {!usable && <span className="aikey-need-tag">키 필요</span>}</span>
+        <span>데일리 AI 브리핑 {!usable && <span className="aikey-need-tag">키 필요</span>}</span>
         <button className="mode-btn" onClick={run} disabled={loading} style={{ padding: '2px 8px' }}>
           {loading ? '생성 중…' : text ? '다시' : '생성'}
         </button>
       </div>
-      {text && <div style={{ fontSize: 12, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{text}</div>}
-      {!text && err && <div className="down" style={{ fontSize: 12 }}>{err}</div>}
-      {!text && !err && !loading && (
-        <div className="dim" style={{ fontSize: 12 }}>
-          {usable ? '관심종목+뉴스로 오늘 시장 요약을 생성합니다.' : 'AI 키 입력 후 사용 가능 (상단 AI 키)'}
-        </div>
-      )}
+      <div className="brief-body">
+        {text && <div style={{ fontSize: 12, lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{text}</div>}
+        {!text && err && <div className="down" style={{ fontSize: 12 }}>{err}</div>}
+        {!text && !err && !loading && (
+          <div className="dim" style={{ fontSize: 12 }}>
+            {usable ? '관심종목+뉴스로 오늘 시장 요약을 생성합니다.' : 'AI 키 입력 후 사용 가능 (상단 AI 키)'}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
