@@ -64,9 +64,10 @@ export function BriefPanel({ watchlist, names, quotes, news, hasServerKey, onNee
 interface ExplainProps {
   hasServerKey: boolean;
   onNeedKey: () => void;
+  compact?: boolean; // 상단 검색줄에 가로로 들어갈 때
 }
 
-export function ExplainPanel({ hasServerKey, onNeedKey }: ExplainProps) {
+export function ExplainPanel({ hasServerKey, onNeedKey, compact }: ExplainProps) {
   const [term, setTerm] = useState('');
   const [text, setText] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -98,6 +99,29 @@ export function ExplainPanel({ hasServerKey, onNeedKey }: ExplainProps) {
       setLoading(false);
     }
   };
+
+  // compact: 상단 검색줄용 — 한 줄 입력 + 결과는 아래 팝오버
+  if (compact) {
+    return (
+      <div className="explain-compact" style={{ position: 'relative' }}>
+        <input
+          className="aikey-input"
+          value={term}
+          placeholder={`용어 풀이${!usable ? ' (키 필요)' : ''} — 예: PER, ETF`}
+          onChange={(e) => setTerm(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && run()}
+        />
+        <button className="mode-btn" onClick={run} disabled={loading}>
+          {loading ? '…' : '풀이'}
+        </button>
+        {(text || err) && (
+          <div className="explain-pop" onClick={() => { setText(null); setErr(null); }}>
+            {text ? <span style={{ whiteSpace: 'pre-wrap' }}>{text}</span> : <span className="down">{err}</span>}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="panel">

@@ -204,30 +204,37 @@ export function App() {
 
       {mode === 'stock' ? (
         <>
-          <SearchBar onAdd={addSymbol} />
-          <div className="grid">
-            <Watchlist
+          <div className="topbars">
+            <SearchBar onAdd={addSymbol} />
+            <ExplainPanel hasServerKey={hasServerKey} onNeedKey={onNeedKey} compact />
+          </div>
+          {/* 상단 정보 띠: 브리핑 · 지수 · 환율 · 급상승 */}
+          <div className="inforow">
+            <BriefPanel
               watchlist={watchlist}
               names={names}
               quotes={quotes}
-              selected={selected}
-              newsFilter={newsFilter}
-              onSelect={setSelected}
-              onRemove={removeSymbol}
-              onFilterNews={(sym) => setNewsFilter((f) => (f === sym ? null : sym))}
-            />
-            <QuotePanel quote={selected ? quotes[selected] : undefined} detail={detail} />
-            <NewsStream
               news={news}
-              scope={scope}
-              onScopeChange={setScope}
-              filter={newsFilter}
-              onClearFilter={() => setNewsFilter(null)}
+              hasServerKey={hasServerKey}
+              onNeedKey={onNeedKey}
             />
-            <div className="area-side">
-              <IndicesPanel quotes={indices} labels={labels.indices} />
-              <MarketsPanel quotes={markets} labels={labels.markets} />
-              <HotPanel items={hot} onSelect={(sym) => addSymbol(sym, '')} />
+            <IndicesPanel quotes={indices} labels={labels.indices} />
+            <MarketsPanel quotes={markets} labels={labels.markets} />
+            <HotPanel items={hot} onSelect={(sym) => addSymbol(sym, '')} />
+          </div>
+          {/* 메인: WATCHLIST · QUOTE · NEWS */}
+          <div className="grid2">
+            <div className="g2-watch">
+              <Watchlist
+                watchlist={watchlist}
+                names={names}
+                quotes={quotes}
+                selected={selected}
+                newsFilter={newsFilter}
+                onSelect={setSelected}
+                onRemove={removeSymbol}
+                onFilterNews={(sym) => setNewsFilter((f) => (f === sym ? null : sym))}
+              />
               <AlertPanel
                 settings={stockAlerts.settings}
                 bases={stockAlerts.bases}
@@ -237,16 +244,15 @@ export function App() {
                 onThreshold={stockAlerts.setThreshold}
                 onSetBase={stockAlerts.setBase}
               />
-              <BriefPanel
-                watchlist={watchlist}
-                names={names}
-                quotes={quotes}
-                news={news}
-                hasServerKey={hasServerKey}
-                onNeedKey={onNeedKey}
-              />
-              <ExplainPanel hasServerKey={hasServerKey} onNeedKey={onNeedKey} />
             </div>
+            <QuotePanel quote={selected ? quotes[selected] : undefined} detail={detail} />
+            <NewsStream
+              news={news}
+              scope={scope}
+              onScopeChange={setScope}
+              filter={newsFilter}
+              onClearFilter={() => setNewsFilter(null)}
+            />
           </div>
         </>
       ) : (
