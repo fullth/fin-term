@@ -20,7 +20,9 @@ import { fetchCoinDashboard, upbitFeed, DEFAULT_COINS, searchCoins, fetchCoinNew
 
 const PORT = Number(process.env.PORT ?? 8787);
 const FINNHUB_KEY = process.env.FINNHUB_KEY;
-const QUOTE_INTERVAL = Number(process.env.FIN_QUOTE_INTERVAL_MS ?? 15_000);
+const QUOTE_INTERVAL = Number(process.env.FIN_QUOTE_INTERVAL_MS ?? 60_000);
+// 지수·환율(markets)은 Finnhub 무료 미지원 심볼 → Yahoo 로만 조회하고 주기를 길게(레이트리밋 절약).
+const MARKETS_INTERVAL = Number(process.env.FIN_MARKETS_INTERVAL_MS ?? 300_000);
 
 // 기본 관심종목 — TUI 기본값과 동일. 클라이언트가 watchlist 를 쿼리로 보내면 그걸 우선.
 const DEFAULT_WATCHLIST = ['AAPL', 'TSLA', 'NVDA', 'MSFT'];
@@ -45,12 +47,14 @@ interface MarketCache {
   updatedAt: number;
 }
 const marketCache: MarketCache = { indices: [], markets: [], updatedAt: 0 };
+const quoteCache = new Map<string, Quote>(); // symbol → 최신 시세 (전역 공유, SSE·REST 공용)
 
 async function refreshMarkets() {
   try {
+    // 지수·환율은 Finnhub 무료 미지원 → 키 없이 Yahoo 로만 조회 (Finnhub 레이트리밋 보호)
     const [indices, markets] = await Promise.all([
-      fetchQuotes(INDICES.map((i) => i.symbol), FINNHUB_KEY),
-      fetchQuotes(MARKETS.map((m) => m.symbol), FINNHUB_KEY),
+      fetchQuotes(INDICES.map((i) => i.symbol)),
+      fetchQuotes(MARKETS.map((m) => m.symbol)),
     ]);
     marketCache.indices = indices;
     marketCache.markets = markets;
@@ -61,14 +65,19 @@ async function refreshMarkets() {
 }
 
 // ── REST 라우트 ───────────────────────────────────────────────────────
-// 시세: 클라이언트별 watchlist 가 다르므로 요청 시 조회 (짧은 캐시는 추후)
+// 시세 초기 로드: 공유 캐시에 있으면 그대로, 없는 심볼만 조회 (Finnhub 호출 절약).
 app.get('/api/quotes', async (req: Request, res: Response) => {
   const symbols = String(req.query.symbols ?? '')
     .split(',')
     .map((s) => s.trim().toUpperCase())
     .filter(Boolean);
   const list = symbols.length ? symbols : DEFAULT_WATCHLIST;
-  const quotes = await fetchQuotes(list, FINNHUB_KEY);
+  const missing = list.filter((s) => !quoteCache.has(s));
+  if (missing.length) {
+    const fresh = await fetchQuotes(missing, FINNHUB_KEY);
+    for (const q of fresh) if (!q.error) quoteCache.set(q.symbol, q);
+  }
+  const quotes = list.map((s) => quoteCache.get(s) ?? { symbol: s, price: null, change: null, change_pct: null, open: null, high: null, low: null, prev_close: null, spark: [], updated_at: Date.now(), error: 'no data' });
   res.json({ quotes });
 });
 
@@ -136,8 +145,45 @@ app.get('/api/explain', async (req, res) => {
   res.json({ text });
 });
 
-// ── SSE: 시세 스트림 ──────────────────────────────────────────────────
-// 클라이언트가 watchlist 를 쿼리로 주면 그 종목들을 주기 폴링해 push.
+// ── SSE: 시세 스트림 (전역 공유 캐시) ────────────────────────────────
+// 다수 사용자 대비: 클라이언트별 폴링이 아니라, 서버가 "구독 중인 모든 심볼의 합집합"을
+// 단일 루프로 주기 조회해 캐시하고, 모든 구독자에게 같은 캐시를 push 한다.
+// → N명이 같은 종목을 봐도 외부 API 호출은 심볼당 1회. Finnhub 레이트리밋 보호.
+interface QuoteSub {
+  res: Response;
+  symbols: string[];
+}
+const quoteSubs = new Set<QuoteSub>();
+
+// 구독 중인 모든 심볼의 합집합
+function subscribedSymbols(): string[] {
+  const set = new Set<string>();
+  for (const sub of quoteSubs) for (const s of sub.symbols) set.add(s);
+  return [...set];
+}
+
+let quoteLoopTimer: ReturnType<typeof setInterval> | null = null;
+async function quoteLoop() {
+  const symbols = subscribedSymbols();
+  if (symbols.length === 0) return;
+  try {
+    const quotes = await fetchQuotes(symbols, FINNHUB_KEY);
+    for (const q of quotes) if (!q.error) quoteCache.set(q.symbol, q);
+  } catch {
+    /* 부분 실패 무시 */
+  }
+  // 각 구독자에게 자기 심볼 시세만 추려서 push
+  for (const sub of quoteSubs) {
+    const mine = sub.symbols.map((s) => quoteCache.get(s)).filter((q): q is Quote => !!q);
+    try {
+      sub.res.write(`event: quotes\ndata: ${JSON.stringify({ quotes: mine })}\n\n`);
+      sub.res.write(`event: markets\ndata: ${JSON.stringify({ indices: marketCache.indices, markets: marketCache.markets })}\n\n`);
+    } catch {
+      /* 끊긴 연결 무시 */
+    }
+  }
+}
+
 app.get('/api/stream/quotes', async (req, res) => {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -151,25 +197,40 @@ app.get('/api/stream/quotes', async (req, res) => {
     .split(',')
     .map((s) => s.trim().toUpperCase())
     .filter(Boolean);
-  const list = symbols.length ? symbols : DEFAULT_WATCHLIST;
+  const sub: QuoteSub = { res, symbols: symbols.length ? symbols : DEFAULT_WATCHLIST };
+  quoteSubs.add(sub);
 
-  let closed = false;
-  const tick = async () => {
-    if (closed) return;
-    try {
-      const quotes = await fetchQuotes(list, FINNHUB_KEY);
-      res.write(`event: quotes\ndata: ${JSON.stringify({ quotes })}\n\n`);
-      res.write(`event: markets\ndata: ${JSON.stringify({ indices: marketCache.indices, markets: marketCache.markets })}\n\n`);
-    } catch (e) {
-      // 부분 실패는 무시하고 다음 틱 진행
-    }
-  };
+  // 신규 구독자에게 캐시된 시세 즉시 전달 (없으면 다음 루프에서 채워짐)
+  const cached = sub.symbols.map((s) => quoteCache.get(s)).filter((q): q is Quote => !!q);
+  if (cached.length) res.write(`event: quotes\ndata: ${JSON.stringify({ quotes: cached })}\n\n`);
+  res.write(`event: markets\ndata: ${JSON.stringify({ indices: marketCache.indices, markets: marketCache.markets })}\n\n`);
 
-  await tick();
-  const timer = setInterval(tick, QUOTE_INTERVAL);
+  // 새 심볼이 추가됐으면 즉시 한 번 조회해 반영 (캐시에 없던 종목)
+  const missing = sub.symbols.filter((s) => !quoteCache.has(s));
+  if (missing.length) {
+    void fetchQuotes(missing, FINNHUB_KEY).then((qs) => {
+      for (const q of qs) if (!q.error) quoteCache.set(q.symbol, q);
+      const mine = sub.symbols.map((s) => quoteCache.get(s)).filter((q): q is Quote => !!q);
+      try {
+        res.write(`event: quotes\ndata: ${JSON.stringify({ quotes: mine })}\n\n`);
+      } catch {
+        /* 무시 */
+      }
+    });
+  }
+
+  // 전역 루프가 멈춰 있으면 시작
+  if (!quoteLoopTimer) {
+    void quoteLoop();
+    quoteLoopTimer = setInterval(() => void quoteLoop(), QUOTE_INTERVAL);
+  }
+
   req.on('close', () => {
-    closed = true;
-    clearInterval(timer);
+    quoteSubs.delete(sub);
+    if (quoteSubs.size === 0 && quoteLoopTimer) {
+      clearInterval(quoteLoopTimer);
+      quoteLoopTimer = null;
+    }
   });
 });
 
@@ -245,7 +306,7 @@ if (existsSync(CLIENT_DIST)) {
 
 // ── 부팅 ──────────────────────────────────────────────────────────────
 void refreshMarkets();
-setInterval(() => void refreshMarkets(), QUOTE_INTERVAL);
+setInterval(() => void refreshMarkets(), MARKETS_INTERVAL);
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`[fin-term BFF] listening on :${PORT}  (finnhub=${FINNHUB_KEY ? 'on' : 'off'})`);
