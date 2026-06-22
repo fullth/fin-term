@@ -31,5 +31,4 @@ export const MARKETS: { symbol: string; label: string }[] = [
   { symbol: 'DX-Y.NYB', label: '달러인덱스' },
   { symbol: 'CL=F', label: 'WTI 유가' },
   { symbol: 'GC=F', label: '금' },
-  { symbol: 'BTC-USD', label: '비트코인' },
 ];

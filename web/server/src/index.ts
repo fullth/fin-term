@@ -66,7 +66,7 @@ async function refreshMarkets() {
     // 지수·환율은 Finnhub 무료 미지원 → 키 없이 Yahoo 로만 조회 (Finnhub 레이트리밋 보호)
     const [indices, markets] = await Promise.all([
       fetchMixedQuotes(INDICES.map((i) => i.symbol)),
-      fetchQuotes(MARKETS.map((m) => m.symbol)),
+      fetchMixedQuotes(MARKETS.map((m) => m.symbol)),
     ]);
     marketCache.indices = indices;
     marketCache.markets = markets;

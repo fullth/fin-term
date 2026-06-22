@@ -9,16 +9,29 @@ const NAVER_HEADERS = {
   Accept: 'application/json',
 };
 
-// 심볼이 한국 종목(.KS/.KQ) 또는 국내 지수(^KS11/^KQ11)인지
-export function isKrSymbol(symbol: string): boolean {
-  return /\.(KS|KQ)$/i.test(symbol) || symbol === '^KS11' || symbol === '^KQ11';
-}
+// Yahoo 심볼 → 네이버 시세 소스 매핑.
+// kind: kr-stock(국내종목) / index(국내·해외 지수) / market(환율·원자재 productDetail)
+// kr-index: 국내 지수(m.stock/api/index) / index: 해외 지수(api.stock/index) / market: 환율·원자재
+type NaverKind = 'kr-index' | 'index' | 'market';
+const NAVER_MAP: Record<string, { kind: NaverKind; code: string; category?: string }> = {
+  // 국내 지수 (m.stock.naver.com/api/index/{KOSPI|KOSDAQ}/basic)
+  '^KS11': { kind: 'kr-index', code: 'KOSPI' },
+  '^KQ11': { kind: 'kr-index', code: 'KOSDAQ' },
+  // 해외 지수 (api.stock.naver.com/index/{code}/basic)
+  '^GSPC': { kind: 'index', code: '.INX' },
+  '^IXIC': { kind: 'index', code: '.IXIC' },
+  '^DJI': { kind: 'index', code: '.DJI' },
+  // 환율·원자재 (front-api/marketIndex/productDetail)
+  'KRW=X': { kind: 'market', code: 'FX_USDKRW', category: 'exchange' },
+  'DX-Y.NYB': { kind: 'market', code: '.DXY', category: 'exchange' },
+  'CL=F': { kind: 'market', code: 'CLcv1', category: 'energy' },
+  'GC=F': { kind: 'market', code: 'GCcv1', category: 'metals' },
+  // BTC-USD 는 업비트로 처리(여기선 제외)
+};
 
-// Yahoo 심볼 → 네이버 코드. 005930.KS → 005930, ^KS11 → KOSPI, ^KQ11 → KOSDAQ
-function toNaverCode(symbol: string): { code: string; isIndex: boolean } {
-  if (symbol === '^KS11') return { code: 'KOSPI', isIndex: true };
-  if (symbol === '^KQ11') return { code: 'KOSDAQ', isIndex: true };
-  return { code: symbol.replace(/\.(KS|KQ)$/i, ''), isIndex: false };
+// 네이버로 조회 가능한 심볼인지 (한국 종목 .KS/.KQ + 매핑 테이블)
+export function isKrSymbol(symbol: string): boolean {
+  return /\.(KS|KQ)$/i.test(symbol) || symbol in NAVER_MAP;
 }
 
 function num(s: unknown): number | null {
@@ -47,56 +60,54 @@ function emptyQuote(symbol: string, error?: string): Quote {
   };
 }
 
-// 개별 종목: /api/stock/{code}/basic
-async function fetchKrStock(symbol: string): Promise<Quote> {
-  const { code } = toNaverCode(symbol);
-  try {
-    const d = await fetchNaverJson(`https://m.stock.naver.com/api/stock/${code}/basic`);
-    const price = num(d.closePrice);
-    const change = num(d.compareToPreviousClosePrice);
-    const pct = num(d.fluctuationsRatio);
-    const dir = d.compareToPreviousPrice?.name; // RISING/FALLING/...
-    const signedChange = change == null ? null : dir === 'FALLING' ? -Math.abs(change) : Math.abs(change);
-    return {
-      symbol,
-      price,
-      change: signedChange,
-      change_pct: pct,
-      open: num(d.openPrice),
-      high: num(d.highPrice),
-      low: num(d.lowPrice),
-      prev_close: price != null && signedChange != null ? price - signedChange : null,
-      spark: [],
-      updated_at: Date.now(),
-    };
-  } catch (e) {
-    return emptyQuote(symbol, e instanceof Error ? e.message : 'fetch failed');
-  }
-}
-
-// 지수: /api/index/{KOSPI|KOSDAQ}/basic
-async function fetchKrIndex(symbol: string): Promise<Quote> {
-  const { code } = toNaverCode(symbol);
-  try {
-    const d = await fetchNaverJson(`https://m.stock.naver.com/api/index/${code}/basic`);
-    const price = num(d.closePrice);
-    const change = num(d.compareToPreviousClosePrice);
-    const pct = num(d.fluctuationsRatio);
-    const dir = d.compareToPreviousPrice?.name;
-    const signedChange = change == null ? null : dir === 'FALLING' ? -Math.abs(change) : Math.abs(change);
-    return {
-      symbol, price, change: signedChange, change_pct: pct,
-      open: null, high: null, low: null,
-      prev_close: price != null && signedChange != null ? price - signedChange : null,
-      spark: [], updated_at: Date.now(),
-    };
-  } catch (e) {
-    return emptyQuote(symbol, e instanceof Error ? e.message : 'fetch failed');
-  }
+// 네이버 basic/productDetail 공통 필드 → Quote
+function toQuote(symbol: string, d: any, withOHLC: boolean): Quote {
+  const price = num(d.closePrice) ?? num(d.calcPrice);
+  const change = num(d.compareToPreviousClosePrice);
+  const pct = num(d.fluctuationsRatio);
+  const dir = d.compareToPreviousPrice?.name; // RISING/FALLING/...
+  const signedChange = change == null ? null : dir === 'FALLING' ? -Math.abs(change) : Math.abs(change);
+  return {
+    symbol,
+    price,
+    change: signedChange,
+    change_pct: pct,
+    open: withOHLC ? num(d.openPrice) : null,
+    high: withOHLC ? num(d.highPrice) : null,
+    low: withOHLC ? num(d.lowPrice) : null,
+    prev_close: price != null && signedChange != null ? price - signedChange : null,
+    spark: [],
+    updated_at: Date.now(),
+  };
 }
 
 export async function fetchKrQuote(symbol: string): Promise<Quote> {
-  return toNaverCode(symbol).isIndex ? fetchKrIndex(symbol) : fetchKrStock(symbol);
+  try {
+    const mapped = NAVER_MAP[symbol];
+    if (!mapped) {
+      // 한국 개별종목 (.KS/.KQ)
+      const code = symbol.replace(/\.(KS|KQ)$/i, '');
+      const d = await fetchNaverJson(`https://m.stock.naver.com/api/stock/${code}/basic`);
+      return toQuote(symbol, d, true);
+    }
+    if (mapped.kind === 'kr-index') {
+      // 국내 지수 — m.stock 경로
+      const d = await fetchNaverJson(`https://m.stock.naver.com/api/index/${mapped.code}/basic`);
+      return toQuote(symbol, d, false);
+    }
+    if (mapped.kind === 'index') {
+      // 해외 지수 — api.stock 경로
+      const d = await fetchNaverJson(`https://api.stock.naver.com/index/${mapped.code}/basic`);
+      return toQuote(symbol, d, false);
+    }
+    // market(환율·원자재): productDetail → result 안에 데이터
+    const wrap = await fetchNaverJson(
+      `https://m.stock.naver.com/front-api/marketIndex/productDetail?category=${mapped.category}&reutersCode=${mapped.code}`,
+    );
+    return toQuote(symbol, wrap?.result ?? {}, false);
+  } catch (e) {
+    return emptyQuote(symbol, e instanceof Error ? e.message : 'fetch failed');
+  }
 }
 
 export async function fetchKrQuotes(symbols: string[]): Promise<Quote[]> {
