@@ -7,6 +7,9 @@ import { QuotePanel } from './components/QuotePanel';
 import { NewsStream } from './components/NewsStream';
 import { IndicesPanel, MarketsPanel, HotPanel } from './components/SidePanels';
 import { BriefPanel, ExplainPanel } from './components/AiPanels';
+import { AlertPanel } from './components/AlertPanel';
+import { usePriceAlerts } from './lib/alerts';
+import { fmtPrice } from './lib/format';
 import { AiKeyManager } from './components/AiKeyManager';
 import { SearchBar } from './components/SearchBar';
 import { CryptoView } from './components/CryptoView';
@@ -29,6 +32,7 @@ export function App() {
   const [hasServerKey, setHasServerKey] = useState(false);
   const [, setAiKeyVersion] = useState(0); // 키 변경 시 AI 패널 리렌더 트리거
   const [theme, setTheme] = useState<'dark' | 'light'>(persisted.theme);
+  const stockAlerts = usePriceAlerts('stock');
 
   const [quotes, setQuotes] = useState<Record<string, Quote>>({});
   const [indices, setIndices] = useState<Quote[]>([]);
@@ -112,6 +116,7 @@ export function App() {
         for (const q of quotes) next[q.symbol] = q;
         return next;
       });
+      for (const q of quotes) if (q.price != null) stockAlerts.onPrice(q.symbol, q.price, q.symbol);
     });
     es.addEventListener('markets', (e) => {
       const { indices, markets } = JSON.parse((e as MessageEvent).data) as { indices: Quote[]; markets: Quote[] };
@@ -119,7 +124,7 @@ export function App() {
       if (markets?.length) setMarkets(markets);
     });
     return () => es.close();
-  }, [watchlist]);
+  }, [watchlist, stockAlerts]);
 
   // 뉴스 폴링
   useEffect(() => {
@@ -221,6 +226,15 @@ export function App() {
               <IndicesPanel quotes={indices} labels={labels.indices} />
               <MarketsPanel quotes={markets} labels={labels.markets} />
               <HotPanel items={hot} onSelect={(sym) => addSymbol(sym, '')} />
+              <AlertPanel
+                settings={stockAlerts.settings}
+                bases={stockAlerts.bases}
+                rows={watchlist.map((sym) => ({ key: sym, label: sym, price: quotes[sym]?.price ?? null }))}
+                fmt={fmtPrice}
+                onToggle={stockAlerts.toggle}
+                onThreshold={stockAlerts.setThreshold}
+                onSetBase={stockAlerts.setBase}
+              />
               <BriefPanel
                 watchlist={watchlist}
                 names={names}
@@ -243,8 +257,13 @@ export function App() {
             ? '클릭 선택 · 우클릭 삭제 · / 검색 · j/k 이동 · m 모드전환 · Esc 필터해제'
             : '클릭 코인 선택 · 업비트 실시간 · m 모드전환'}
         </span>
-        <span className="dim">데이터: Yahoo · Naver · RSS · CoinGecko · Upbit · 키 없이 동작</span>
+        <span className="dim">데이터: Yahoo · Naver · RSS · Upbit · 키 없이 동작</span>
       </div>
+      {mode === 'stock' && stockAlerts.toast && (
+        <div className="alert-toast" onClick={() => stockAlerts.setToast(null)}>
+          🔔 {stockAlerts.toast}
+        </div>
+      )}
     </>
   );
 }

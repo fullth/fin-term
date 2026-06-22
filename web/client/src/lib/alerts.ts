@@ -1,17 +1,21 @@
-// 코인 가격 알림 — localStorage 기반, 만료 없음.
-// 세션 시작가(앱 진입 시 첫 가격) 대비 ±threshold% 도달 시 알림. 알림 후 기준가 리셋해 반복 방지.
-const KEY = 'fin-term:alerts';
+// 가격 알림 — localStorage 기반, 만료 없음. 코인/주식 공용.
+// 기준가 대비 ±threshold% 도달 시 알림. 알림 후 기준가 리셋(반복 방지). 기준가는 수동 변경 가능.
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export interface AlertSettings {
   enabled: boolean;
-  threshold: number; // % (기본 5)
+  threshold: number; // %
 }
 
 const DEFAULT: AlertSettings = { enabled: false, threshold: 5 };
 
-export function loadAlertSettings(): AlertSettings {
+function settingsKey(scope: string) {
+  return `fin-term:alerts:${scope}`;
+}
+
+export function loadAlertSettings(scope: string): AlertSettings {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(settingsKey(scope));
     if (!raw) return DEFAULT;
     const s = JSON.parse(raw) as Partial<AlertSettings>;
     return {
@@ -23,15 +27,14 @@ export function loadAlertSettings(): AlertSettings {
   }
 }
 
-export function saveAlertSettings(s: AlertSettings): void {
+export function saveAlertSettings(scope: string, s: AlertSettings): void {
   try {
-    localStorage.setItem(KEY, JSON.stringify(s));
+    localStorage.setItem(settingsKey(scope), JSON.stringify(s));
   } catch {
     /* 무시 */
   }
 }
 
-// 브라우저 알림 권한 요청 (사용자 제스처에서 호출)
 export async function requestNotifyPermission(): Promise<boolean> {
   if (!('Notification' in window)) return false;
   if (Notification.permission === 'granted') return true;
@@ -40,7 +43,6 @@ export async function requestNotifyPermission(): Promise<boolean> {
   return p === 'granted';
 }
 
-// 알림 발사 — 브라우저 알림(권한 있으면) + 소리. 토스트는 호출부에서 화면에 표시.
 let audioCtx: AudioContext | null = null;
 function beep() {
   try {
@@ -57,7 +59,7 @@ function beep() {
     o.start();
     o.stop(audioCtx.currentTime + 0.36);
   } catch {
-    /* 오디오 차단 시 무시 */
+    /* 무시 */
   }
 }
 
@@ -70,4 +72,57 @@ export function fireAlert(title: string, body: string): void {
     }
   }
   beep();
+}
+
+// ── 공용 알림 훅 ──────────────────────────────────────────────────────
+// scope: 'crypto' | 'stock' (설정 키 분리). label: 알림 문구용 ("코인"/"종목").
+export function usePriceAlerts(scope: string) {
+  const [settings, setSettings] = useState(() => loadAlertSettings(scope));
+  const [bases, setBases] = useState<Record<string, number>>({}); // key → 기준가
+  const [toast, setToast] = useState<string | null>(null);
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  const basesRef = useRef(bases);
+  basesRef.current = bases;
+
+  useEffect(() => saveAlertSettings(scope, settings), [scope, settings]);
+
+  // 가격 1건 갱신 시 호출 — key(심볼/마켓), price, displayName
+  const onPrice = useCallback((key: string, price: number, displayName: string) => {
+    if (price == null || !Number.isFinite(price)) return;
+    const base = basesRef.current[key];
+    if (base == null) {
+      // 첫 수신 = 기준가 설정 (꺼져 있어도 기준은 잡아둠)
+      basesRef.current[key] = price;
+      setBases((b) => ({ ...b, [key]: price }));
+      return;
+    }
+    if (!settingsRef.current.enabled) return;
+    const pct = ((price - base) / base) * 100;
+    if (Math.abs(pct) >= settingsRef.current.threshold) {
+      const dir = pct > 0 ? '▲ 상승' : '▼ 하락';
+      const msg = `${displayName} ${dir} ${pct > 0 ? '+' : ''}${pct.toFixed(1)}% (${price.toLocaleString('ko-KR')})`;
+      fireAlert(`${displayName} ${settingsRef.current.threshold}% ${pct > 0 ? '급등' : '급락'}`, msg);
+      setToast(msg);
+      setTimeout(() => setToast(null), 6000);
+      basesRef.current[key] = price; // 기준 리셋
+      setBases((b) => ({ ...b, [key]: price }));
+    }
+  }, []);
+
+  const setBase = useCallback((key: string, price: number) => {
+    basesRef.current[key] = price;
+    setBases((b) => ({ ...b, [key]: price }));
+  }, []);
+
+  const toggle = useCallback(async () => {
+    if (!settingsRef.current.enabled) await requestNotifyPermission();
+    setSettings((s) => ({ ...s, enabled: !s.enabled }));
+  }, []);
+
+  const setThreshold = useCallback((threshold: number) => {
+    setSettings((s) => ({ ...s, threshold: Math.max(0.1, threshold) }));
+  }, []);
+
+  return { settings, bases, toast, setToast, onPrice, setBase, toggle, setThreshold };
 }
