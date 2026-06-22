@@ -46,11 +46,21 @@ export interface SearchResult {
   exchange: string;
 }
 
+export interface HotNews {
+  title: string;
+  source: string;
+  url: string;
+}
+
 export interface HotItem {
   symbol: string;
   name: string;
   price: number | null;
   change_pct: number | null;
+  market: 'KR' | 'US';
+  sector: string | null;
+  volume: number | null;
+  news: HotNews[];
 }
 
 export interface LabelEntry {

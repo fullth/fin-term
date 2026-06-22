@@ -1,5 +1,5 @@
 import type { Quote, HotItem, LabelEntry } from '../lib/types';
-import { fmtPriceCompact, fmtPct, arrow, changeClass } from '../lib/format';
+import { fmtPriceCompact, fmtPct, fmtBig, arrow, changeClass } from '../lib/format';
 
 function QuoteList({ quotes, labels, labelWidth }: { quotes: Quote[]; labels: LabelEntry[]; labelWidth: number }) {
   const labelOf = (sym: string) => labels.find((l) => l.symbol === sym)?.label ?? sym;
@@ -44,14 +44,38 @@ export function HotPanel({ items, onSelect }: { items: HotItem[]; onSelect: (sym
       </div>
       {items.length === 0 && <div className="dim">불러오는 중…</div>}
       {items.map((it, i) => (
-        <div key={`${it.symbol}-${i}`} className="row" onClick={() => onSelect(it.symbol)}>
-          <span className="sym" style={{ color: 'var(--cyan)', minWidth: 70 }}>
-            {i + 1}. {it.symbol}
-          </span>
-          <span className="name">{it.name}</span>
-          <span className={`val ${changeClass(it.change_pct)}`}>
-            {fmtPriceCompact(it.price)} {arrow(it.change_pct)}{fmtPct(it.change_pct)}
-          </span>
+        <div key={`${it.symbol}-${i}`} className="hot-row" onClick={() => onSelect(it.symbol)}>
+          <div className="hot-main">
+            <span className={`hot-mkt mkt-${it.market.toLowerCase()}`}>{it.market}</span>
+            <span className="sym" style={{ color: 'var(--cyan)' }}>
+              {i + 1}. {it.symbol}
+            </span>
+            <span className="name">{it.name}</span>
+            <span className={`val ${changeClass(it.change_pct)}`}>
+              {fmtPriceCompact(it.price)} {arrow(it.change_pct)}{fmtPct(it.change_pct)}
+            </span>
+          </div>
+          <div className="hot-meta">
+            {it.sector && <span className="hot-sector">{it.sector}</span>}
+            {it.volume != null && <span className="hot-vol">거래량 {fmtBig(it.volume)}</span>}
+          </div>
+          {it.news.length > 0 && (
+            <ul className="hot-news">
+              {it.news.map((n, j) => (
+                <li
+                  key={j}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (n.url) window.open(n.url, '_blank', 'noopener');
+                  }}
+                  title={n.title}
+                >
+                  <span className="hot-news-dot">·</span>
+                  <span className="hot-news-title">{n.title}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       ))}
     </div>
