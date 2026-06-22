@@ -308,6 +308,11 @@ if (existsSync(CLIENT_DIST)) {
 void refreshMarkets();
 setInterval(() => void refreshMarkets(), MARKETS_INTERVAL);
 
+// 기본 관심종목 시세 캐시 워밍 — 첫 접속이 빈 화면 안 되게 미리 채움.
+void fetchQuotes(DEFAULT_WATCHLIST, FINNHUB_KEY).then((qs) => {
+  for (const q of qs) if (!q.error) quoteCache.set(q.symbol, q);
+});
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`[fin-term BFF] listening on :${PORT}  (finnhub=${FINNHUB_KEY ? 'on' : 'off'})`);
 });
