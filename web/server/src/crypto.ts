@@ -27,52 +27,69 @@ export interface CoinQuote {
   symbol: string;
   name: string;
   upbitMarket: string;
-  price_krw: number | null; // 업비트 실시간(우선) 또는 CoinGecko KRW
-  price_usd: number | null;
+  price_krw: number | null;
+  price_usd: number | null; // 업비트는 KRW 마켓만 → USD 미제공(null)
   change_1h: number | null;
   change_24h: number | null;
   change_7d: number | null;
-  spark: number[]; // 7d sparkline (CoinGecko)
+  spark: number[]; // 7일 종가 (업비트 days 캔들)
 }
 
 async function fetchJson(url: string): Promise<any> {
-  // CoinGecko 무료 API 는 순간 429(레이트리밋)가 잦다 → 1회 짧게 재시도.
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const res = await fetch(url, { headers: UA });
-    if (res.ok) return res.json();
-    if (res.status === 429 && attempt === 0) {
-      await new Promise((r) => setTimeout(r, 1200));
-      continue;
-    }
-    throw new Error(`HTTP ${res.status}`);
-  }
+  const res = await fetch(url, { headers: UA });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
 }
 
-// CoinGecko: USD(1h/24h/7d + 스파크라인) + KRW(24h) 머지. 코인 목록은 인자로 받음.
+// 업비트 기반 코인 대시보드 — CoinGecko 가 클라우드 IP 를 차단해 업비트로 일원화.
+// ticker(현재가·당일변동) + days 캔들(7일 스파크라인·7d변동) + minutes/60 캔들(1h변동).
 export async function fetchCoinDashboard(coins: CoinMeta[] = DEFAULT_COINS): Promise<CoinQuote[]> {
   if (coins.length === 0) return [];
-  const ids = coins.map((c) => c.id).join(',');
-  const [usd, krw] = await Promise.all([
-    fetchJson(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids}&price_change_percentage=1h,24h,7d&sparkline=true`),
-    fetchJson(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=krw&ids=${ids}`),
-  ]);
-  const krwById = new Map<string, any>((krw as any[]).map((c) => [c.id, c]));
-  return coins.map((coin) => {
-    const u = (usd as any[]).find((c) => c.id === coin.id);
-    const k = krwById.get(coin.id);
-    return {
-      id: coin.id,
-      symbol: coin.symbol,
-      name: coin.name,
-      upbitMarket: coin.upbitMarket,
-      price_krw: k?.current_price ?? null,
-      price_usd: u?.current_price ?? null,
-      change_1h: u?.price_change_percentage_1h_in_currency ?? null,
-      change_24h: u?.price_change_percentage_24h_in_currency ?? u?.price_change_percentage_24h ?? null,
-      change_7d: u?.price_change_percentage_7d_in_currency ?? null,
-      spark: (u?.sparkline_in_7d?.price ?? []).filter((n: unknown): n is number => typeof n === 'number').slice(-48),
-    };
-  });
+  const markets = coins.map((c) => c.upbitMarket).join(',');
+  const tickers = (await fetchJson(`https://api.upbit.com/v1/ticker?markets=${encodeURIComponent(markets)}`)) as any[];
+  const tickerByMarket = new Map<string, any>(tickers.map((t) => [t.market, t]));
+
+  // 코인별 캔들은 병렬로. 실패해도 해당 항목만 비고 전체는 진행.
+  return Promise.all(
+    coins.map(async (coin) => {
+      const t = tickerByMarket.get(coin.upbitMarket);
+      let spark: number[] = [];
+      let change_7d: number | null = null;
+      let change_1h: number | null = null;
+      try {
+        const days = (await fetchJson(
+          `https://api.upbit.com/v1/candles/days?market=${encodeURIComponent(coin.upbitMarket)}&count=7`,
+        )) as any[];
+        // 업비트는 최신순 → 오래된순으로 뒤집어 스파크라인
+        const closes = days.map((d) => d.trade_price).reverse();
+        spark = closes;
+        if (closes.length >= 2 && closes[0]) change_7d = ((closes[closes.length - 1] - closes[0]) / closes[0]) * 100;
+      } catch {
+        /* 캔들 실패 무시 */
+      }
+      try {
+        const m = (await fetchJson(
+          `https://api.upbit.com/v1/candles/minutes/60?market=${encodeURIComponent(coin.upbitMarket)}&count=1`,
+        )) as any[];
+        const c = m[0];
+        if (c && t && c.opening_price) change_1h = ((t.trade_price - c.opening_price) / c.opening_price) * 100;
+      } catch {
+        /* 무시 */
+      }
+      return {
+        id: coin.id,
+        symbol: coin.symbol,
+        name: coin.name,
+        upbitMarket: coin.upbitMarket,
+        price_krw: t?.trade_price ?? null,
+        price_usd: null,
+        change_1h,
+        change_24h: t ? t.signed_change_rate * 100 : null,
+        change_7d,
+        spark,
+      };
+    }),
+  );
 }
 
 // 업비트 실시간 체결가를 단일 WS 로 받아 콜백으로 흘려보낸다 (서버 1연결 → SSE 다중 중계).

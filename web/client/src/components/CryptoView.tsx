@@ -10,10 +10,6 @@ function fmtKrw(n: number | null): string {
   const digits = Math.abs(n) >= 100 ? 0 : 2;
   return `₩${n.toLocaleString('ko-KR', { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
 }
-function fmtUsd(n: number | null): string {
-  if (n == null) return '—';
-  return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
 
 interface Props {
   coins: CoinMeta[];
@@ -131,7 +127,7 @@ export function CryptoView({ coins: coinList, onAdd, onRemove }: Props) {
                 <span className="qsym">{sel.symbol}</span>
                 <span className="qname">{selMeta?.name ?? sel.name}</span>
                 <span className={`qprice ${changeClass(liveRateOf(sel) ?? sel.change_24h)}`}>
-                  {fmtKrw(priceOf(sel))} <span className="dim" style={{ fontSize: 13 }}>{fmtUsd(sel.price_usd)}</span>
+                  {fmtKrw(priceOf(sel))}
                 </span>
               </div>
               <div className="fields">
@@ -140,7 +136,7 @@ export function CryptoView({ coins: coinList, onAdd, onRemove }: Props) {
                 <span className="field"><span className="l">7일</span><span className={changeClass(sel.change_7d)}>{fmtPct(sel.change_7d)}</span></span>
               </div>
               <Sparkline values={sel.spark} positive={(sel.change_7d ?? 0) >= 0} />
-              <div className="updated">7일 추이 · CoinGecko</div>
+              <div className="updated">7일 추이 · 업비트</div>
             </>
           )}
         </div>
@@ -165,12 +161,12 @@ export function CryptoView({ coins: coinList, onAdd, onRemove }: Props) {
         {/* 우측: USD 시세 + 24h 요약 */}
         <div className="area-side">
           <div className="panel">
-            <div className="ptitle t-blue">USD 시세</div>
+            <div className="ptitle t-blue">24시간 시세 <span className="sub">KRW</span></div>
             {quotes.length === 0 && <div className="dim">불러오는 중…</div>}
             {quotes.map((c) => (
-              <div key={c.id} className="row" style={{ cursor: 'default' }}>
+              <div key={c.id} className="row" style={{ cursor: 'pointer' }} onClick={() => setSelected(c.symbol)}>
                 <span className="sym">{c.symbol}</span>
-                <span className={`val ${changeClass(c.change_24h)}`}>{fmtUsd(c.price_usd)} {arrow(c.change_24h)}{fmtPct(c.change_24h)}</span>
+                <span className={`val ${changeClass(c.change_24h)}`}>{fmtKrw(priceOf(c))} {arrow(c.change_24h)}{fmtPct(c.change_24h)}</span>
               </div>
             ))}
           </div>

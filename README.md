@@ -9,6 +9,9 @@
 실시간 시세 + 영문/한글 뉴스 스트림을 한 화면에 확인할 수 있습니다.
 주식모드 / 코인모드 두 가지 모드가 존재합니다
 
+> **웹 버전도 있습니다.** 같은 블룸버그 UI를 브라우저에서 그대로 — 반응형·마우스·모바일 지원.
+> 터미널 없이 바로 쓰려면 웹앱을 띄우세요. 자세한 내용은 [`web/README.md`](web/README.md).
+
 ## 대시보드 화면 - 주식/코인
 **API 키 없이 바로 동작**합니다.
 <img width="1392" height="1522" alt="image" src="https://github.com/user-attachments/assets/6a1b536d-64c9-4e4e-8ec5-e2813bba1441" />
@@ -141,8 +144,7 @@ FIN_NEWS_SCOPE=domestic FIN_WATCHLIST=AAPL,TSLA,NVDA fin-term
 | 시세 (우선) | Finnhub | `FINNHUB_KEY` 있을 때 |
 | 해외 뉴스 | RSS (Yahoo / CNBC / MarketWatch) | 불필요 |
 | 국내 뉴스 | RSS (한경 / 동아경제 / 연합경제) | 불필요 |
-| 코인 KRW 시세 / 캔들 | 업비트 (웹소켓 실시간 + REST 캔들) | 불필요 |
-| 코인 시총·ATH | CoinGecko | 불필요 |
+| 코인 KRW 시세 / 변동률 / 캔들 | 업비트 (웹소켓 실시간 + REST 캔들) | 불필요 |
 | 코인 뉴스 | 구글 뉴스 RSS (한국어) | 불필요 |
 
 뉴스는 모두 원문 그대로 나옵니다 (번역 없음). `:scope` 로 국내·해외·전체를 즉시 전환합니다.
