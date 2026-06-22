@@ -7,7 +7,12 @@
 nixPkgs = ["nodejs_20"]
 
 [phases.install]
-cmds = ["npm --prefix web/server ci || npm --prefix web/server install"]
+# 루트 install 필수: server 가 import 하는 src/sources/* 의 의존성(rss-parser, @anthropic-ai/sdk, ws)이
+# Node ESM 해석상 /app/node_modules 에서 찾아지므로 루트에도 설치해야 한다.
+cmds = [
+  "npm ci || npm install",
+  "npm --prefix web/server ci || npm --prefix web/server install",
+]
 
 [phases.build]
 cmds = [
