@@ -63,7 +63,9 @@ export function CryptoView({ coins: coinList, onAdd, onRemove }: Props) {
       alerts.onPrice(tick.market, tick.trade_price, sym);
     });
     return () => es.close();
-  }, [coinList, alerts]);
+    // alerts.onPrice 는 useCallback 으로 안정적 — coinList 만 재연결 트리거 (무한 재연결 방지)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coinList]);
 
   // 코인 뉴스 폴링
   useEffect(() => {

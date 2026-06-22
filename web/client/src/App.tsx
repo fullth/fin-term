@@ -124,7 +124,9 @@ export function App() {
       if (markets?.length) setMarkets(markets);
     });
     return () => es.close();
-  }, [watchlist, stockAlerts]);
+    // onPrice 는 usePriceAlerts 에서 useCallback 으로 안정적 — watchlist 만 재연결 트리거
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchlist]);
 
   // 뉴스 폴링
   useEffect(() => {
