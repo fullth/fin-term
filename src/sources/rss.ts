@@ -55,10 +55,28 @@ export async function fetchNews(
   const batches = await Promise.all(activeFeeds.map((f) => fetchFeed(f, watchlist)));
   const all = batches.flat();
 
-  // id 중복제거 후 최신순 정렬
+  // id 중복제거
   const seen = new Map<string, NewsItem>();
   for (const item of all) {
     if (!seen.has(item.id)) seen.set(item.id, item);
   }
-  return [...seen.values()].sort((a, b) => b.published_at - a.published_at);
+  const items = [...seen.values()].sort((a, b) => b.published_at - a.published_at);
+
+  // 단일 scope(국내/해외)는 최신순 그대로. '전체'는 국내·해외를 교차 배치한다.
+  // 해외 피드 타임스탬프가 더 최근이라 순수 최신순이면 상단을 영어가 독점하는 문제 해소.
+  if (scope !== 'all') return items;
+  return interleaveByLang(items);
+}
+
+// 국내(ko)·해외(en)를 각각 최신순으로 둔 뒤 번갈아 끼운다. 한쪽이 끝나면 나머지를 이어붙임.
+function interleaveByLang(items: NewsItem[]): NewsItem[] {
+  const ko = items.filter((n) => n.lang === 'ko');
+  const en = items.filter((n) => n.lang === 'en');
+  const merged: NewsItem[] = [];
+  const max = Math.max(ko.length, en.length);
+  for (let i = 0; i < max; i++) {
+    if (i < ko.length) merged.push(ko[i]);
+    if (i < en.length) merged.push(en[i]);
+  }
+  return merged;
 }
