@@ -17,6 +17,7 @@ import { resolveKey, explainTermWith, generateBriefWith } from './ai.js';
 import type { Quote, NewsScope } from '../../../src/core/types.js';
 import { DEFAULT_FEEDS, INDICES, MARKETS } from './feeds.js';
 import { fetchCoinDashboard, upbitFeed, DEFAULT_COINS, searchCoins, fetchCoinNews, type CoinMeta } from './crypto.js';
+import { isKrSymbol, fetchKrQuotes } from './kr-quote.js';
 
 const PORT = Number(process.env.PORT ?? 8787);
 const FINNHUB_KEY = process.env.FINNHUB_KEY;
@@ -49,11 +50,22 @@ interface MarketCache {
 const marketCache: MarketCache = { indices: [], markets: [], updatedAt: 0 };
 const quoteCache = new Map<string, Quote>(); // symbol → 최신 시세 (전역 공유, SSE·REST 공용)
 
+// 심볼을 한국(네이버)·미국(Finnhub/Yahoo)으로 나눠 조회 후 합침.
+async function fetchMixedQuotes(symbols: string[]): Promise<Quote[]> {
+  const kr = symbols.filter(isKrSymbol);
+  const us = symbols.filter((s) => !isKrSymbol(s));
+  const [krQ, usQ] = await Promise.all([
+    kr.length ? fetchKrQuotes(kr) : Promise.resolve([]),
+    us.length ? fetchQuotes(us, FINNHUB_KEY) : Promise.resolve([]),
+  ]);
+  return [...krQ, ...usQ];
+}
+
 async function refreshMarkets() {
   try {
     // 지수·환율은 Finnhub 무료 미지원 → 키 없이 Yahoo 로만 조회 (Finnhub 레이트리밋 보호)
     const [indices, markets] = await Promise.all([
-      fetchQuotes(INDICES.map((i) => i.symbol)),
+      fetchMixedQuotes(INDICES.map((i) => i.symbol)),
       fetchQuotes(MARKETS.map((m) => m.symbol)),
     ]);
     marketCache.indices = indices;
@@ -74,7 +86,7 @@ app.get('/api/quotes', async (req: Request, res: Response) => {
   const list = symbols.length ? symbols : DEFAULT_WATCHLIST;
   const missing = list.filter((s) => !quoteCache.has(s));
   if (missing.length) {
-    const fresh = await fetchQuotes(missing, FINNHUB_KEY);
+    const fresh = await fetchMixedQuotes(missing);
     for (const q of fresh) if (!q.error) quoteCache.set(q.symbol, q);
   }
   const quotes = list.map((s) => quoteCache.get(s) ?? { symbol: s, price: null, change: null, change_pct: null, open: null, high: null, low: null, prev_close: null, spark: [], updated_at: Date.now(), error: 'no data' });
@@ -167,7 +179,7 @@ async function quoteLoop() {
   const symbols = subscribedSymbols();
   if (symbols.length === 0) return;
   try {
-    const quotes = await fetchQuotes(symbols, FINNHUB_KEY);
+    const quotes = await fetchMixedQuotes(symbols);
     for (const q of quotes) if (!q.error) quoteCache.set(q.symbol, q);
   } catch {
     /* 부분 실패 무시 */
@@ -208,7 +220,7 @@ app.get('/api/stream/quotes', async (req, res) => {
   // 새 심볼이 추가됐으면 즉시 한 번 조회해 반영 (캐시에 없던 종목)
   const missing = sub.symbols.filter((s) => !quoteCache.has(s));
   if (missing.length) {
-    void fetchQuotes(missing, FINNHUB_KEY).then((qs) => {
+    void fetchMixedQuotes(missing).then((qs) => {
       for (const q of qs) if (!q.error) quoteCache.set(q.symbol, q);
       const mine = sub.symbols.map((s) => quoteCache.get(s)).filter((q): q is Quote => !!q);
       try {
@@ -309,7 +321,7 @@ void refreshMarkets();
 setInterval(() => void refreshMarkets(), MARKETS_INTERVAL);
 
 // 기본 관심종목 시세 캐시 워밍 — 첫 접속이 빈 화면 안 되게 미리 채움.
-void fetchQuotes(DEFAULT_WATCHLIST, FINNHUB_KEY).then((qs) => {
+void fetchMixedQuotes(DEFAULT_WATCHLIST).then((qs) => {
   for (const q of qs) if (!q.error) quoteCache.set(q.symbol, q);
 });
 
