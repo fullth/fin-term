@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>fin-term · web mockup</title>
+<style>
+  /* ── 블룸버그 룩 디자인 토큰 ─────────────────────────────── */
+  :root {
+    --bg:        #000000;
+    --panel:     #050608;
+    --border:    #2a2f37;   /* gray 테두리 */
+    --border-foc:#22d3ee;   /* cyan 포커스 */
+    --txt:       #d7dbe0;
+    --dim:       #6b7280;   /* dimColor */
+    --yellow:    #eab308;   /* 패널 타이틀 */
+    --cyan:      #22d3ee;   /* 선택/포커스 */
+    --blue:      #3b82f6;   /* 지수 */
+    --magenta:   #c026d3;   /* 환율·브리핑 */
+    --red:       #ef4444;   /* 핫·에러 */
+    --green:     #22c55e;   /* 티커 태그 */
+    --up:        #22c55e;   /* 상승 */
+    --down:      #ef4444;   /* 하락 */
+    --mono: "SF Mono","JetBrains Mono","Menlo","Consolas",monospace;
+  }
+  * { box-sizing: border-box; }
+  html,body { margin:0; height:100%; }
+  body {
+    background: var(--bg);
+    color: var(--txt);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── 상단 바 ─────────────────────────────────────────────── */
+  .topbar {
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 8px 14px; border-bottom: 1px solid var(--border);
+    background: var(--panel);
+  }
+  .brand { color: var(--yellow); font-weight:700; letter-spacing:.5px; }
+  .brand .ver { color: var(--dim); font-weight:400; margin-left:6px; }
+  .modes { display:flex; gap:6px; }
+  .mode-btn {
+    font-family:var(--mono); font-size:12px; cursor:pointer;
+    background:transparent; color:var(--dim);
+    border:1px solid var(--border); border-radius:6px; padding:4px 10px;
+  }
+  .mode-btn.active { color:var(--cyan); border-color:var(--border-foc); }
+
+  /* ── 그리드 레이아웃 ─────────────────────────────────────── */
+  .grid {
+    display:grid;
+    grid-template-columns: 320px 1fr 300px;
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "watch  quote  side"
+      "watch  news   side";
+    gap:10px; padding:10px; height: calc(100vh - 95px);
+  }
+  .watch { grid-area: watch; }
+  .quote { grid-area: quote; }
+  .news  { grid-area: news; }
+  .side  { grid-area: side; display:flex; flex-direction:column; gap:10px; overflow:auto; }
+
+  /* ── 패널 공통 ───────────────────────────────────────────── */
+  .panel {
+    border:1px solid var(--border); border-radius:8px;
+    background: var(--panel); padding: 8px 12px; overflow:auto;
+  }
+  .panel.focused { border-color: var(--border-foc); }
+  .ptitle { font-weight:700; margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+  .ptitle .sub { color:var(--dim); font-weight:400; font-size:12px; }
+  .ptitle .dot { color:var(--cyan); }   /* 포커스 ● */
+  .t-yellow  { color: var(--yellow); }
+  .t-blue    { color: var(--blue); }
+  .t-magenta { color: var(--magenta); }
+  .t-red     { color: var(--red); }
+  .dim { color: var(--dim); }
+  .up   { color: var(--up); }
+  .down { color: var(--down); }
+
+  /* ── 행 공통 (라벨 좌 / 값 우) ───────────────────────────── */
+  .row { display:flex; align-items:center; gap:8px; padding:1px 0; }
+  .row .sym  { color:var(--txt); font-weight:600; min-width:62px; }
+  .row .name { color:var(--dim); flex:1; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+  .row .val  { margin-left:auto; white-space:nowrap; }
+  .row.sel { background: rgba(34,211,238,.10); border-radius:4px; }
+  .row.sel .sym { color: var(--cyan); }
+  .caret { width:10px; display:inline-block; color:var(--cyan); }
+
+  /* ── QUOTE 상세 ──────────────────────────────────────────── */
+  .quote-head { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
+  .quote-head .qsym { font-size:18px; font-weight:700; }
+  .quote-head .qname { color:var(--dim); }
+  .quote-head .qprice { font-size:18px; font-weight:700; }
+  .fields { display:flex; gap:18px; flex-wrap:wrap; margin-bottom:8px; }
+  .field .l { color:var(--dim); margin-right:5px; }
+  .meta { color:var(--dim); font-size:12px; margin-bottom:8px; }
+  .meta b { color:var(--txt); font-weight:600; }
+  .spark { height:48px; margin:6px 0; }
+  .updated { color:var(--dim); font-size:11px; }
+
+  /* ── NEWS ────────────────────────────────────────────────── */
+  .news-row { display:flex; gap:7px; padding:2px 0; align-items:baseline; }
+  .news-row.sel { background: rgba(34,211,238,.10); border-radius:4px; }
+  .news-row .num { color:var(--dim); min-width:26px; text-align:right; }
+  .news-row .time { color:var(--dim); }
+  .tag { font-weight:600; }
+  .tag.tkr { color: var(--green); }
+  .tag.mkt { color: var(--dim); }
+  .news-row .title { flex:1; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; color:var(--txt); cursor:pointer; }
+  .news-row.sel .title { color:var(--cyan); }
+  .news-row .src { color:var(--dim); white-space:nowrap; }
+
+  /* ── 명령/상태 바 ────────────────────────────────────────── */
+  .cmdbar {
+    border-top:1px solid var(--border); background:var(--panel);
+    padding:7px 14px; display:flex; justify-content:space-between; color:var(--dim);
+  }
+  .cmdbar .prompt { color:var(--cyan); }
+
+  /* ── 반응형: 모바일 세로 스택 ────────────────────────────── */
+  @media (max-width: 880px) {
+    .grid {
+      grid-template-columns: 1fr;
+      grid-template-rows: none;
+      grid-template-areas: "watch" "quote" "side" "news";
+      height:auto;
+    }
+    .side { flex-direction:column; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- 상단 바 -->
+  <div class="topbar">
+    <div class="brand">fin-term <span class="ver">v0.9.1 · web</span></div>
+    <div class="modes">
+      <button class="mode-btn active">주식</button>
+      <button class="mode-btn">코인</button>
+    </div>
+  </div>
+
+  <div class="grid">
+
+    <!-- WATCHLIST -->
+    <div class="panel watch focused">
+      <div class="ptitle t-yellow">WATCHLIST <span class="dot">●</span></div>
+      <div class="row sel"><span class="caret">▶</span><span class="sym">AAPL</span><span class="name">Apple</span><span class="val up">228.52 ▲1.34%</span></div>
+      <div class="row"><span class="caret"></span><span class="sym">TSLA</span><span class="name">Tesla</span><span class="val down">242.84 ▼2.07%</span></div>
+      <div class="row"><span class="caret"></span><span class="sym">NVDA</span><span class="name">NVIDIA</span><span class="val up">141.95 ▲3.21%</span></div>
+      <div class="row"><span class="caret"></span><span class="sym">MSFT</span><span class="name">Microsoft</span><span class="val up">441.06 ▲0.58%</span></div>
+      <div class="row"><span class="caret"></span><span class="sym">005930.KS</span><span class="name">삼성전자</span><span class="val down">58,400 ▼0.85%</span></div>
+    </div>
+
+    <!-- QUOTE 상세 -->
+    <div class="panel quote">
+      <div class="ptitle t-yellow">QUOTE</div>
+      <div class="quote-head">
+        <span class="qsym">AAPL</span>
+        <span class="qname">Apple Inc.</span>
+        <span class="qprice up">228.52 ▲ +3.02 (+1.34%)</span>
+      </div>
+      <div class="fields">
+        <span class="field"><span class="l">시가</span>226.10</span>
+        <span class="field"><span class="l">고가</span>229.43</span>
+        <span class="field"><span class="l">저가</span>225.77</span>
+        <span class="field"><span class="l">전일</span>225.50</span>
+      </div>
+      <div class="meta">
+        <span class="l dim">52주 </span><b>164.08~237.49</b>&nbsp;&nbsp;
+        <span class="l dim">거래량 </span><b>48.2M</b>&nbsp;&nbsp;
+        <span class="l dim">PER </span><b>34.7</b>&nbsp;&nbsp;
+        <span class="l dim">시총 </span><b>3.45T</b>&nbsp;&nbsp;
+        <span class="l dim">업종 </span><b>Consumer Electronics</b>
+      </div>
+      <!-- 인트라데이 스파크라인 (실 구현은 lightweight-charts/uPlot/SVG) -->
+      <svg class="spark" width="100%" viewBox="0 0 400 48" preserveAspectRatio="none">
+        <polyline fill="none" stroke="#22c55e" stroke-width="1.5"
+          points="0,40 30,38 60,42 90,33 120,30 150,34 180,26 210,22 240,25 270,18 300,20 330,14 360,12 400,9" />
+      </svg>
+      <div class="updated">updated 22:41:07</div>
+    </div>
+
+    <!-- NEWS STREAM -->
+    <div class="panel news">
+      <div class="ptitle t-yellow" style="justify-content:space-between;">
+        <span>NEWS STREAM <span class="sub">[1/124 ▼]</span></span>
+        <span class="sub">[전체] · Tab/클릭으로 포커스</span>
+      </div>
+      <div class="news-row sel"><span class="num">1</span><span class="time">22:38</span><span class="tag tkr">[AAPL]</span><span class="title">Apple unveils new chip lineup, shares climb in late trading</span><span class="src">(Yahoo)</span></div>
+      <div class="news-row"><span class="num">2</span><span class="time">22:31</span><span class="tag mkt">[MKT]</span><span class="title">Wall Street rallies as inflation data comes in softer than expected</span><span class="src">(CNBC)</span></div>
+      <div class="news-row"><span class="num">3</span><span class="time">22:20</span><span class="tag tkr">[NVDA]</span><span class="title">엔비디아, 차세대 GPU 수요 급증에 목표주가 상향</span><span class="src">(한경증권)</span></div>
+      <div class="news-row"><span class="num">4</span><span class="time">22:05</span><span class="tag mkt">[MKT]</span><span class="title">코스피, 외국인 순매수에 2,600선 회복 시도</span><span class="src">(연합시장)</span></div>
+      <div class="news-row"><span class="num">5</span><span class="time">21:54</span><span class="tag tkr">[TSLA]</span><span class="title">Tesla deliveries miss estimates; stock slides premarket</span><span class="src">(MarketWatch)</span></div>
+      <div class="news-row"><span class="num">6</span><span class="time">21:40</span><span class="tag mkt">[MKT]</span><span class="title">원/달러 환율 1,380원대 등락…미 국채금리 주시</span><span class="src">(동아경제)</span></div>
+      <div class="news-row"><span class="num">7</span><span class="time">21:22</span><span class="tag mkt">[MKT]</span><span class="title">Oil edges higher on supply concerns ahead of OPEC meeting</span><span class="src">(Yahoo)</span></div>
+    </div>
+
+    <!-- 우측 보조 패널 스택 -->
+    <div class="side">
+      <!-- 지수 현황 -->
+      <div class="panel">
+        <div class="ptitle t-blue">지수 현황</div>
+        <div class="row"><span class="sym">S&amp;P 500</span><span class="val up">5,917.11 ▲0.41%</span></div>
+        <div class="row"><span class="sym">NASDAQ</span><span class="val up">19,338.29 ▲0.62%</span></div>
+        <div class="row"><span class="sym">Dow Jones</span><span class="val down">43,870.35 ▼0.13%</span></div>
+        <div class="row"><span class="sym">KOSPI</span><span class="val up">2,604.92 ▲0.88%</span></div>
+        <div class="row"><span class="sym">KOSDAQ</span><span class="val down">742.10 ▼0.34%</span></div>
+      </div>
+
+      <!-- 환율 · 원자재 -->
+      <div class="panel">
+        <div class="ptitle t-magenta">환율 · 원자재</div>
+        <div class="row"><span class="sym">달러/원</span><span class="val up">1,382.50 ▲0.22%</span></div>
+        <div class="row"><span class="sym">달러인덱스</span><span class="val up">106.84 ▲0.15%</span></div>
+        <div class="row"><span class="sym">WTI 유가</span><span class="val up">71.34 ▲1.02%</span></div>
+        <div class="row"><span class="sym">금</span><span class="val down">2,608.40 ▼0.27%</span></div>
+        <div class="row"><span class="sym">비트코인</span><span class="val up">98,210 ▲2.45%</span></div>
+      </div>
+
+      <!-- 핫 종목 -->
+      <div class="panel">
+        <div class="ptitle t-red">핫 종목 <span class="sub">거래량 급등</span></div>
+        <div class="row"><span class="sym" style="color:var(--cyan)">1. SMCI</span><span class="name">Super Micro</span><span class="val up">▲12.4%</span></div>
+        <div class="row"><span class="sym" style="color:var(--cyan)">2. PLTR</span><span class="name">Palantir</span><span class="val up">▲6.8%</span></div>
+        <div class="row"><span class="sym" style="color:var(--cyan)">3. SOFI</span><span class="name">SoFi Tech</span><span class="val down">▼4.1%</span></div>
+        <div class="row"><span class="sym" style="color:var(--cyan)">4. RIVN</span><span class="name">Rivian</span><span class="val up">▲5.5%</span></div>
+      </div>
+
+      <!-- AI 시장 브리핑 -->
+      <div class="panel">
+        <div class="ptitle t-magenta">AI 시장 브리핑 <span class="sub">· Esc 닫기</span></div>
+        <div style="color:var(--txt); font-size:12px; line-height:1.6;">
+          오늘 미 증시는 예상보다 둔화된 인플레이션 지표에 힘입어 기술주 중심으로 상승했습니다.
+          반도체 섹터는 엔비디아·슈퍼마이크로의 강세가 두드러졌고, 국내 증시는 외국인 순매수 전환으로
+          코스피가 2,600선 회복을 시도했습니다. 원/달러 환율과 미 국채금리 흐름이 단기 변수입니다.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 명령/상태 바 -->
+  <div class="cmdbar">
+    <span><span class="prompt">: </span><span class="dim">add SYM · rm SYM · news SYM · brief · search · hot</span></span>
+    <span class="dim">Tab 패널 전환 · ↑↓ 이동 · Enter 열기 · / 검색 · q 종료</span>
+  </div>
+
+</body>
+</html>

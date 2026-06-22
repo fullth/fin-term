@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- fin-term: 블룸버그 터미널 룩. 검정 배경 + 노랑 프롬프트 + 시안 상승 라인 -->
+  <rect width="64" height="64" rx="12" fill="#000000"/>
+  <rect x="3.5" y="3.5" width="57" height="57" rx="10" fill="none" stroke="#2a2f37" stroke-width="2"/>
+  <!-- 상승 시세 라인 (cyan) -->
+  <polyline points="10,42 20,38 28,44 36,30 44,34 54,18"
+            fill="none" stroke="#22d3ee" stroke-width="3"
+            stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- 끝점 강조 -->
+  <circle cx="54" cy="18" r="3.2" fill="#22c55e"/>
+  <!-- 터미널 프롬프트 ">_" (yellow) -->
+  <path d="M11 52 l5 4 -5 4" fill="none" stroke="#eab308" stroke-width="2.6"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="20" y="54" width="9" height="2.6" rx="1.3" fill="#eab308"/>
+</svg>

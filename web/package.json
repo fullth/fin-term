@@ -1,0 +1,11 @@
+{
+  "name": "fin-term-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "fin-term web — Railway 단일 서비스 배포 오케스트레이션 (client 정적 빌드 + server BFF)",
+  "scripts": {
+    "install:all": "npm --prefix server install && npm --prefix client install",
+    "build": "npm --prefix client install && npm --prefix client run build && npm --prefix server install",
+    "start": "npm --prefix server start"
+  }
+}

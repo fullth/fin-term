@@ -2,3 +2,6 @@ node_modules/
 dist/
 *.log
 .DS_Store
+
+# web 빌드 캐시
+web/client/tsconfig.tsbuildinfo
