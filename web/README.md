@@ -1,4 +1,5 @@
 # fin-term web
+<img width="1819" height="1522" alt="image" src="https://github.com/user-attachments/assets/225d3442-a5dc-4c16-88c7-3d544303364f" />
 
 fin-term TUI 를 동일한 블룸버그 스타일 UI 로 재구현한 React DOM 웹앱.
 같은 데이터 레이어(`src/sources/*`)를 BFF 가 재사용하고, UI 만 HTML/CSS 로 새로 그린다.
