@@ -13,7 +13,7 @@ import { fetchNews } from '../../../src/sources/rss.js';
 import { fetchDetail } from '../../../src/sources/detail.js';
 import { searchSymbols } from '../../../src/sources/search.js';
 import { fetchHot } from '../../../src/sources/hot.js';
-import { resolveKey, explainTermWith, generateBriefWith } from './ai.js';
+import { resolveUserKey, explainTermWith, generateBriefWith } from './ai.js';
 import type { Quote, NewsScope } from '../../../src/core/types.js';
 import { DEFAULT_FEEDS, INDICES, MARKETS } from './feeds.js';
 import { fetchCoinDashboard, upbitFeed, DEFAULT_COINS, searchCoins, fetchCoinNews, type CoinMeta } from './crypto.js';
@@ -133,23 +133,18 @@ app.get('/api/hot', async (_req, res) => {
 // AI 기능 사용 가능 여부 — 서버 env 키 보유 여부만 알려줌(클라가 키 없을 때 fallback 판단용).
 app.get('/api/ai-status', (_req, res) => res.json({ serverKey: Boolean(process.env.ANTHROPIC_API_KEY) }));
 
-// 클라 헤더 키(X-AI-Key) 우선, 없으면 서버 env. 둘 다 없으면 needKey.
-function aiKeyOf(req: Request): string | null {
-  return resolveKey(req.header('X-AI-Key') ?? undefined);
-}
-
-// AI 브리핑
+// AI 브리핑 — 서버 키 전용(운영자 부담). 시장 요약은 입력이 고정 구조라 악용 여지가 적어 기본 기능으로 제공.
 app.post('/api/brief', async (req, res) => {
-  const key = aiKeyOf(req);
-  if (!key) return res.status(401).json({ text: null, error: 'need_key' });
+  const key = process.env.ANTHROPIC_API_KEY || null;
+  if (!key) return res.status(401).json({ text: null, error: 'no_server_key' });
   const { watchlist = [], names = {}, quotes = {}, news = [] } = req.body ?? {};
   const text = await generateBriefWith(key, { watchlist, names, quotes, news });
   res.json({ text });
 });
 
-// 용어 풀이
+// 용어 풀이 — 사용자 키 전용. 임의 문자열을 받으므로 서버 키로 열어주면 무제한 프롬프트 악용 위험.
 app.get('/api/explain', async (req, res) => {
-  const key = aiKeyOf(req);
+  const key = resolveUserKey(req.header('X-AI-Key') ?? undefined);
   if (!key) return res.status(401).json({ text: null, error: 'need_key' });
   const term = String(req.query.term ?? '').trim();
   if (!term) return res.json({ text: null });

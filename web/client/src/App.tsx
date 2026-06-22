@@ -217,7 +217,7 @@ export function App() {
         <>
           <div className="topbars">
             <SearchBar onAdd={addSymbol} />
-            <ExplainPanel hasServerKey={hasServerKey} onNeedKey={onNeedKey} compact />
+            <ExplainPanel onNeedKey={onNeedKey} compact />
           </div>
           {/* 3열: 좌(브리핑+WATCHLIST) · 중앙(지수·환율+QUOTE+NEWS) · 우(급상승) */}
           <div className="layout3">

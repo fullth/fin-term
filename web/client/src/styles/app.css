@@ -222,6 +222,14 @@ body {
   background: var(--panel); border: 1px solid var(--magenta); border-radius: 8px; padding: 10px 12px;
   font-size: 12px; line-height: 1.6; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,.4); }
 
+/* 브리핑 전체보기 모달 */
+.brief-modal-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,.55);
+  display: flex; align-items: center; justify-content: center; padding: 24px; }
+.brief-modal { width: min(720px, 92vw); max-height: 80vh; display: flex; flex-direction: column;
+  background: var(--panel); border: 1px solid var(--magenta); border-radius: 10px; padding: 14px 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.5); }
+.brief-modal-body { margin-top: 8px; overflow: auto; font-size: 14px; line-height: 1.75; white-space: pre-wrap; color: var(--txt); }
+
 /* 정보 띠: 브리핑 · 지수 · 환율 · 급상승 (가로 4분할) */
 .inforow { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 10px; padding: 10px 10px 0; align-items: start; }
 .inforow .panel { max-height: 230px; }

@@ -5,9 +5,9 @@ import Anthropic from '@anthropic-ai/sdk';
 
 const PLAIN = ' 마크다운 기호(**, #, -, ` 등)를 절대 쓰지 말고 평문으로만 작성하라. 강조가 필요하면 따옴표를 써라.';
 
-// 사용할 키 결정: 클라 헤더 키 > 서버 env. 둘 다 없으면 null.
-export function resolveKey(headerKey?: string): string | null {
-  const k = (headerKey ?? '').trim() || process.env.ANTHROPIC_API_KEY || '';
+// 용어 풀이용 키 — 사용자가 보낸 헤더 키만 사용. 서버 env 로 fallback 하지 않는다(임의 질의 악용 방지).
+export function resolveUserKey(headerKey?: string): string | null {
+  const k = (headerKey ?? '').trim();
   return k || null;
 }
 
