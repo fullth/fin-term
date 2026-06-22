@@ -3,7 +3,12 @@ const YAHOO_CHART = 'https://query1.finance.yahoo.com/v8/finance/chart';
 const FINNHUB_METRIC = 'https://finnhub.io/api/v1/stock/metric';
 const FINNHUB_PROFILE = 'https://finnhub.io/api/v1/stock/profile2';
 
-const UA = { 'User-Agent': 'Mozilla/5.0 (fin-term)' };
+const UA = {
+  'User-Agent':
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  Accept: 'application/json,text/plain,*/*',
+  'Accept-Language': 'en-US,en;q=0.9',
+};
 
 export interface Detail {
   symbol: string;

@@ -1,6 +1,13 @@
-// 핫 종목 (거래량 급등 상위). Yahoo day_gainers 스크리너. 키 불필요.
+// 급상승 종목 (상승률 상위). Yahoo day_gainers 스크리너. 키 불필요.
 const SCREENER =
   'https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?formatted=false&scrIds=day_gainers&count=5';
+
+const UA = {
+  'User-Agent':
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  Accept: 'application/json,text/plain,*/*',
+  'Accept-Language': 'en-US,en;q=0.9',
+};
 
 export interface HotItem {
   symbol: string;
@@ -11,7 +18,7 @@ export interface HotItem {
 
 export async function fetchHot(): Promise<HotItem[]> {
   try {
-    const res = await fetch(SCREENER, { headers: { 'User-Agent': 'Mozilla/5.0 (fin-term)' } });
+    const res = await fetch(SCREENER, { headers: UA });
     if (!res.ok) return [];
     const data = (await res.json()) as { finance?: { result?: { quotes?: any[] }[] } };
     const quotes = data.finance?.result?.[0]?.quotes ?? [];

@@ -4,12 +4,28 @@ import type { Quote } from '../core/types.js';
 const YAHOO_CHART = 'https://query1.finance.yahoo.com/v8/finance/chart';
 const FINNHUB_QUOTE = 'https://finnhub.io/api/v1/quote';
 
-const UA = { 'User-Agent': 'Mozilla/5.0 (fin-term)' };
+// 실제 브라우저 UA 로 위장 — Yahoo 가 데이터센터/봇 UA 를 차단하는 것을 우회 시도.
+const UA = {
+  'User-Agent':
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  Accept: 'application/json,text/plain,*/*',
+  'Accept-Language': 'en-US,en;q=0.9',
+};
 
 async function fetchJson(url: string): Promise<any> {
-  const res = await fetch(url, { headers: UA });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+  // Yahoo 가 클라우드 IP 등에서 순간 거부(429/5xx)하는 경우가 있어 1회 짧게 재시도.
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(url, { headers: UA });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (e) {
+      lastErr = e;
+      if (attempt === 0) await new Promise((r) => setTimeout(r, 800));
+    }
+  }
+  throw lastErr;
 }
 
 // Yahoo: 시세 + 인트라데이 스파크라인까지 한 방에.
