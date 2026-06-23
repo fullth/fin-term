@@ -66,7 +66,9 @@ function beep() {
 export function fireAlert(title: string, body: string): void {
   if ('Notification' in window && Notification.permission === 'granted') {
     try {
-      new Notification(title, { body, tag: `fin-term-${title}`, icon: '/favicon.svg' });
+      // requireInteraction: 사용자가 닫기 전까지 유지 (지원 브라우저/OS 한정).
+      // OS 알림 표시 시간 자체는 운영체제가 제어하므로 코드로 늘릴 수 있는 건 이 옵션뿐.
+      new Notification(title, { body, tag: `fin-term-${title}`, icon: '/favicon.svg', requireInteraction: true });
     } catch {
       /* 무시 */
     }
@@ -104,7 +106,7 @@ export function usePriceAlerts(scope: string) {
       const msg = `${displayName} ${dir} ${pct > 0 ? '+' : ''}${pct.toFixed(1)}% (${price.toLocaleString('ko-KR')})`;
       fireAlert(`${displayName} ${settingsRef.current.threshold}% ${pct > 0 ? '급등' : '급락'}`, msg);
       setToast(msg);
-      setTimeout(() => setToast(null), 6000);
+      setTimeout(() => setToast(null), 12000);
       basesRef.current[key] = price; // 기준 리셋
       setBases((b) => ({ ...b, [key]: price }));
     }
