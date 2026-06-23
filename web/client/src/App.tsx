@@ -182,7 +182,7 @@ export function App() {
     <>
       <div className="topbar">
         <div className="brand">
-          fin-term <span className="ver">v0.9.3 · web</span>
+          fin-term <span className="ver">v0.9.4 · web</span>
         </div>
         <div className="modes">
           {mode === 'stock' && (
@@ -201,7 +201,7 @@ export function App() {
             onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
             title="테마 전환"
           >
-            {theme === 'dark' ? '☾' : '☀'}
+            {theme === 'dark' ? '☾ 다크' : '☀ 라이트'}
           </button>
           <AiKeyManager onChange={onAiKeyChange} />
           <button className={`mode-btn${mode === 'stock' ? ' active' : ''}`} onClick={() => setMode('stock')}>

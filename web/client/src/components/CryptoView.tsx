@@ -194,11 +194,13 @@ export function CryptoView({ coins: coinList, onAdd, onRemove }: Props) {
           </div>
           <div className="panel">
             <div className="ptitle t-red" style={{ justifyContent: 'space-between' }}>
-              <span>가격 알림</span>
-              <button className="newsbtn" onClick={() => setAlertOpen(true)}>설정</button>
+              <span>🔔 변동 알림</span>
+              <button className={'newsbtn' + (alerts.settings.enabled ? ' on' : '')} onClick={() => setAlertOpen(true)}>설정</button>
             </div>
             <div className="dim" style={{ fontSize: 12 }}>
-              {alerts.settings.enabled ? `켜짐 · 공통 ±${alerts.settings.threshold}%` : '꺼짐'}
+              {alerts.settings.enabled
+                ? `켜짐 · ${coinList.length}개 종목 · 공통 ±${alerts.settings.threshold}%`
+                : '꺼짐 · 기준가 대비 변동 시 알림'}
             </div>
           </div>
           {alertOpen && (

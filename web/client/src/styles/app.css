@@ -61,7 +61,10 @@ body {
 }
 .brand { color: var(--yellow); font-weight: 700; letter-spacing: .5px; }
 .brand .ver { color: var(--dim); font-weight: 400; margin-left: 6px; }
-.modes { display: flex; gap: 6px; }
+.modes { display: flex; gap: 6px; align-items: center; }
+/* 버튼·팝오버 래퍼(div)도 버튼과 같은 높이로 정렬 — 높낮이 어긋남 방지 */
+.modes > .alert-btn-wrap, .modes > .aikey { display: flex; align-items: center; }
+.modes .mode-btn { height: 28px; display: inline-flex; align-items: center; line-height: 1; }
 .mode-btn {
   font-family: var(--mono); font-size: 12px; cursor: pointer;
   background: transparent; color: var(--txt);
@@ -71,6 +74,13 @@ body {
 .mode-btn.active {
   color: var(--cyan); border-color: var(--border-foc);
   background: var(--accent-bg-strong); font-weight: 700;
+}
+/* 변동 알림 버튼 — 꺼짐도 살짝 강조, 켜짐이면 빨강으로 확실히 */
+.alert-trigger { border-color: var(--red); color: var(--red); font-weight: 600; }
+.alert-trigger:hover { border-color: var(--red); background: rgba(244, 63, 94, .10); }
+.alert-trigger.on {
+  color: #fff; background: var(--red); border-color: var(--red); font-weight: 700;
+  box-shadow: 0 0 0 1px var(--red), 0 0 10px rgba(244, 63, 94, .45);
 }
 
 /* 그리드 */

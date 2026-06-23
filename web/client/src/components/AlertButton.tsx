@@ -19,8 +19,8 @@ export function AlertButton({ settings, bases, overrides, rows, fmt, onToggle, o
   const on = settings.enabled;
   return (
     <div className="alert-btn-wrap" style={{ position: 'relative' }}>
-      <button className={'mode-btn' + (on ? ' active' : '')} onClick={() => setOpen(true)} title="가격 알림 설정">
-        {on ? '알림 ●' : '알림'}
+      <button className={'mode-btn alert-trigger' + (on ? ' on' : '')} onClick={() => setOpen(true)} title="변동 알림 설정">
+        🔔 변동 알림{on ? ' ●' : ''}
       </button>
       {open && (
         <AlertSettingsModal

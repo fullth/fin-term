@@ -71,7 +71,7 @@ export function AlertSettingsModal({ settings, bases, overrides, rows, fmt, onCl
     <div className="brief-modal-overlay" onClick={onClose}>
       <div className="alert-modal" onClick={(e) => e.stopPropagation()}>
         <div className="ptitle t-red" style={{ justifyContent: 'space-between' }}>
-          <span>가격 알림 설정</span>
+          <span>🔔 변동 알림 설정</span>
           <button className={'mode-btn' + (settings.enabled ? ' active' : '')} style={{ padding: '2px 8px' }} onClick={onToggle}>
             {settings.enabled ? '켜짐' : '꺼짐'}
           </button>
