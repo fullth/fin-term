@@ -27,6 +27,8 @@ export function App() {
   const [mode, setMode] = useState<Mode>('stock');
   const [watchlist, setWatchlist] = useState<string[]>(persisted.watchlist);
   const [names, setNames] = useState<Record<string, string>>(persisted.names);
+  const namesRef = useRef(names); // 알림 표시명용 — SSE 클로저에서 최신 종목명 참조
+  namesRef.current = names;
   const [scope, setScope] = useState<NewsScope>(persisted.scope);
   const [selected, setSelected] = useState<string | null>(persisted.watchlist[0] ?? null);
   const [coins, setCoins] = useState<CoinMeta[]>(persisted.coins);
@@ -121,7 +123,13 @@ export function App() {
         for (const q of quotes) next[q.symbol] = q;
         return next;
       });
-      for (const q of quotes) if (q.price != null) stockAlerts.onPrice(q.symbol, q.price, q.symbol);
+      for (const q of quotes)
+        if (q.price != null) {
+          const nm = namesRef.current[q.symbol];
+          // 알림에 종목명 노출 (코드만으로는 어떤 종목인지 알기 어려움)
+          const displayName = nm ? `${nm} (${q.symbol})` : q.symbol;
+          stockAlerts.onPrice(q.symbol, q.price, displayName);
+        }
     });
     es.addEventListener('markets', (e) => {
       const { indices, markets } = JSON.parse((e as MessageEvent).data) as { indices: Quote[]; markets: Quote[] };
@@ -187,7 +195,7 @@ export function App() {
     <>
       <div className="topbar">
         <div className="brand">
-          fin-term <span className="ver">v0.9.6 · web</span>
+          fin-term <span className="ver">v0.9.7 · web</span>
         </div>
         <div className="modes">
           {mode === 'stock' && (
