@@ -10,6 +10,7 @@ import { BriefPanel, ExplainPanel } from './components/AiPanels';
 import { AlertButton } from './components/AlertButton';
 import { AlertSettingsModal } from './components/AlertSettingsModal';
 import { AlertTriggerButton } from './components/AlertTriggerButton';
+import { InstallButton } from './components/InstallButton';
 import { usePriceAlerts, fireAlert } from './lib/alerts';
 import { fmtPrice } from './lib/format';
 import { AiKeyManager } from './components/AiKeyManager';
@@ -222,7 +223,7 @@ export function App() {
     <>
       <div className="topbar">
         <div className="brand">
-          fin-term <span className="ver">v0.9.10 · web</span>
+          fin-term <span className="ver">v0.9.11 · web</span>
         </div>
         <div className="modes">
           {mode === 'stock' && (
@@ -243,6 +244,7 @@ export function App() {
               <AlertTriggerButton enabled={cryptoAlerts.settings.enabled} onClick={() => setCryptoAlertOpen(true)} />
             </div>
           )}
+          <InstallButton />
           <button
             className="mode-btn"
             onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}

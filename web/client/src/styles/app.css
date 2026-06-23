@@ -196,6 +196,11 @@ body {
 /* 거래정지/서킷브레이커 배지 */
 .halt-badge { font-size: 10px; font-weight: 700; color: #fff; background: var(--red);
   border-radius: 4px; padding: 1px 5px; margin-left: 4px; flex-shrink: 0; white-space: nowrap; }
+/* PWA iOS 설치 안내 말풍선 */
+.install-hint { position: absolute; right: 0; top: 34px; z-index: 50; width: 240px;
+  background: var(--panel); border: 1px solid var(--border-foc); border-radius: 8px;
+  padding: 10px 12px; font-size: 12px; line-height: 1.6; color: var(--txt);
+  box-shadow: 0 4px 16px rgba(0,0,0,.4); }
 
 /* 가격 알림 토스트 */
 .alert-toast {
