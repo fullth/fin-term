@@ -12,8 +12,9 @@
   --magenta: #c026d3;
   --red: #ef4444;
   --green: #22c55e;
-  --up: #22c55e;
-  --down: #ef4444;
+  /* 한국식: 상승=빨강, 하락=파랑 */
+  --up: #f43f5e;
+  --down: #3b82f6;
   --input-bg: #0b0d10;
   --accent-bg: rgba(34, 211, 238, .08);
   --accent-bg-strong: rgba(34, 211, 238, .14);
@@ -33,8 +34,9 @@
   --magenta: #a21caf;
   --red: #dc2626;
   --green: #15803d;
-  --up: #15803d;
-  --down: #dc2626;
+  /* 한국식: 상승=빨강, 하락=파랑 */
+  --up: #dc2626;
+  --down: #2563eb;
   --input-bg: #ffffff;
   --accent-bg: rgba(8, 145, 178, .10);
   --accent-bg-strong: rgba(8, 145, 178, .18);
