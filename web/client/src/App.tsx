@@ -10,7 +10,7 @@ import { BriefPanel, ExplainPanel } from './components/AiPanels';
 import { AlertButton } from './components/AlertButton';
 import { AlertSettingsModal } from './components/AlertSettingsModal';
 import { AlertTriggerButton } from './components/AlertTriggerButton';
-import { usePriceAlerts } from './lib/alerts';
+import { usePriceAlerts, fireAlert } from './lib/alerts';
 import { fmtPrice } from './lib/format';
 import { AiKeyManager } from './components/AiKeyManager';
 import { SearchBar } from './components/SearchBar';
@@ -46,6 +46,7 @@ export function App() {
   const [markets, setMarkets] = useState<Quote[]>([]);
   const [labels, setLabels] = useState<{ indices: LabelEntry[]; markets: LabelEntry[] }>({ indices: [], markets: [] });
   const [news, setNews] = useState<NewsItem[]>([]);
+  const seenNewsRef = useRef<Set<string> | null>(null); // 속보 알림 중복 방지 (null=첫 로드 전)
   const [hot, setHot] = useState<HotItem[]>([]);
   const [detail, setDetail] = useState<Detail | null>(null);
 
@@ -141,10 +142,36 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchlist]);
 
-  // 뉴스 폴링
+  // 제목에 속보/긴급/breaking 포함 = 속보. 새로 들어온 것만 알림(첫 로드는 폭탄 방지로 스킵).
+  const BREAKING_RE = /\[?\s*(속보|긴급)\s*\]?|breaking/i;
+  const checkBreakingNews = (items: NewsItem[]) => {
+    const first = seenNewsRef.current === null;
+    if (seenNewsRef.current === null) seenNewsRef.current = new Set();
+    const seen = seenNewsRef.current;
+    for (const n of items) {
+      if (seen.has(n.id)) continue;
+      seen.add(n.id);
+      if (first) continue; // 최초 로드분은 알림 생략
+      if (BREAKING_RE.test(n.title)) {
+        fireAlert('📰 속보', n.title);
+        stockAlerts.setToast(`📰 속보 · ${n.title}`);
+        setTimeout(() => stockAlerts.setToast(null), 12000);
+      }
+    }
+  };
+
+  // 뉴스 폴링 + [속보] 알림
   useEffect(() => {
     let alive = true;
-    const load = () => api.news(scope, watchlist).then((r) => alive && setNews(r.news)).catch(() => {});
+    const load = () =>
+      api
+        .news(scope, watchlist)
+        .then((r) => {
+          if (!alive) return;
+          setNews(r.news);
+          checkBreakingNews(r.news);
+        })
+        .catch(() => {});
     load();
     const t = setInterval(load, NEWS_INTERVAL);
     return () => {
