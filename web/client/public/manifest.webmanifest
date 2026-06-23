@@ -1,0 +1,13 @@
+{
+  "name": "fin-term · web",
+  "short_name": "fin-term",
+  "description": "블룸버그 스타일 실시간 시세·뉴스 터미널 — 주식/코인",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
