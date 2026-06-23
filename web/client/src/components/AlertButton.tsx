@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { AlertSettings, AlertOverride } from '../lib/alerts';
+import type { AlertSettings, AlertOverride, AlertEvent } from '../lib/alerts';
 import { AlertSettingsModal } from './AlertSettingsModal';
 import { AlertTriggerButton } from './AlertTriggerButton';
 
@@ -12,10 +12,12 @@ interface Props {
   fmt: (n: number | null) => string;
   onToggle: () => void;
   onApply: (patch: { threshold?: number; bases?: Record<string, number>; overrides?: Record<string, AlertOverride> }) => void;
+  history: AlertEvent[];
+  onClearHistory: () => void;
 }
 
 // 상단바용 - 알림 버튼 + 클릭 시 설정 모달 (테마/AI키 칩 옆)
-export function AlertButton({ settings, bases, overrides, rows, fmt, onToggle, onApply }: Props) {
+export function AlertButton({ settings, bases, overrides, rows, fmt, onToggle, onApply, history, onClearHistory }: Props) {
   const [open, setOpen] = useState(false);
   return (
     <div className="alert-btn-wrap" style={{ position: 'relative' }}>
@@ -30,6 +32,8 @@ export function AlertButton({ settings, bases, overrides, rows, fmt, onToggle, o
           onClose={() => setOpen(false)}
           onToggle={onToggle}
           onApply={onApply}
+          history={history}
+          onClearHistory={onClearHistory}
         />
       )}
     </div>

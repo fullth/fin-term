@@ -195,7 +195,7 @@ export function App() {
     <>
       <div className="topbar">
         <div className="brand">
-          fin-term <span className="ver">v0.9.7 · web</span>
+          fin-term <span className="ver">v0.9.8 · web</span>
         </div>
         <div className="modes">
           {mode === 'stock' && (
@@ -207,6 +207,8 @@ export function App() {
               fmt={fmtPrice}
               onToggle={stockAlerts.toggle}
               onApply={stockAlerts.applyBatch}
+              history={stockAlerts.history}
+              onClearHistory={stockAlerts.clearHistory}
             />
           )}
           {mode === 'crypto' && (
@@ -316,6 +318,8 @@ export function App() {
           onClose={() => setCryptoAlertOpen(false)}
           onToggle={cryptoAlerts.toggle}
           onApply={cryptoAlerts.applyBatch}
+          history={cryptoAlerts.history}
+          onClearHistory={cryptoAlerts.clearHistory}
         />
       )}
     </>

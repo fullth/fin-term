@@ -12,6 +12,18 @@ export interface AlertOverride {
   threshold?: number;
 }
 
+// 발생한 알림 1건 — 메모리에만 보관(페이지 닫으면 소멸), localStorage 미저장.
+export interface AlertEvent {
+  id: number;
+  at: number; // epoch ms
+  label: string; // 표시명 (종목명/심볼)
+  pct: number; // 변동률 %
+  price: number;
+  up: boolean; // 상승 여부
+}
+
+const HISTORY_MAX = 50; // 메모리 상한
+
 const DEFAULT: AlertSettings = { enabled: false, threshold: 5 };
 
 function settingsKey(scope: string) {
@@ -110,6 +122,8 @@ export function usePriceAlerts(scope: string) {
   const [bases, setBases] = useState<Record<string, number>>(() => loadMap<number>(basesKey(scope)));
   const [overrides, setOverrides] = useState<Record<string, AlertOverride>>(() => loadMap<AlertOverride>(overridesKey(scope)));
   const [toast, setToast] = useState<string | null>(null);
+  const [history, setHistory] = useState<AlertEvent[]>([]); // 알림 이력 — 메모리 한정
+  const eventSeq = useRef(0);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
   const basesRef = useRef(bases);
@@ -143,6 +157,9 @@ export function usePriceAlerts(scope: string) {
       fireAlert(`${displayName} ${th}% ${pct > 0 ? '급등' : '급락'}`, msg);
       setToast(msg);
       setTimeout(() => setToast(null), 12000);
+      // 이력 누적 (최신순, 상한 유지)
+      const ev: AlertEvent = { id: ++eventSeq.current, at: Date.now(), label: displayName, pct, price, up: pct > 0 };
+      setHistory((h) => [ev, ...h].slice(0, HISTORY_MAX));
       basesRef.current[key] = price; // 기준 리셋
       setBases((b) => ({ ...b, [key]: price }));
     }
@@ -200,12 +217,16 @@ export function usePriceAlerts(scope: string) {
     setSettings((s) => ({ ...s, threshold: Math.max(0.1, threshold) }));
   }, []);
 
+  const clearHistory = useCallback(() => setHistory([]), []);
+
   return {
     settings,
     bases,
     overrides,
     toast,
     setToast,
+    history,
+    clearHistory,
     onPrice,
     setBase,
     setOverrideThreshold,

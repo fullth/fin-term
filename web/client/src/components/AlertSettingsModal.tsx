@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { AlertSettings, AlertOverride } from '../lib/alerts';
+import type { AlertSettings, AlertOverride, AlertEvent } from '../lib/alerts';
 
 interface Row {
   key: string; // 심볼/마켓 (기준가 맵 키)
@@ -17,10 +17,13 @@ interface Props {
   onToggle: () => void;
   // 확인 시 일괄 커밋
   onApply: (patch: { threshold?: number; bases?: Record<string, number>; overrides?: Record<string, AlertOverride> }) => void;
+  history: AlertEvent[]; // 이번 세션 알림 이력 (페이지 닫으면 소멸)
+  onClearHistory: () => void;
 }
 
 // 가격 알림 설정 모달 — 공통/개별 임계값·기준가를 편집해 "확인" 으로 일괄 적용.
-export function AlertSettingsModal({ settings, bases, overrides, rows, fmt, onClose, onToggle, onApply }: Props) {
+export function AlertSettingsModal({ settings, bases, overrides, rows, fmt, onClose, onToggle, onApply, history, onClearHistory }: Props) {
+  const [tab, setTab] = useState<'settings' | 'history'>('settings');
   // 편집 버퍼 (확인 전까지 실제 설정 미반영)
   const [threshold, setThreshold] = useState(String(settings.threshold));
   const [baseEdits, setBaseEdits] = useState<Record<string, string>>(() =>
@@ -71,12 +74,22 @@ export function AlertSettingsModal({ settings, bases, overrides, rows, fmt, onCl
     <div className="brief-modal-overlay" onClick={onClose}>
       <div className="alert-modal" onClick={(e) => e.stopPropagation()}>
         <div className="ptitle t-red" style={{ justifyContent: 'space-between' }}>
-          <span>🔔 변동 알림 설정</span>
+          <span>🔔 변동 알림</span>
           <button className={'mode-btn' + (settings.enabled ? ' active' : '')} style={{ padding: '2px 8px' }} onClick={onToggle}>
             {settings.enabled ? '켜짐' : '꺼짐'}
           </button>
         </div>
 
+        {/* 탭: 설정 / 이력 */}
+        <div className="alert-modal-tabs">
+          <button className={'newsbtn' + (tab === 'settings' ? ' on' : '')} onClick={() => setTab('settings')}>설정</button>
+          <button className={'newsbtn' + (tab === 'history' ? ' on' : '')} onClick={() => setTab('history')}>
+            최근 알림{history.length ? ` (${history.length})` : ''}
+          </button>
+        </div>
+
+        {tab === 'settings' && (
+        <>
         {/* 공통 임계값 + 전체 일괄 */}
         <div className="alert-modal-common">
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -151,6 +164,35 @@ export function AlertSettingsModal({ settings, bases, overrides, rows, fmt, onCl
             <button className="newsbtn on" onClick={apply}>확인</button>
           </div>
         </div>
+        </>
+        )}
+
+        {tab === 'history' && (
+        <>
+          <div className="alert-modal-list">
+            {history.length === 0 && (
+              <div className="dim" style={{ fontSize: 12 }}>아직 발생한 알림이 없습니다 (페이지를 닫으면 이력은 초기화됩니다)</div>
+            )}
+            {history.map((e) => (
+              <div key={e.id} className="alert-hist-row">
+                <span className="alert-hist-time">{new Date(e.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                <span className="alert-hist-label">{e.label}</span>
+                <span className={'alert-hist-pct ' + (e.up ? 'up' : 'down')}>
+                  {e.up ? '▲' : '▼'} {e.up ? '+' : ''}{e.pct.toFixed(1)}%
+                </span>
+                <span className="alert-hist-price dim">{fmt(e.price)}</span>
+              </div>
+            ))}
+          </div>
+          <div className="alert-modal-footer">
+            <span className="dim" style={{ fontSize: 11 }}>이번 세션 알림 이력 · 최대 {50}건</span>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {history.length > 0 && <button className="newsbtn" onClick={onClearHistory}>지우기</button>}
+              <button className="newsbtn on" onClick={onClose}>닫기</button>
+            </div>
+          </div>
+        </>
+        )}
       </div>
     </div>
   );

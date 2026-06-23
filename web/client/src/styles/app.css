@@ -260,6 +260,16 @@ body {
 .alert-modal-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px;
   margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
 .alert-modal-footer .newsbtn { padding: 5px 14px; font-size: 12px; }
+/* 알림 모달 탭 */
+.alert-modal-tabs { display: flex; gap: 6px; margin: 10px 0; }
+.alert-modal-tabs .newsbtn { padding: 4px 12px; font-size: 12px; }
+/* 알림 이력 행 */
+.alert-hist-row { display: flex; align-items: baseline; gap: 10px; font-size: 12px; padding: 4px 2px;
+  border-bottom: 1px solid var(--border); }
+.alert-hist-time { flex: 0 0 64px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.alert-hist-label { flex: 1; color: var(--txt); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.alert-hist-pct { flex: 0 0 84px; text-align: right; font-weight: 600; }
+.alert-hist-price { flex: 0 0 96px; text-align: right; font-variant-numeric: tabular-nums; }
 
 /* 정보 띠: 브리핑 · 지수 · 환율 · 급상승 (가로 4분할) */
 .inforow { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 10px; padding: 10px 10px 0; align-items: start; }
