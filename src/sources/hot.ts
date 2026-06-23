@@ -16,12 +16,14 @@ const UA = {
   Accept: 'application/json',
 };
 
-const NEWS_PER_ITEM = 3; // 종목별 관련 기사 수
+const NEWS_PER_ITEM = 2; // 화면에 노출할 종목별 관련 기사 수
+const NEWS_FETCH = 8; // API 에서 받아 종목 관련도 정렬에 쓸 후보 수
 
 export interface HotNews {
   title: string;
   source: string;
   url: string;
+  summary: string; // 본문 발췌 — 미리보기/상승 근거 파악용
 }
 
 export interface HotItem {
@@ -100,39 +102,67 @@ async function fetchExchange(exchange: Exchange): Promise<RankedItem[]> {
   }
 }
 
+// 종목 직접 관련 기사를 앞으로. 제목·요약에 종목명/심볼이 들어가면 일반 시황보다 상승 근거로 유용.
+function rankByRelevance(news: HotNews[], name: string, symbol: string): HotNews[] {
+  const needles = [name, symbol]
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => s.length >= 2);
+  const relevant = (n: HotNews) => {
+    const hay = `${n.title} ${n.summary}`.toLowerCase();
+    return needles.some((q) => hay.includes(q));
+  };
+  // 관련 기사 우선, 그 안에서는 원래(최신) 순서 유지
+  return [...news].sort((a, b) => Number(relevant(b)) - Number(relevant(a)));
+}
+
 // 종목별 관련 기사. 미국/국내 응답 구조가 달라 분기.
-async function fetchItemNews(market: 'KR' | 'US', key: string): Promise<HotNews[]> {
+async function fetchItemNews(market: 'KR' | 'US', key: string, name: string, symbol: string): Promise<HotNews[]> {
   try {
+    let news: HotNews[] = [];
     if (market === 'US') {
-      // [{ tit, ohnm, oid, aid, dt }, ...]
+      // [{ tit, ohnm, oid, aid, subcontent }, ...]
       const res = await fetch(
-        `https://api.stock.naver.com/news/worldStock/${encodeURIComponent(key)}?pageSize=${NEWS_PER_ITEM}&page=1`,
+        `https://api.stock.naver.com/news/worldStock/${encodeURIComponent(key)}?pageSize=${NEWS_FETCH}&page=1`,
         { headers: UA },
       );
       if (!res.ok) return [];
-      const arr = (await res.json()) as { tit?: string; ohnm?: string; oid?: string; aid?: string }[];
-      return arr.slice(0, NEWS_PER_ITEM).map((n) => ({
+      const arr = (await res.json()) as { tit?: string; ohnm?: string; oid?: string; aid?: string; subcontent?: string }[];
+      news = arr.map((n) => ({
         title: (n.tit ?? '').trim(),
         source: n.ohnm ?? '',
         // 미국(해외) 기사는 네이버 증권 내부 뷰어 경로. n.news.naver.com 은 fnGuide 등 제휴 oid 에 500.
         url: n.oid && n.aid ? `https://m.stock.naver.com/worldstock/news/view/${n.oid}/${n.aid}` : '',
+        summary: (n.subcontent ?? '').trim(),
       }));
+    } else {
+      // 국내: [{ total, items: [{ title, officeName, officeId, articleId, body, mobileNewsUrl }] }]
+      const res = await fetch(
+        `https://api.stock.naver.com/news/stock/${encodeURIComponent(key)}?pageSize=${NEWS_FETCH}&page=1`,
+        { headers: UA },
+      );
+      if (!res.ok) return [];
+      const groups = (await res.json()) as {
+        items?: {
+          title?: string;
+          officeName?: string;
+          officeId?: string;
+          articleId?: string;
+          body?: string;
+          mobileNewsUrl?: string;
+        }[];
+      }[];
+      news = groups
+        .flatMap((g) => g.items ?? [])
+        .map((n) => ({
+          title: (n.title ?? '').trim(),
+          source: n.officeName ?? '',
+          url:
+            n.mobileNewsUrl ??
+            (n.officeId && n.articleId ? `https://n.news.naver.com/mnews/article/${n.officeId}/${n.articleId}` : ''),
+          summary: (n.body ?? '').trim(),
+        }));
     }
-    // 국내: [{ total, items: [{ title, officeName, officeId, articleId }] }]
-    const res = await fetch(
-      `https://api.stock.naver.com/news/stock/${encodeURIComponent(key)}?pageSize=${NEWS_PER_ITEM}&page=1`,
-      { headers: UA },
-    );
-    if (!res.ok) return [];
-    const groups = (await res.json()) as {
-      items?: { title?: string; officeName?: string; officeId?: string; articleId?: string }[];
-    }[];
-    const items = groups.flatMap((g) => g.items ?? []);
-    return items.slice(0, NEWS_PER_ITEM).map((n) => ({
-      title: (n.title ?? '').trim(),
-      source: n.officeName ?? '',
-      url: n.officeId && n.articleId ? `https://n.news.naver.com/mnews/article/${n.officeId}/${n.articleId}` : '',
-    }));
+    return rankByRelevance(news, name, symbol).slice(0, NEWS_PER_ITEM);
   } catch {
     return [];
   }
@@ -148,7 +178,9 @@ export async function fetchHot(): Promise<HotItem[]> {
   // 상위 N개에 대해서만 관련 기사 조회 (불필요한 호출 최소화)
   await Promise.all(
     top.map(async (it) => {
-      if (it.newsKey) it.news = await fetchItemNews(it.market, it.newsKey);
+      if (!it.newsKey) return;
+      const plainSymbol = it.symbol.replace(/\.(KS|KQ)$/i, ''); // 관련도 매칭용 순수 심볼
+      it.news = await fetchItemNews(it.market, it.newsKey, it.name, plainSymbol);
     }),
   );
 

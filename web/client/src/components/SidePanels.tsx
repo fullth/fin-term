@@ -68,10 +68,12 @@ export function HotPanel({ items, onSelect }: { items: HotItem[]; onSelect: (sym
                     e.stopPropagation();
                     if (n.url) window.open(n.url, '_blank', 'noopener');
                   }}
-                  title={n.title}
                 >
-                  <span className="hot-news-dot">·</span>
-                  <span className="hot-news-title">{n.title}</span>
+                  <div className="hot-news-head">
+                    <span className="hot-news-dot">·</span>
+                    <span className="hot-news-title">{n.title}</span>
+                  </div>
+                  {n.summary && <p className="hot-news-summary">{n.summary}</p>}
                 </li>
               ))}
             </ul>

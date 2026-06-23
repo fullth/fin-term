@@ -50,6 +50,7 @@ export interface HotNews {
   title: string;
   source: string;
   url: string;
+  summary: string;
 }
 
 export interface HotItem {
