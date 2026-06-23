@@ -9,6 +9,7 @@ import { IndicesPanel, MarketsPanel, HotPanel } from './components/SidePanels';
 import { BriefPanel, ExplainPanel } from './components/AiPanels';
 import { AlertButton } from './components/AlertButton';
 import { AlertSettingsModal } from './components/AlertSettingsModal';
+import { AlertTriggerButton } from './components/AlertTriggerButton';
 import { usePriceAlerts } from './lib/alerts';
 import { fmtPrice } from './lib/format';
 import { AiKeyManager } from './components/AiKeyManager';
@@ -186,7 +187,7 @@ export function App() {
     <>
       <div className="topbar">
         <div className="brand">
-          fin-term <span className="ver">v0.9.5 · web</span>
+          fin-term <span className="ver">v0.9.6 · web</span>
         </div>
         <div className="modes">
           {mode === 'stock' && (
@@ -201,13 +202,9 @@ export function App() {
             />
           )}
           {mode === 'crypto' && (
-            <button
-              className={'mode-btn alert-trigger' + (cryptoAlerts.settings.enabled ? ' on' : '')}
-              onClick={() => setCryptoAlertOpen(true)}
-              title="변동 알림 설정"
-            >
-              🔔 변동 알림{cryptoAlerts.settings.enabled ? ' ●' : ''}
-            </button>
+            <div className="alert-btn-wrap" style={{ position: 'relative' }}>
+              <AlertTriggerButton enabled={cryptoAlerts.settings.enabled} onClick={() => setCryptoAlertOpen(true)} />
+            </div>
           )}
           <button
             className="mode-btn"

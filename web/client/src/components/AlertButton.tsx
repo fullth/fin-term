@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { AlertSettings, AlertOverride } from '../lib/alerts';
 import { AlertSettingsModal } from './AlertSettingsModal';
+import { AlertTriggerButton } from './AlertTriggerButton';
 
 interface Row { key: string; label: string; price: number | null; }
 interface Props {
@@ -16,12 +17,9 @@ interface Props {
 // 상단바용 - 알림 버튼 + 클릭 시 설정 모달 (테마/AI키 칩 옆)
 export function AlertButton({ settings, bases, overrides, rows, fmt, onToggle, onApply }: Props) {
   const [open, setOpen] = useState(false);
-  const on = settings.enabled;
   return (
     <div className="alert-btn-wrap" style={{ position: 'relative' }}>
-      <button className={'mode-btn alert-trigger' + (on ? ' on' : '')} onClick={() => setOpen(true)} title="변동 알림 설정">
-        🔔 변동 알림{on ? ' ●' : ''}
-      </button>
+      <AlertTriggerButton enabled={settings.enabled} onClick={() => setOpen(true)} />
       {open && (
         <AlertSettingsModal
           settings={settings}
