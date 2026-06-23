@@ -8,6 +8,7 @@ import { NewsStream } from './components/NewsStream';
 import { IndicesPanel, MarketsPanel, HotPanel } from './components/SidePanels';
 import { BriefPanel, ExplainPanel } from './components/AiPanels';
 import { AlertButton } from './components/AlertButton';
+import { AlertSettingsModal } from './components/AlertSettingsModal';
 import { usePriceAlerts } from './lib/alerts';
 import { fmtPrice } from './lib/format';
 import { AiKeyManager } from './components/AiKeyManager';
@@ -33,6 +34,9 @@ export function App() {
   const [, setAiKeyVersion] = useState(0); // 키 변경 시 AI 패널 리렌더 트리거
   const [theme, setTheme] = useState<'dark' | 'light'>(persisted.theme);
   const stockAlerts = usePriceAlerts('stock');
+  const cryptoAlerts = usePriceAlerts('crypto');
+  const [cryptoAlertOpen, setCryptoAlertOpen] = useState(false);
+  const [coinPrices, setCoinPrices] = useState<Record<string, number | null>>({}); // upbitMarket → 현재가 (알림 모달 rows 용)
 
   const [quotes, setQuotes] = useState<Record<string, Quote>>({});
   const [indices, setIndices] = useState<Quote[]>([]);
@@ -182,7 +186,7 @@ export function App() {
     <>
       <div className="topbar">
         <div className="brand">
-          fin-term <span className="ver">v0.9.4 · web</span>
+          fin-term <span className="ver">v0.9.5 · web</span>
         </div>
         <div className="modes">
           {mode === 'stock' && (
@@ -195,6 +199,15 @@ export function App() {
               onToggle={stockAlerts.toggle}
               onApply={stockAlerts.applyBatch}
             />
+          )}
+          {mode === 'crypto' && (
+            <button
+              className={'mode-btn alert-trigger' + (cryptoAlerts.settings.enabled ? ' on' : '')}
+              onClick={() => setCryptoAlertOpen(true)}
+              title="변동 알림 설정"
+            >
+              🔔 변동 알림{cryptoAlerts.settings.enabled ? ' ●' : ''}
+            </button>
           )}
           <button
             className="mode-btn"
@@ -261,7 +274,13 @@ export function App() {
           </div>
         </>
       ) : (
-        <CryptoView coins={coins} onAdd={addCoin} onRemove={removeCoin} />
+        <CryptoView
+          coins={coins}
+          onAdd={addCoin}
+          onRemove={removeCoin}
+          alerts={cryptoAlerts}
+          onCoinPrices={setCoinPrices}
+        />
       )}
 
       <div className="cmdbar">
@@ -276,6 +295,23 @@ export function App() {
         <div className="alert-toast" onClick={() => stockAlerts.setToast(null)}>
           🔔 {stockAlerts.toast}
         </div>
+      )}
+      {mode === 'crypto' && cryptoAlerts.toast && (
+        <div className="alert-toast" onClick={() => cryptoAlerts.setToast(null)}>
+          🔔 {cryptoAlerts.toast}
+        </div>
+      )}
+      {cryptoAlertOpen && (
+        <AlertSettingsModal
+          settings={cryptoAlerts.settings}
+          bases={cryptoAlerts.bases}
+          overrides={cryptoAlerts.overrides}
+          rows={coins.map((c) => ({ key: c.upbitMarket, label: c.symbol, price: coinPrices[c.upbitMarket] ?? null }))}
+          fmt={(n: number | null) => (n == null ? '—' : `₩${n.toLocaleString('ko-KR')}`)}
+          onClose={() => setCryptoAlertOpen(false)}
+          onToggle={cryptoAlerts.toggle}
+          onApply={cryptoAlerts.applyBatch}
+        />
       )}
     </>
   );
