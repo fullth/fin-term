@@ -5,7 +5,7 @@ import { fmtPct, arrow, changeClass, fmtTime } from '../lib/format';
 import { Sparkline } from './Sparkline';
 import { CoinSearchBar } from './CoinSearchBar';
 import { usePriceAlerts } from '../lib/alerts';
-import { AlertPanel } from './AlertPanel';
+import { AlertSettingsModal } from './AlertSettingsModal';
 
 function fmtKrw(n: number | null): string {
   if (n == null) return '—';
@@ -24,6 +24,7 @@ export function CryptoView({ coins: coinList, onAdd, onRemove }: Props) {
   const [live, setLive] = useState<Record<string, UpbitTick>>({});
   const [news, setNews] = useState<CoinNewsItem[]>([]);
   const [selected, setSelected] = useState<string | null>(coinList[0]?.symbol ?? null);
+  const [alertOpen, setAlertOpen] = useState(false);
 
   // 가격 알림 — 공용 훅 (scope=crypto). 기준가는 market 키로 관리.
   const alerts = usePriceAlerts('crypto');
@@ -191,15 +192,27 @@ export function CryptoView({ coins: coinList, onAdd, onRemove }: Props) {
             ))}
             <div className="dim" style={{ fontSize: 11, marginTop: 4 }}>1h · 24h · 7d</div>
           </div>
-          <AlertPanel
-            settings={alerts.settings}
-            bases={alerts.bases}
-            rows={coinList.map((c) => ({ key: c.upbitMarket, label: c.symbol, price: priceOf(quotes.find((q) => q.symbol === c.symbol) ?? ({ upbitMarket: c.upbitMarket, price_krw: null } as CoinQuote)) }))}
-            fmt={fmtKrw}
-            onToggle={alerts.toggle}
-            onThreshold={alerts.setThreshold}
-            onSetBase={alerts.setBase}
-          />
+          <div className="panel">
+            <div className="ptitle t-red" style={{ justifyContent: 'space-between' }}>
+              <span>가격 알림</span>
+              <button className="newsbtn" onClick={() => setAlertOpen(true)}>설정</button>
+            </div>
+            <div className="dim" style={{ fontSize: 12 }}>
+              {alerts.settings.enabled ? `켜짐 · 공통 ±${alerts.settings.threshold}%` : '꺼짐'}
+            </div>
+          </div>
+          {alertOpen && (
+            <AlertSettingsModal
+              settings={alerts.settings}
+              bases={alerts.bases}
+              overrides={alerts.overrides}
+              rows={coinList.map((c) => ({ key: c.upbitMarket, label: c.symbol, price: priceOf(quotes.find((q) => q.symbol === c.symbol) ?? ({ upbitMarket: c.upbitMarket, price_krw: null } as CoinQuote)) }))}
+              fmt={fmtKrw}
+              onClose={() => setAlertOpen(false)}
+              onToggle={alerts.toggle}
+              onApply={alerts.applyBatch}
+            />
+          )}
           <div className="panel">
             <div className="ptitle t-magenta">실시간 피드</div>
             <div className="dim" style={{ fontSize: 12 }}>

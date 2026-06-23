@@ -4,13 +4,24 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 export interface AlertSettings {
   enabled: boolean;
-  threshold: number; // %
+  threshold: number; // 공통 임계값 %
+}
+
+// 종목별 오버라이드 — threshold 가 있으면 공통값 대신 사용. 없으면 공통값.
+export interface AlertOverride {
+  threshold?: number;
 }
 
 const DEFAULT: AlertSettings = { enabled: false, threshold: 5 };
 
 function settingsKey(scope: string) {
   return `fin-term:alerts:${scope}`;
+}
+function basesKey(scope: string) {
+  return `fin-term:alerts:bases:${scope}`;
+}
+function overridesKey(scope: string) {
+  return `fin-term:alerts:overrides:${scope}`;
 }
 
 export function loadAlertSettings(scope: string): AlertSettings {
@@ -30,6 +41,22 @@ export function loadAlertSettings(scope: string): AlertSettings {
 export function saveAlertSettings(scope: string, s: AlertSettings): void {
   try {
     localStorage.setItem(settingsKey(scope), JSON.stringify(s));
+  } catch {
+    /* 무시 */
+  }
+}
+
+function loadMap<T>(key: string): Record<string, T> {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as Record<string, T>) : {};
+  } catch {
+    return {};
+  }
+}
+function saveMap(key: string, m: Record<string, unknown>): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(m));
   } catch {
     /* 무시 */
   }
@@ -80,14 +107,22 @@ export function fireAlert(title: string, body: string): void {
 // scope: 'crypto' | 'stock' (설정 키 분리). label: 알림 문구용 ("코인"/"종목").
 export function usePriceAlerts(scope: string) {
   const [settings, setSettings] = useState(() => loadAlertSettings(scope));
-  const [bases, setBases] = useState<Record<string, number>>({}); // key → 기준가
+  const [bases, setBases] = useState<Record<string, number>>(() => loadMap<number>(basesKey(scope)));
+  const [overrides, setOverrides] = useState<Record<string, AlertOverride>>(() => loadMap<AlertOverride>(overridesKey(scope)));
   const [toast, setToast] = useState<string | null>(null);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
   const basesRef = useRef(bases);
   basesRef.current = bases;
+  const overridesRef = useRef(overrides);
+  overridesRef.current = overrides;
 
   useEffect(() => saveAlertSettings(scope, settings), [scope, settings]);
+  useEffect(() => saveMap(basesKey(scope), bases), [scope, bases]);
+  useEffect(() => saveMap(overridesKey(scope), overrides), [scope, overrides]);
+
+  // 종목 유효 임계값 — 개별 오버라이드 우선, 없으면 공통값
+  const thresholdOf = (key: string) => overridesRef.current[key]?.threshold ?? settingsRef.current.threshold;
 
   // 가격 1건 갱신 시 호출 — key(심볼/마켓), price, displayName
   const onPrice = useCallback((key: string, price: number, displayName: string) => {
@@ -101,10 +136,11 @@ export function usePriceAlerts(scope: string) {
     }
     if (!settingsRef.current.enabled) return;
     const pct = ((price - base) / base) * 100;
-    if (Math.abs(pct) >= settingsRef.current.threshold) {
+    const th = thresholdOf(key);
+    if (Math.abs(pct) >= th) {
       const dir = pct > 0 ? '▲ 상승' : '▼ 하락';
       const msg = `${displayName} ${dir} ${pct > 0 ? '+' : ''}${pct.toFixed(1)}% (${price.toLocaleString('ko-KR')})`;
-      fireAlert(`${displayName} ${settingsRef.current.threshold}% ${pct > 0 ? '급등' : '급락'}`, msg);
+      fireAlert(`${displayName} ${th}% ${pct > 0 ? '급등' : '급락'}`, msg);
       setToast(msg);
       setTimeout(() => setToast(null), 12000);
       basesRef.current[key] = price; // 기준 리셋
@@ -117,6 +153,44 @@ export function usePriceAlerts(scope: string) {
     setBases((b) => ({ ...b, [key]: price }));
   }, []);
 
+  // 종목별 개별 임계값 설정 (null/undefined 면 오버라이드 제거 = 공통값 사용)
+  const setOverrideThreshold = useCallback((key: string, threshold: number | null) => {
+    setOverrides((o) => {
+      const next = { ...o };
+      if (threshold == null || !Number.isFinite(threshold) || threshold <= 0) {
+        delete next[key];
+      } else {
+        next[key] = { ...next[key], threshold: Math.max(0.1, threshold) };
+      }
+      return next;
+    });
+  }, []);
+
+  // 모달 확인 시 일괄 커밋 — 기준가/개별임계값/공통임계값 한 번에 반영
+  const applyBatch = useCallback(
+    (patch: {
+      threshold?: number;
+      bases?: Record<string, number>;
+      overrides?: Record<string, AlertOverride>;
+    }) => {
+      if (patch.threshold != null) setSettings((s) => ({ ...s, threshold: Math.max(0.1, patch.threshold!) }));
+      if (patch.bases) {
+        basesRef.current = { ...basesRef.current, ...patch.bases };
+        setBases((b) => ({ ...b, ...patch.bases }));
+      }
+      if (patch.overrides) setOverrides(patch.overrides);
+    },
+    [],
+  );
+
+  // 전체 종목 기준가를 현재가로 리셋
+  const resetAllToCurrent = useCallback((rows: { key: string; price: number | null }[]) => {
+    const next: Record<string, number> = {};
+    for (const r of rows) if (r.price != null && Number.isFinite(r.price)) next[r.key] = r.price;
+    basesRef.current = { ...basesRef.current, ...next };
+    setBases((b) => ({ ...b, ...next }));
+  }, []);
+
   const toggle = useCallback(async () => {
     if (!settingsRef.current.enabled) await requestNotifyPermission();
     setSettings((s) => ({ ...s, enabled: !s.enabled }));
@@ -126,5 +200,18 @@ export function usePriceAlerts(scope: string) {
     setSettings((s) => ({ ...s, threshold: Math.max(0.1, threshold) }));
   }, []);
 
-  return { settings, bases, toast, setToast, onPrice, setBase, toggle, setThreshold };
+  return {
+    settings,
+    bases,
+    overrides,
+    toast,
+    setToast,
+    onPrice,
+    setBase,
+    setOverrideThreshold,
+    applyBatch,
+    resetAllToCurrent,
+    toggle,
+    setThreshold,
+  };
 }

@@ -234,6 +234,21 @@ body {
   box-shadow: 0 8px 32px rgba(0,0,0,.5); }
 .brief-modal-body { margin-top: 8px; overflow: auto; font-size: 14px; line-height: 1.75; white-space: pre-wrap; color: var(--txt); }
 
+/* 가격 알림 설정 모달 */
+.alert-modal { width: min(560px, 94vw); max-height: 84vh; display: flex; flex-direction: column;
+  background: var(--panel); border: 1px solid var(--red); border-radius: 10px; padding: 14px 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.5); }
+.alert-modal-common { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  flex-wrap: wrap; margin: 10px 0; padding-bottom: 10px; border-bottom: 1px solid var(--border); font-size: 12px; }
+.alert-modal-list { overflow: auto; display: flex; flex-direction: column; gap: 5px; }
+.alert-modal-head { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--dim);
+  padding: 0 2px 4px; }
+.alert-modal-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.alert-modal-row .sym { color: var(--txt); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.alert-modal-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+.alert-modal-footer .newsbtn { padding: 5px 14px; font-size: 12px; }
+
 /* 정보 띠: 브리핑 · 지수 · 환율 · 급상승 (가로 4분할) */
 .inforow { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 10px; padding: 10px 10px 0; align-items: start; }
 .inforow .panel { max-height: 230px; }

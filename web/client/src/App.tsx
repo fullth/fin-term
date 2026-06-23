@@ -182,18 +182,18 @@ export function App() {
     <>
       <div className="topbar">
         <div className="brand">
-          fin-term <span className="ver">v0.9.2 · web</span>
+          fin-term <span className="ver">v0.9.3 · web</span>
         </div>
         <div className="modes">
           {mode === 'stock' && (
             <AlertButton
               settings={stockAlerts.settings}
               bases={stockAlerts.bases}
+              overrides={stockAlerts.overrides}
               rows={watchlist.map((sym) => ({ key: sym, label: sym, price: quotes[sym]?.price ?? null }))}
               fmt={fmtPrice}
               onToggle={stockAlerts.toggle}
-              onThreshold={stockAlerts.setThreshold}
-              onSetBase={stockAlerts.setBase}
+              onApply={stockAlerts.applyBatch}
             />
           )}
           <button
