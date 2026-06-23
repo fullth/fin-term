@@ -182,7 +182,7 @@ export function App() {
     <>
       <div className="topbar">
         <div className="brand">
-          fin-term <span className="ver">v0.9.1 · web</span>
+          fin-term <span className="ver">v0.9.2 · web</span>
         </div>
         <div className="modes">
           {mode === 'stock' && (
