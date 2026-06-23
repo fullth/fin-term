@@ -58,6 +58,50 @@ async function fromYahoo(symbol: string): Promise<Quote> {
   };
 }
 
+// ── 네이버 폴백 (Yahoo 429 차단 대응) ──────────────────────────────
+// 심볼 → 네이버 reutersCode(예: NVDA.O) 캐시. 자동완성 API 로 해석.
+const reutersCache = new Map<string, string | null>();
+
+async function resolveReutersCode(symbol: string): Promise<string | null> {
+  if (reutersCache.has(symbol)) return reutersCache.get(symbol)!;
+  try {
+    const data = await fetchJson(`https://ac.stock.naver.com/ac?q=${encodeURIComponent(symbol)}&target=stock`);
+    const items: { code?: string; reutersCode?: string; category?: string }[] = data?.items ?? [];
+    // 심볼이 정확히 일치하는 해외주식 우선
+    const hit = items.find((it) => it.code?.toUpperCase() === symbol.toUpperCase() && it.reutersCode) ?? items[0];
+    const code = hit?.reutersCode ?? null;
+    reutersCache.set(symbol, code);
+    return code;
+  } catch {
+    reutersCache.set(symbol, null);
+    return null;
+  }
+}
+
+// 네이버 해외주식 시세. open/high/low·스파크라인은 미제공 → null/빈배열.
+async function fromNaver(symbol: string): Promise<Quote> {
+  const reuters = await resolveReutersCode(symbol);
+  if (!reuters) throw new Error('no reuters code');
+  const d = await fetchJson(`https://api.stock.naver.com/stock/${encodeURIComponent(reuters)}/basic`);
+  const price = d?.closePrice != null ? Number(String(d.closePrice).replace(/,/g, '')) : null;
+  if (price == null || !Number.isFinite(price)) throw new Error('no data');
+  const change = d?.compareToPreviousClosePrice != null ? Number(String(d.compareToPreviousClosePrice).replace(/,/g, '')) : null;
+  const change_pct = d?.fluctuationsRatio != null ? Number(String(d.fluctuationsRatio).replace(/,/g, '')) : null;
+  const prev_close = change != null ? price - change : null;
+  return {
+    symbol,
+    price,
+    change,
+    change_pct,
+    open: null,
+    high: null,
+    low: null,
+    prev_close,
+    spark: [],
+    updated_at: Date.now(),
+  };
+}
+
 // Finnhub: 스파크라인 미제공 → price/change 만. 키 있을 때만.
 async function fromFinnhub(symbol: string, key: string): Promise<Quote> {
   const url = `${FINNHUB_QUOTE}?symbol=${encodeURIComponent(symbol)}&token=${key}`;
@@ -79,17 +123,22 @@ async function fromFinnhub(symbol: string, key: string): Promise<Quote> {
 }
 
 export async function fetchQuote(symbol: string, finnhubKey?: string): Promise<Quote> {
-  try {
-    if (finnhubKey) {
-      try {
-        return await fromFinnhub(symbol, finnhubKey);
-      } catch {
-        // Finnhub 실패 시 Yahoo 폴백 (스파크라인 보너스)
-        return await fromYahoo(symbol);
-      }
+  // 소스 우선순위: Finnhub(키) → Yahoo → 네이버. Yahoo 가 429 로 막히면 네이버가 받친다.
+  const sources: (() => Promise<Quote>)[] = [];
+  if (finnhubKey) sources.push(() => fromFinnhub(symbol, finnhubKey));
+  sources.push(() => fromYahoo(symbol));
+  sources.push(() => fromNaver(symbol));
+
+  let lastErr: unknown;
+  for (const src of sources) {
+    try {
+      return await src();
+    } catch (e) {
+      lastErr = e;
     }
-    return await fromYahoo(symbol);
-  } catch (e) {
+  }
+  {
+    const e = lastErr;
     return {
       symbol,
       price: null,
