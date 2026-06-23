@@ -325,7 +325,7 @@ export function App() {
             ? '클릭 선택 · 우클릭 삭제 · / 검색 · j/k 이동 · m 모드전환 · Esc 필터해제'
             : '클릭 코인 선택 · 업비트 실시간 · m 모드전환'}
         </span>
-        <span className="dim">데이터: Yahoo · Naver · RSS · Upbit · 키 없이 동작</span>
+        <span className="dim">데이터: Naver · Upbit · RSS · Yahoo(폴백) · 키 없이 동작</span>
       </div>
       {mode === 'stock' && stockAlerts.toast && (
         <div className="alert-toast" onClick={() => stockAlerts.setToast(null)}>
