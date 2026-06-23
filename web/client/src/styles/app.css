@@ -346,4 +346,6 @@ body {
   .topbar { flex-wrap: wrap; gap: 8px; }
   .modes { flex-wrap: wrap; justify-content: flex-end; row-gap: 6px; }
   .modes > * { flex: 0 0 auto; } /* 버튼·래퍼가 줄어들지 않고 원래 크기 유지 */
+  /* 설치 안내 말풍선 — 버튼이 아닌 뷰포트 기준으로 고정해 화면 밖으로 나가지 않도록 */
+  .install-hint { position: fixed; top: 46px; left: 12px; right: 12px; width: auto; max-width: none; }
 }
