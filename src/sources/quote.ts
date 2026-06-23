@@ -88,6 +88,7 @@ async function fromNaver(symbol: string): Promise<Quote> {
   const change = d?.compareToPreviousClosePrice != null ? Number(String(d.compareToPreviousClosePrice).replace(/,/g, '')) : null;
   const change_pct = d?.fluctuationsRatio != null ? Number(String(d.fluctuationsRatio).replace(/,/g, '')) : null;
   const prev_close = change != null ? price - change : null;
+  const halted = d?.tradeStopType?.name === 'HALTED';
   return {
     symbol,
     price,
@@ -99,6 +100,7 @@ async function fromNaver(symbol: string): Promise<Quote> {
     prev_close,
     spark: [],
     updated_at: Date.now(),
+    ...(halted ? { halted: true } : {}),
   };
 }
 

@@ -11,6 +11,7 @@ export interface Quote {
   prev_close: number | null;
   spark: number[];
   updated_at: number;
+  halted?: boolean; // 거래정지/중단(서킷브레이커·VI 등)
   error?: string;
 }
 

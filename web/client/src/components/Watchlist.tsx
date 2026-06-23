@@ -38,6 +38,7 @@ export function Watchlist({ watchlist, names, quotes, selected, newsFilter, onSe
             <div className="listrow-top">
               <span className="caret">{isSel ? '▶' : ''}</span>
               <span className="sym">{sym}</span>
+              {q?.halted && <span className="halt-badge" title="거래정지/중단 (서킷브레이커·VI 등)">⛔ 정지</span>}
               <button
                 className={`newsbtn${newsFilter === sym ? ' on' : ''}`}
                 title="이 종목 뉴스만 보기"

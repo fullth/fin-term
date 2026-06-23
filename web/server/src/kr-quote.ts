@@ -67,6 +67,7 @@ function toQuote(symbol: string, d: any, withOHLC: boolean): Quote {
   const pct = num(d.fluctuationsRatio);
   const dir = d.compareToPreviousPrice?.name; // RISING/FALLING/...
   const signedChange = change == null ? null : dir === 'FALLING' ? -Math.abs(change) : Math.abs(change);
+  const halted = d.tradeStopType?.name === 'HALTED'; // 거래정지/중단(서킷브레이커·VI 등)
   return {
     symbol,
     price,
@@ -78,6 +79,7 @@ function toQuote(symbol: string, d: any, withOHLC: boolean): Quote {
     prev_close: price != null && signedChange != null ? price - signedChange : null,
     spark: [],
     updated_at: Date.now(),
+    ...(halted ? { halted: true } : {}),
   };
 }
 

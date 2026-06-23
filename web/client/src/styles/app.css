@@ -193,6 +193,9 @@ body {
   border-radius: 4px; padding: 0 5px; margin-left: 2px; }
 .newsbtn:hover { color: var(--cyan); border-color: var(--cyan); }
 .newsbtn.on { color: var(--cyan); border-color: var(--cyan); background: var(--accent-bg-strong); }
+/* 거래정지/서킷브레이커 배지 */
+.halt-badge { font-size: 10px; font-weight: 700; color: #fff; background: var(--red);
+  border-radius: 4px; padding: 1px 5px; margin-left: 4px; flex-shrink: 0; white-space: nowrap; }
 
 /* 가격 알림 토스트 */
 .alert-toast {

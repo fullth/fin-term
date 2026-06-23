@@ -11,6 +11,7 @@ export interface Quote {
   prev_close: number | null;
   spark: number[]; // 인트라데이 가격 샘플 (스파크라인용)
   updated_at: number; // epoch ms
+  halted?: boolean; // 거래정지/중단(서킷브레이커·VI 등). 네이버 tradeStopType=HALTED
   error?: string;
 }
 
