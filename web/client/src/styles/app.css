@@ -71,6 +71,7 @@ body {
   font-family: var(--mono); font-size: 12px; cursor: pointer;
   background: transparent; color: var(--txt);
   border: 1px solid var(--btn-border); border-radius: 6px; padding: 4px 10px;
+  white-space: nowrap; /* 라벨이 버튼 높이를 벗어나며 줄바꿈되지 않도록 */
 }
 .mode-btn:hover { border-color: var(--border-foc); }
 .mode-btn.active {
@@ -198,9 +199,10 @@ body {
   border-radius: 4px; padding: 1px 5px; margin-left: 4px; flex-shrink: 0; white-space: nowrap; }
 /* PWA iOS 설치 안내 말풍선 */
 .install-hint { position: absolute; right: 0; top: 34px; z-index: 50; width: 240px;
+  max-width: calc(100vw - 24px); /* 좁은 화면에서 말풍선이 뷰포트를 벗어나지 않도록 */
   background: var(--panel); border: 1px solid var(--border-foc); border-radius: 8px;
   padding: 10px 12px; font-size: 12px; line-height: 1.6; color: var(--txt);
-  box-shadow: 0 4px 16px rgba(0,0,0,.4); }
+  box-shadow: 0 4px 16px rgba(0,0,0,.4); overflow-wrap: break-word; }
 
 /* 가격 알림 토스트 */
 .alert-toast {
@@ -337,4 +339,11 @@ body {
   .mid-info { grid-template-columns: 1fr 1fr; }
   .topbars { flex-direction: column; }
   .explain-compact .aikey-input { width: 100%; flex: 1; }
+}
+
+/* 모바일 — 상단바 버튼이 좁은 폭에서 짓눌리지 않고 다음 줄로 흐르도록 */
+@media (max-width: 640px) {
+  .topbar { flex-wrap: wrap; gap: 8px; }
+  .modes { flex-wrap: wrap; justify-content: flex-end; row-gap: 6px; }
+  .modes > * { flex: 0 0 auto; } /* 버튼·래퍼가 줄어들지 않고 원래 크기 유지 */
 }
