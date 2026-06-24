@@ -36,13 +36,15 @@ export function MarketsPanel({ quotes, labels }: { quotes: Quote[]; labels: Labe
   );
 }
 
-export function HotPanel({ items, onSelect }: { items: HotItem[]; onSelect: (sym: string) => void }) {
+export function HotPanel({ items, loaded, onSelect }: { items: HotItem[]; loaded: boolean; onSelect: (sym: string) => void }) {
   return (
     <div className="panel">
       <div className="ptitle t-red">
         급상승 종목 <span className="sub">상승률 상위</span>
       </div>
-      {items.length === 0 && <div className="dim">불러오는 중…</div>}
+      {items.length === 0 && (
+        <div className="dim">{loaded ? '거래 시간이 아니거나 급상승 종목이 없습니다' : '불러오는 중…'}</div>
+      )}
       {items.map((it, i) => (
         <div key={`${it.symbol}-${i}`} className="hot-row" onClick={() => onSelect(it.symbol)}>
           <div className="hot-main">

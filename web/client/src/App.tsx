@@ -56,6 +56,7 @@ export function App() {
   const [news, setNews] = useState<NewsItem[]>([]);
   const seenNewsRef = useRef<Set<string> | null>(null); // 속보 알림 중복 방지 (null=첫 로드 전)
   const [hot, setHot] = useState<HotItem[]>([]);
+  const [hotLoaded, setHotLoaded] = useState(false); // 최초 응답 도착 여부 — 로딩 vs 빈 결과(장 마감) 구분
   const [detail, setDetail] = useState<Detail | null>(null);
 
   // 영속화 — 주식 watchlist + 코인 목록 + 테마
@@ -192,7 +193,15 @@ export function App() {
   // 핫 종목 폴링
   useEffect(() => {
     let alive = true;
-    const load = () => api.hot().then((r) => alive && setHot(r.items)).catch(() => {});
+    const load = () =>
+      api
+        .hot()
+        .then((r) => {
+          if (!alive) return;
+          setHot(r.items);
+          setHotLoaded(true);
+        })
+        .catch(() => {});
     load();
     const t = setInterval(load, HOT_INTERVAL);
     return () => {
@@ -327,7 +336,7 @@ export function App() {
               />
             </div>
             <div className="col-right">
-              <HotPanel items={hot} onSelect={(sym) => addSymbol(sym, '')} />
+              <HotPanel items={hot} loaded={hotLoaded} onSelect={(sym) => addSymbol(sym, '')} />
             </div>
           </div>
         </>
