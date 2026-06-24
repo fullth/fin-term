@@ -32,6 +32,15 @@ const MARKETS_INTERVAL = Number(process.env.FIN_MARKETS_INTERVAL_MS ?? 300_000);
 // 기본 관심종목 — TUI 기본값과 동일. 클라이언트가 watchlist 를 쿼리로 보내면 그걸 우선.
 const DEFAULT_WATCHLIST = ['AAPL', 'TSLA', 'NVDA', 'MSFT'];
 
+// 마지막 방어선 — Express 4 는 async 라우트의 reject 를 에러 미들웨어로 자동 전달하지 않는다.
+// 외부 API throw(예: 코인 검색 429)가 라우트의 try/catch 를 빠져나가도 프로세스가 죽지 않게 로깅만 한다.
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err);
+});
+
 const app = express();
 // Railway 프록시 뒤 → X-Forwarded-For 를 신뢰해야 req.ip 가 실 IP 가 된다.
 app.set('trust proxy', 1);
@@ -422,6 +431,15 @@ if (existsSync(CLIENT_DIST)) {
   app.get(/^(?!\/api).*/, (_req, res) => res.sendFile(join(CLIENT_DIST, 'index.html')));
   console.log(`[fin-term BFF] serving client from ${CLIENT_DIST}`);
 }
+
+// ── 전역 에러 핸들러 ──────────────────────────────────────────────────
+// 라우트 핸들러가 throw/reject 하면(외부 API 429 등) 여기서 500 으로 받아낸다.
+// 핸들러별 try/catch 가 누락돼도 프로세스가 죽지 않도록 하는 마지막 방어선.
+// 4-인자 시그니처여야 Express 가 에러 미들웨어로 인식한다(next 미사용이라도 유지).
+app.use((err: unknown, _req: Request, res: Response, _next: () => void) => {
+  console.error('[unhandled route error]', err);
+  if (!res.headersSent) res.status(500).json({ error: 'internal_error' });
+});
 
 // ── 부팅 ──────────────────────────────────────────────────────────────
 void refreshMarkets();
