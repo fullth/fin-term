@@ -52,5 +52,27 @@ export function savePersisted(p: Persisted): void {
   }
 }
 
+// 데일리 브리핑 — 마지막 생성 결과를 별도 키에 보관해 새로고침 후 복원한다.
+const BRIEF_KEY = 'fin-term:brief';
+
+export function loadStoredBrief(): string | null {
+  try {
+    const raw = localStorage.getItem(BRIEF_KEY);
+    if (!raw) return null;
+    const b = JSON.parse(raw) as { text?: string | null };
+    return b.text ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveStoredBrief(text: string): void {
+  try {
+    localStorage.setItem(BRIEF_KEY, JSON.stringify({ text, savedAt: new Date().toISOString() }));
+  } catch {
+    /* quota 등 무시 */
+  }
+}
+
 export type { Persisted };
 export { DEFAULT_COINS };

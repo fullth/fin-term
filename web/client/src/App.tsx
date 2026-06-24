@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Quote, NewsItem, NewsScope, Detail, HotItem, LabelEntry, CoinMeta } from './lib/types';
 import { api } from './lib/api';
-import { loadPersisted, savePersisted } from './lib/storage';
+import { loadPersisted, savePersisted, loadStoredBrief, saveStoredBrief } from './lib/storage';
 import { Watchlist } from './components/Watchlist';
 import { QuotePanel } from './components/QuotePanel';
 import { NewsStream } from './components/NewsStream';
@@ -41,11 +41,12 @@ export function App() {
   const cryptoAlerts = usePriceAlerts('crypto');
   const [cryptoAlertOpen, setCryptoAlertOpen] = useState(false);
   // 데일리 브리핑 — 주식/코인 공용, 모드 전환·새로고침에도 유지. 생성 버튼 누를 때만 갱신.
-  const [brief, setBrief] = useState<{ text: string | null; loading: boolean; err: string | null }>({
-    text: null,
+  // 마지막 생성 결과를 localStorage 에 보관해 새로고침 후에도 복원한다.
+  const [brief, setBrief] = useState<{ text: string | null; loading: boolean; err: string | null }>(() => ({
+    text: loadStoredBrief(),
     loading: false,
     err: null,
-  });
+  }));
   const [coinPrices, setCoinPrices] = useState<Record<string, number | null>>({}); // upbitMarket → 현재가 (알림 모달 rows 용)
 
   const [quotes, setQuotes] = useState<Record<string, Quote>>({});
@@ -237,7 +238,10 @@ export function App() {
       const r = await api.brief();
       if (r.status === 401) setBrief({ text: null, loading: false, err: '브리핑은 현재 사용할 수 없습니다' });
       else if (!r.text) setBrief({ text: null, loading: false, err: '생성 실패 — 잠시 후 다시 시도하세요' });
-      else setBrief({ text: r.text, loading: false, err: null });
+      else {
+        setBrief({ text: r.text, loading: false, err: null });
+        saveStoredBrief(r.text);
+      }
     } catch {
       setBrief((b) => ({ ...b, loading: false, err: '생성 실패' }));
     }
