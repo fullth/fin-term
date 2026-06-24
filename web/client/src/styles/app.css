@@ -130,6 +130,14 @@ body {
 .row .name { color: var(--dim); flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .row .val { margin-left: auto; white-space: nowrap; flex-shrink: 0; }
 .row:hover { background: var(--accent-bg); border-radius: 4px; }
+
+/* 급변동 실시간 피드 — 한 줄씩 위로 쌓이는 로그 */
+.surge-row { display: flex; align-items: baseline; gap: 7px; padding: 2px 0; font-size: 12.5px; animation: surge-in .25s ease-out; }
+.surge-row .time { color: var(--dim); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.surge-row .sym { color: var(--txt); font-weight: 600; flex-shrink: 0; }
+.surge-row .surge-price { color: var(--dim); flex: 1 1 auto; text-align: right; font-variant-numeric: tabular-nums; }
+.surge-row .val { flex-shrink: 0; white-space: nowrap; font-variant-numeric: tabular-nums; }
+@keyframes surge-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
 .row.sel { background: var(--accent-bg-strong); border-radius: 4px; }
 .row.sel .sym { color: var(--cyan); }
 .caret { width: 10px; display: inline-block; color: var(--cyan); flex-shrink: 0; }

@@ -12,6 +12,17 @@ function fmtKrw(n: number | null): string {
   return `₩${n.toLocaleString('ko-KR', { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
 }
 
+// 급변동 피드 한 줄 — 직전 수신가 대비 순간 변동.
+interface Surge {
+  id: number;
+  symbol: string;
+  price: number;
+  deltaPct: number; // 직전 수신가 대비 순간 변동률(부호 포함)
+  at: number;
+}
+const SURGE_PCT = 0.15; // 이 절댓값(%) 이상 튄 순간만 피드에 기록
+const MAX_SURGES = 30; // 피드 최대 줄 수(메모리·렌더 가드)
+
 interface Props {
   coins: CoinMeta[];
   onAdd: (c: CoinMeta) => void;
@@ -26,6 +37,10 @@ export function CryptoView({ coins: coinList, onAdd, onRemove, alerts, onCoinPri
   const [live, setLive] = useState<Record<string, UpbitTick>>({});
   const [news, setNews] = useState<CoinNewsItem[]>([]);
   const [selected, setSelected] = useState<string | null>(coinList[0]?.symbol ?? null);
+  // 급변동 피드 — 직전 수신가 대비 SURGE_PCT 이상 튄 순간만 기록(최근 MAX_SURGES 개)
+  const [surges, setSurges] = useState<Surge[]>([]);
+  const lastPriceRef = useRef<Record<string, number>>({}); // market → 직전 수신 체결가
+  const surgeSeqRef = useRef(0); // 피드 항목 고유 키(수신 순서)
 
   // CoinGecko 대시보드 폴링 — coinList 바뀌면 재조회
   useEffect(() => {
@@ -60,6 +75,18 @@ export function CryptoView({ coins: coinList, onAdd, onRemove, alerts, onCoinPri
       setLive((prev) => ({ ...prev, [tick.market]: tick }));
       const sym = coinList.find((c) => c.upbitMarket === tick.market)?.symbol ?? tick.market;
       alerts.onPrice(tick.market, tick.trade_price, sym);
+
+      // 급변동 감지 — 직전 수신가 대비 순간 변동률이 임계값 이상이면 피드에 추가.
+      const prevPrice = lastPriceRef.current[tick.market];
+      lastPriceRef.current[tick.market] = tick.trade_price;
+      if (prevPrice && prevPrice > 0) {
+        const deltaPct = ((tick.trade_price - prevPrice) / prevPrice) * 100;
+        if (Math.abs(deltaPct) >= SURGE_PCT) {
+          surgeSeqRef.current += 1;
+          const surge: Surge = { id: surgeSeqRef.current, symbol: sym, price: tick.trade_price, deltaPct, at: Date.now() };
+          setSurges((prev) => [surge, ...prev].slice(0, MAX_SURGES));
+        }
+      }
     });
     return () => es.close();
     // alerts.onPrice 는 useCallback 으로 안정적 — coinList 만 재연결 트리거 (무한 재연결 방지)
@@ -205,10 +232,25 @@ export function CryptoView({ coins: coinList, onAdd, onRemove, alerts, onCoinPri
             <div className="dim" style={{ fontSize: 11, marginTop: 4 }}>1h · 24h · 7d</div>
           </div>
           <div className="panel">
-            <div className="ptitle t-magenta">실시간 피드</div>
-            <div className="dim" style={{ fontSize: 12 }}>
-              {Object.keys(live).length > 0 ? `업비트 WS 연결됨 · ${Object.keys(live).length}종 수신` : '연결 중…'}
+            <div className="ptitle t-magenta">
+              실시간 피드 <span className="sub">급변동 ±{SURGE_PCT}%</span>
             </div>
+            {surges.length === 0 ? (
+              <div className="dim" style={{ fontSize: 12 }}>
+                {Object.keys(live).length > 0 ? '급변동 대기 중…' : '연결 중…'}
+              </div>
+            ) : (
+              surges.map((s) => (
+                <div key={s.id} className="surge-row">
+                  <span className="time">{fmtTime(s.at)}</span>
+                  <span className="sym">{s.symbol}</span>
+                  <span className="surge-price">{fmtKrw(s.price)}</span>
+                  <span className={`val ${changeClass(s.deltaPct)}`}>
+                    {arrow(s.deltaPct)}{fmtPct(s.deltaPct)}
+                  </span>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>
