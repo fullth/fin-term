@@ -181,16 +181,29 @@ class UpbitFeed {
 
 export const upbitFeed = new UpbitFeed();
 
-// ── 업비트 KRW 마켓 캐시 (검색 시 거래 가능 여부 판별) ────────────────
-let upbitMarkets: { market: string; symbol: string }[] = [];
+// ── 업비트 KRW 마켓 캐시 (검색 대상 = 실시간 시세 가능한 KRW 상장 코인) ──
+// 시세를 업비트로 일원화한 것과 동일하게 검색도 업비트 목록에서 수행한다.
+// CoinGecko 검색은 클라우드 IP 가 차단돼 운영에서 동작하지 않으므로 쓰지 않는다.
+interface UpbitMarket {
+  market: string; // KRW-BTC
+  symbol: string; // BTC
+  koreanName: string; // 비트코인
+  englishName: string; // Bitcoin
+}
+let upbitMarkets: UpbitMarket[] = [];
 let upbitMarketsAt = 0;
-async function getUpbitMarkets(): Promise<{ market: string; symbol: string }[]> {
+async function getUpbitMarkets(): Promise<UpbitMarket[]> {
   if (upbitMarkets.length && Date.now() - upbitMarketsAt < 3_600_000) return upbitMarkets;
   try {
-    const all = (await fetchJson('https://api.upbit.com/v1/market/all')) as any[];
+    const all = (await fetchJson('https://api.upbit.com/v1/market/all?isDetails=false')) as any[];
     upbitMarkets = all
       .filter((m) => typeof m.market === 'string' && m.market.startsWith('KRW-'))
-      .map((m) => ({ market: m.market, symbol: m.market.slice(4) }));
+      .map((m) => ({
+        market: m.market,
+        symbol: m.market.slice(4),
+        koreanName: m.korean_name ?? '',
+        englishName: m.english_name ?? '',
+      }));
     upbitMarketsAt = Date.now();
   } catch {
     /* 캐시 유지 */
@@ -198,7 +211,8 @@ async function getUpbitMarkets(): Promise<{ market: string; symbol: string }[]> 
   return upbitMarkets;
 }
 
-// 코인 검색 — CoinGecko 검색 ∩ 업비트 KRW 상장 (실시간 시세 가능한 것만)
+// 코인 검색 — 업비트 KRW 상장 목록에서 심볼·한글명·영문명 부분 일치.
+// id 는 식별용(React key·추가/삭제)이라 마켓 코드로 채운다(CoinGecko id 불필요).
 export interface CoinSearchResult {
   id: string;
   symbol: string;
@@ -206,21 +220,31 @@ export interface CoinSearchResult {
   upbitMarket: string;
 }
 export async function searchCoins(query: string, limit = 8): Promise<CoinSearchResult[]> {
-  if (!query.trim()) return [];
-  const [search, markets] = await Promise.all([
-    fetchJson(`https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(query)}`),
-    getUpbitMarkets(),
-  ]);
-  const krwSymbols = new Map(markets.map((m) => [m.symbol.toUpperCase(), m.market]));
-  const out: CoinSearchResult[] = [];
-  for (const c of (search?.coins ?? []) as any[]) {
-    const sym = String(c.symbol).toUpperCase();
-    const upbitMarket = krwSymbols.get(sym);
-    if (!upbitMarket) continue; // 업비트 KRW 미상장 → 제외
-    out.push({ id: c.id, symbol: sym, name: c.name, upbitMarket });
-    if (out.length >= limit) break;
-  }
-  return out;
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  const markets = await getUpbitMarkets();
+  const scored = markets
+    .map((m) => ({ m, rank: matchRank(m, q) }))
+    .filter((x) => x.rank > 0)
+    .sort((a, b) => a.rank - b.rank); // 낮을수록 정확
+  return scored.slice(0, limit).map(({ m }) => ({
+    id: m.market,
+    symbol: m.symbol,
+    name: m.koreanName || m.englishName || m.symbol,
+    upbitMarket: m.market,
+  }));
+}
+
+// 매칭 우선순위: 심볼 완전일치(1) > 심볼 접두(2) > 이름 접두(3) > 이름 부분일치(4). 미일치 0.
+function matchRank(m: UpbitMarket, q: string): number {
+  const sym = m.symbol.toLowerCase();
+  const ko = m.koreanName.toLowerCase();
+  const en = m.englishName.toLowerCase();
+  if (sym === q) return 1;
+  if (sym.startsWith(q)) return 2;
+  if (ko.startsWith(q) || en.startsWith(q)) return 3;
+  if (ko.includes(q) || en.includes(q) || sym.includes(q)) return 4;
+  return 0;
 }
 
 // 코인 뉴스 — Google News RSS (코인 키워드). 제목/시간/출처만.

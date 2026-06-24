@@ -344,8 +344,12 @@ app.get('/api/crypto', async (req, res) => {
 app.get('/api/crypto/search', async (req, res) => {
   const q = String(req.query.q ?? '').trim();
   if (!q) return res.json({ results: [] });
-  const results = await searchCoins(q);
-  res.json({ results });
+  try {
+    const results = await searchCoins(q);
+    res.json({ results });
+  } catch {
+    res.json({ results: [] }); // 검색 실패는 빈 결과로 — 클라 입력 흐름을 막지 않음
+  }
 });
 
 // 코인 뉴스 — Google News RSS
