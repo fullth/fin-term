@@ -5,12 +5,9 @@
 [![node](https://img.shields.io/node/v/fin-term.svg)](https://www.npmjs.com/package/fin-term)
 [![license](https://img.shields.io/npm/l/fin-term.svg)](https://github.com/fullth/fin-term/blob/master/LICENSE)
 
-블룸버그 터미널 스타일의 TUI를 구현하였습니다.  
+블룸버그 터미널 스타일의 TUI와 웹 페이지를 구현하였습니다.  
 실시간 시세 + 영문/한글 뉴스 스트림을 한 화면에 확인할 수 있습니다.
-주식모드 / 코인모드 두 가지 모드가 존재합니다
-
-> **웹 버전도 있습니다.** 같은 블룸버그 UI를 브라우저에서 그대로 — 반응형·마우스·모바일 지원.
-> 터미널 없이 바로 쓰려면 웹앱을 띄우세요. 자세한 내용은 [`web/README.md`](web/README.md).
+주식모드 / 코인모드 두 가지 모드가 존재합니다.
 
 ## 대시보드 화면 - 주식/코인
 **API 키 없이 바로 동작**합니다.
