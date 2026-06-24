@@ -28,6 +28,12 @@ export const ADMIN_HTML = `<!DOCTYPE html>
   .section h2 { font-size: 13px; color: #88c0d0; margin: 0 0 8px; }
   .muted { color: #4b5563; }
   .err { color: #bf616a; }
+  .grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+  .bar-row { display: grid; grid-template-columns: 110px 1fr 44px; align-items: center; gap: 8px; margin: 5px 0; }
+  .bar-label { font-size: 12px; color: #d8dee9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar-track { background: #1f2733; border-radius: 4px; height: 14px; overflow: hidden; }
+  .bar-fill { background: #5e81ac; height: 100%; }
+  .bar-num { text-align: right; font-size: 12px; color: #88c0d0; font-variant-numeric: tabular-nums; }
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #a3be8c; margin-right: 6px; animation: pulse 2s infinite; }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
 </style>
@@ -42,6 +48,25 @@ export const ADMIN_HTML = `<!DOCTYPE html>
     <div class="card"><div class="label">오늘 방문</div><div class="value" id="today">–</div></div>
     <div class="card"><div class="label">고유 방문자</div><div class="value" id="unique">–</div></div>
     <div class="card"><div class="label">누적 방문</div><div class="value" id="total">–</div></div>
+    <div class="card"><div class="label">브리핑 이용(누적)</div><div class="value" id="brief-total">–</div></div>
+    <div class="card"><div class="label">브리핑 이용(오늘)</div><div class="value" id="brief-today">–</div></div>
+  </div>
+
+  <div class="section">
+    <h2>환경 분포</h2>
+    <div class="grid3">
+      <div><div class="muted" style="font-size:11px;margin-bottom:6px;">OS</div><div id="os-bars"></div></div>
+      <div><div class="muted" style="font-size:11px;margin-bottom:6px;">기기</div><div id="device-bars"></div></div>
+      <div><div class="muted" style="font-size:11px;margin-bottom:6px;">브라우저</div><div id="browser-bars"></div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>이벤트</h2>
+    <table>
+      <thead><tr><th>종류</th><th class="num">누적</th><th class="num">오늘</th><th class="num">고유 사용자</th></tr></thead>
+      <tbody id="event-rows"><tr><td colspan="4" class="muted">–</td></tr></tbody>
+    </table>
   </div>
 
   <div class="section">
@@ -64,6 +89,19 @@ export const ADMIN_HTML = `<!DOCTYPE html>
   const fmt = (ms) => { if (!ms) return '–'; const d = new Date(ms); return d.toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }); };
   const short = (h) => h ? h.slice(0, 8) : '–';
   const set = (id, v) => { document.getElementById(id).textContent = v; };
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  // 분포 막대 렌더 — 최댓값 기준 상대 너비.
+  function renderBars(id, rows) {
+    const el = document.getElementById(id);
+    if (!rows || !rows.length) { el.innerHTML = '<div class="muted" style="font-size:12px;">데이터 없음</div>'; return; }
+    const max = Math.max(...rows.map((r) => r.count), 1);
+    el.innerHTML = rows.map((r) =>
+      '<div class="bar-row"><div class="bar-label" title="' + esc(r.label) + '">' + esc(r.label) +
+      '</div><div class="bar-track"><div class="bar-fill" style="width:' + Math.round((r.count / max) * 100) + '%"></div></div>' +
+      '<div class="bar-num">' + r.count + '</div></div>'
+    ).join('');
+  }
 
   async function load() {
     try {
@@ -72,9 +110,22 @@ export const ADMIN_HTML = `<!DOCTYPE html>
       const s = await r.json();
       set('live-conn', s.live.connections);
       set('live-users', s.live.uniqueUsers);
-      set('today', s.today);
+      set('today', s.todayCount);
       set('unique', s.uniqueIps);
       set('total', s.total);
+
+      const brief = (s.events || []).find((e) => e.type === 'brief');
+      set('brief-total', brief ? brief.total : 0);
+      set('brief-today', brief ? brief.today : 0);
+
+      renderBars('os-bars', s.os);
+      renderBars('device-bars', s.device);
+      renderBars('browser-bars', s.browser);
+
+      const ev = document.getElementById('event-rows');
+      ev.innerHTML = (s.events && s.events.length)
+        ? s.events.map((e) => '<tr><td>' + esc(e.type) + '</td><td class="num">' + e.total + '</td><td class="num">' + e.today + '</td><td class="num">' + e.uniqueUsers + '</td></tr>').join('')
+        : '<tr><td colspan="4" class="muted">이벤트 없음</td></tr>';
 
       const lr = document.getElementById('live-rows');
       lr.innerHTML = s.live.sessions.length

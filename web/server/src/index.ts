@@ -9,7 +9,8 @@ import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { existsSync } from 'node:fs';
-import { recordVisit, getStats } from './db.js';
+import { recordVisit, recordEvent, getStats } from './db.js';
+import { parseUA } from './ua.js';
 import { ADMIN_HTML } from './admin-page.js';
 import { fetchQuotes } from '../../../src/sources/quote.js';
 import { fetchNews } from '../../../src/sources/rss.js';
@@ -173,10 +174,15 @@ app.get('/api/hot', async (_req, res) => {
 // 방문 기록 — 클라이언트가 페이지 로드 시 1회 호출. 원시 IP 미저장(해시만).
 app.post('/api/visit', (req, res) => {
   try {
+    const ua = req.header('User-Agent') ?? null;
+    const { os, device, browser } = parseUA(ua);
     recordVisit(
       {
         ipHash: clientIpHash(req),
-        userAgent: req.header('User-Agent') ?? null,
+        userAgent: ua,
+        os,
+        device,
+        browser,
         path: typeof req.body?.path === 'string' ? req.body.path.slice(0, 200) : null,
       },
       Date.now(),
@@ -192,9 +198,14 @@ app.get('/api/ai-status', (_req, res) => res.json({ serverKey: Boolean(process.e
 
 // AI 데일리 브리핑 — 서버 키 전용. 주식+코인 시장 전반(개인화 없음). 서버가 시장 데이터를 직접 모은다.
 const labelOf = (defs: { symbol: string; label: string }[], sym: string) => defs.find((d) => d.symbol === sym)?.label ?? sym;
-app.post('/api/brief', async (_req, res) => {
+app.post('/api/brief', async (req, res) => {
   const key = process.env.ANTHROPIC_API_KEY || null;
   if (!key) return res.status(401).json({ text: null, error: 'no_server_key' });
+  try {
+    recordEvent('brief', clientIpHash(req), Date.now());
+  } catch {
+    /* 집계 실패 무시 */
+  }
   const [hot, coins, news] = await Promise.all([
     fetchHot().catch(() => []),
     fetchCoinDashboard(DEFAULT_COINS).catch(() => [] as Awaited<ReturnType<typeof fetchCoinDashboard>>),
