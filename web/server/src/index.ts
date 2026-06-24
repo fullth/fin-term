@@ -133,12 +133,23 @@ app.get('/api/hot', async (_req, res) => {
 // AI 기능 사용 가능 여부 — 서버 env 키 보유 여부만 알려줌(클라가 키 없을 때 fallback 판단용).
 app.get('/api/ai-status', (_req, res) => res.json({ serverKey: Boolean(process.env.ANTHROPIC_API_KEY) }));
 
-// AI 브리핑 — 서버 키 전용(운영자 부담). 시장 요약은 입력이 고정 구조라 악용 여지가 적어 기본 기능으로 제공.
-app.post('/api/brief', async (req, res) => {
+// AI 데일리 브리핑 — 서버 키 전용. 주식+코인 시장 전반(개인화 없음). 서버가 시장 데이터를 직접 모은다.
+const labelOf = (defs: { symbol: string; label: string }[], sym: string) => defs.find((d) => d.symbol === sym)?.label ?? sym;
+app.post('/api/brief', async (_req, res) => {
   const key = process.env.ANTHROPIC_API_KEY || null;
   if (!key) return res.status(401).json({ text: null, error: 'no_server_key' });
-  const { watchlist = [], names = {}, quotes = {}, news = [] } = req.body ?? {};
-  const text = await generateBriefWith(key, { watchlist, names, quotes, news });
+  const [hot, coins, news] = await Promise.all([
+    fetchHot().catch(() => []),
+    fetchCoinDashboard(DEFAULT_COINS).catch(() => [] as Awaited<ReturnType<typeof fetchCoinDashboard>>),
+    fetchNews(DEFAULT_FEEDS, [], 'all').catch(() => []),
+  ]);
+  const text = await generateBriefWith(key, {
+    indices: marketCache.indices.map((q) => ({ label: labelOf(INDICES, q.symbol), change_pct: q.change_pct })),
+    markets: marketCache.markets.map((q) => ({ label: labelOf(MARKETS, q.symbol), change_pct: q.change_pct })),
+    hot: hot.map((h) => ({ name: h.name, change_pct: h.change_pct })),
+    coins: coins.map((c) => ({ symbol: c.symbol, change_24h: c.change_24h })),
+    news: news.map((n) => ({ title: n.title, source: n.source })),
+  });
   res.json({ text });
 });
 

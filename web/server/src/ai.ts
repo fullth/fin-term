@@ -42,37 +42,49 @@ export function explainTermWith(apiKey: string, term: string): Promise<string | 
   );
 }
 
+// 시장 전반(주식+코인) 브리핑 입력 — 개인화(관심종목) 없이 시장 데이터만.
 export interface BriefInput {
-  watchlist: string[];
-  names: Record<string, string>;
-  quotes: Record<string, { price: number | null; change_pct: number | null }>;
+  indices: { label: string; change_pct: number | null }[]; // 주요 지수
+  markets: { label: string; change_pct: number | null }[]; // 환율·원자재
+  hot: { name: string; change_pct: number | null }[]; // 급상승 종목
+  coins: { symbol: string; change_24h: number | null }[]; // 코인
   news: { title: string; source: string }[];
 }
 
-function buildBriefPrompt(input: BriefInput): string {
-  const quoteLines = input.watchlist
-    .map((sym) => {
-      const q = input.quotes[sym];
-      const name = input.names[sym] ?? '';
-      if (!q || q.price == null) return `- ${sym} ${name}: 데이터 없음`;
-      const pct = q.change_pct?.toFixed(2) ?? '?';
-      return `- ${sym} ${name}: ${q.price} (${pct}%)`;
+function pctLines(items: { label?: string; name?: string; symbol?: string; change_pct?: number | null; change_24h?: number | null }[]): string {
+  return items
+    .map((it) => {
+      const label = it.label ?? it.name ?? it.symbol ?? '';
+      const pct = it.change_pct ?? it.change_24h;
+      return `- ${label}: ${pct == null ? '?' : pct.toFixed(2) + '%'}`;
     })
     .join('\n');
+}
+
+function buildBriefPrompt(input: BriefInput): string {
   const newsLines = input.news.slice(0, 25).map((n) => `- ${n.title} (${n.source})`).join('\n');
   return [
-    '## 관심종목 시세',
-    quoteLines,
+    '## 주요 지수',
+    pctLines(input.indices),
+    '',
+    '## 환율·원자재',
+    pctLines(input.markets),
+    '',
+    '## 급상승 종목',
+    pctLines(input.hot.slice(0, 8)),
+    '',
+    '## 코인 시세(24h)',
+    pctLines(input.coins.slice(0, 8)),
     '',
     '## 최근 뉴스',
     newsLines,
     '',
-    '위 정보를 바탕으로 한국어로 간결한 시장 브리핑을 작성하라. 형식:',
-    '1. 한 줄 요약: 오늘 시장 분위기를 한 문장으로',
-    '2. 주요 테마: 2~3개 불릿, 각 한 줄',
-    '3. 내 종목 영향: 관심종목 중 뉴스와 관련된 것만 한 줄씩 (없으면 "직접 관련 뉴스 없음")',
+    '위 정보를 바탕으로 한국어 데일리 시장 브리핑을 작성하라. 주식 시장과 코인 시장 두 가지를 모두 다룬다. 형식:',
+    '1. 한 줄 요약: 오늘 전체 시장 분위기를 한 문장으로',
+    '2. 주식 시장: 지수·환율·급상승·관련 뉴스 흐름 2~3줄',
+    '3. 코인 시장: 주요 코인 등락·관련 뉴스 흐름 1~2줄',
     '',
-    '투자 조언이나 매수/매도 권유는 하지 말 것. 사실과 흐름 요약만. 전체 12줄 이내.',
+    '특정 종목 추천/매수·매도 권유는 하지 말 것. 사실과 흐름 요약만. 전체 12줄 이내.',
     '마크다운 기호(**, #, -, ` 등)를 절대 쓰지 말고 평문으로만 작성하라. 강조는 따옴표로.',
   ].join('\n');
 }

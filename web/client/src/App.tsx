@@ -40,6 +40,12 @@ export function App() {
   const stockAlerts = usePriceAlerts('stock');
   const cryptoAlerts = usePriceAlerts('crypto');
   const [cryptoAlertOpen, setCryptoAlertOpen] = useState(false);
+  // 데일리 브리핑 — 주식/코인 공용, 모드 전환·새로고침에도 유지. 생성 버튼 누를 때만 갱신.
+  const [brief, setBrief] = useState<{ text: string | null; loading: boolean; err: string | null }>({
+    text: null,
+    loading: false,
+    err: null,
+  });
   const [coinPrices, setCoinPrices] = useState<Record<string, number | null>>({}); // upbitMarket → 현재가 (알림 모달 rows 용)
 
   const [quotes, setQuotes] = useState<Record<string, Quote>>({});
@@ -219,8 +225,26 @@ export function App() {
   };
   const removeSymbol = (sym: string) => setWatchlist((w) => w.filter((s) => s !== sym));
 
+  // 브리핑 생성 — 명시적 호출에만(생성/다시 버튼). 결과는 모드 전환과 무관하게 유지.
+  const briefUsable = hasServerKey;
+  const runBrief = async () => {
+    if (!briefUsable) {
+      onNeedKey();
+      return;
+    }
+    setBrief((b) => ({ ...b, loading: true, err: null }));
+    try {
+      const r = await api.brief();
+      if (r.status === 401) setBrief({ text: null, loading: false, err: '브리핑은 현재 사용할 수 없습니다' });
+      else if (!r.text) setBrief({ text: null, loading: false, err: '생성 실패 — 잠시 후 다시 시도하세요' });
+      else setBrief({ text: r.text, loading: false, err: null });
+    } catch {
+      setBrief((b) => ({ ...b, loading: false, err: '생성 실패' }));
+    }
+  };
+
   return (
-    <>
+    <div className="app-shell">
       <div className="topbar">
         <div className="brand">
           fin-term <span className="ver">v0.9.12 · web</span>
@@ -271,14 +295,7 @@ export function App() {
           {/* 3열: 좌(브리핑+WATCHLIST) · 중앙(지수·환율+QUOTE+NEWS) · 우(급상승) */}
           <div className="layout3">
             <div className="col-left">
-              <BriefPanel
-                watchlist={watchlist}
-                names={names}
-                quotes={quotes}
-                news={news}
-                hasServerKey={hasServerKey}
-                onNeedKey={onNeedKey}
-              />
+              <BriefPanel text={brief.text} loading={brief.loading} err={brief.err} usable={briefUsable} onRun={runBrief} />
               <Watchlist
                 watchlist={watchlist}
                 names={names}
@@ -316,6 +333,7 @@ export function App() {
           onRemove={removeCoin}
           alerts={cryptoAlerts}
           onCoinPrices={setCoinPrices}
+          briefSlot={<BriefPanel text={brief.text} loading={brief.loading} err={brief.err} usable={briefUsable} onRun={runBrief} />}
         />
       )}
 
@@ -351,6 +369,6 @@ export function App() {
           onClearHistory={cryptoAlerts.clearHistory}
         />
       )}
-    </>
+    </div>
   );
 }

@@ -46,12 +46,11 @@ export const api = {
 
   cryptoNews: () => getJson<{ news: CoinNewsItem[] }>('/api/crypto/news'),
 
-  // AI — need_key(401)는 키 미입력/만료. 호출 전 activeAiKey 로 거를 수 있지만 서버 env fallback 위해 그대로 호출.
-  brief: (body: { watchlist: string[]; names: Record<string, string>; quotes: Record<string, Quote>; news: NewsItem[] }) =>
+  // AI 데일리 브리핑 — 시장 전반(개인화 없음). 서버가 시장 데이터를 직접 모으므로 입력 불필요.
+  brief: () =>
     fetch('/api/brief', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...aiHeaders() },
-      body: JSON.stringify(body),
     }).then(async (r) => ({ status: r.status, ...(await r.json()) } as { status: number; text: string | null; error?: string })),
 
   explain: (term: string) =>

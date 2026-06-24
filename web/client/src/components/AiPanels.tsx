@@ -1,47 +1,19 @@
 import { useState } from 'react';
-import type { Quote, NewsItem } from '../lib/types';
 import { api } from '../lib/api';
 import { activeAiKey } from '../lib/ai-key';
 
+// 브리핑 상태는 App 에서 관리(모드 전환·새로고침에도 유지). 패널은 표시 + 생성 트리거만.
 interface BriefProps {
-  watchlist: string[];
-  names: Record<string, string>;
-  quotes: Record<string, Quote>;
-  news: NewsItem[];
-  hasServerKey: boolean;
-  onNeedKey: () => void;
+  text: string | null;
+  loading: boolean;
+  err: string | null;
+  usable: boolean; // 서버 키 보유
+  onRun: () => void;
 }
 
-export function BriefPanel({ watchlist, names, quotes, news, hasServerKey, onNeedKey }: BriefProps) {
-  const [text, setText] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+export function BriefPanel({ text, loading, err, usable, onRun }: BriefProps) {
   const [expanded, setExpanded] = useState(false);
-  // 브리핑은 서버 키 전용(운영자 부담) — 사용자 키와 무관하게 서버 키가 있으면 기본 제공.
-  const usable = hasServerKey;
-
-  const run = async () => {
-    if (!usable) {
-      onNeedKey();
-      return;
-    }
-    setLoading(true);
-    setErr(null);
-    try {
-      const r = await api.brief({ watchlist, names, quotes, news });
-      if (r.status === 401) {
-        setErr('브리핑은 현재 사용할 수 없습니다');
-      } else if (!r.text) {
-        setErr('생성 실패 — 잠시 후 다시 시도하세요');
-      } else {
-        setText(r.text);
-      }
-    } catch {
-      setErr('생성 실패');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const run = onRun;
 
   return (
     <div className="panel brief-panel">
@@ -65,7 +37,7 @@ export function BriefPanel({ watchlist, names, quotes, news, hasServerKey, onNee
         {!text && err && <div className="down" style={{ fontSize: 12 }}>{err}</div>}
         {!text && !err && !loading && (
           <div className="dim" style={{ fontSize: 12 }}>
-            {usable ? '관심종목+뉴스로 오늘 시장 요약을 생성합니다.' : '브리핑 기능이 비활성화되어 있습니다.'}
+            {usable ? '주식·코인 시장 전반의 오늘 요약을 생성합니다.' : '브리핑 기능이 비활성화되어 있습니다.'}
           </div>
         )}
       </div>

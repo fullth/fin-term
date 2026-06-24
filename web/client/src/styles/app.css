@@ -47,6 +47,12 @@
 }
 * { box-sizing: border-box; }
 html, body, #root { margin: 0; height: 100%; }
+/* 앱 셸 — 화면 전체를 세로로 채워 하단 여백 제거. topbar·cmdbar 고정, 본문이 남은 높이 차지 */
+.app-shell { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+.app-shell > .topbar, .app-shell > .topbars, .app-shell > .cmdbar { flex: none; }
+/* 주식 본문(layout3)·코인 본문은 남은 높이를 채우고 내부 스크롤 */
+.app-shell > .layout3 { flex: 1; min-height: 0; }
+.app-shell > .crypto-main { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 body {
   background: var(--bg);
   color: var(--txt);
@@ -89,12 +95,14 @@ body {
 /* 그리드 */
 .grid {
   display: grid;
-  grid-template-columns: minmax(300px, 1fr) 2fr minmax(280px, 1fr);
+  grid-template-columns: minmax(300px, 1fr) 2fr minmax(300px, 1fr);
   grid-template-rows: auto 1fr;
   grid-template-areas: "watch quote side" "watch news side";
-  gap: 10px; padding: 10px; height: calc(100vh - 95px);
+  gap: 10px; padding: 10px; flex: 1; min-height: 0;
 }
-.area-watch { grid-area: watch; }
+.area-watch-col { grid-area: watch; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.area-watch-col > .brief-panel { flex: none; height: var(--info-h, 190px); overflow: hidden; display: flex; flex-direction: column; }
+.area-watch-col > .area-watch { flex: 1; min-height: 0; overflow: auto; }
 .area-quote { grid-area: quote; }
 .area-news { grid-area: news; }
 .area-side { grid-area: side; display: flex; flex-direction: column; gap: 10px; overflow: auto; }
@@ -289,7 +297,7 @@ body {
 .layout3 {
   display: grid;
   grid-template-columns: minmax(300px, 1fr) 2.4fr minmax(220px, 0.9fr);
-  gap: 10px; padding: 10px; height: calc(100vh - 200px); min-height: 420px;
+  gap: 10px; padding: 10px; min-height: 0;
 }
 .col-left { display: flex; flex-direction: column; gap: 10px; min-width: 0; overflow: hidden; }
 .col-left > .brief-panel { flex: none; height: var(--info-h, 190px); overflow: hidden; display: flex; flex-direction: column; }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { CoinQuote, UpbitTick, CoinMeta, CoinNewsItem } from '../lib/types';
 import { api } from '../lib/api';
 import { fmtPct, arrow, changeClass, fmtTime } from '../lib/format';
@@ -18,9 +18,10 @@ interface Props {
   onRemove: (id: string) => void;
   alerts: ReturnType<typeof usePriceAlerts>; // 알림 훅은 App 에서 끌어올려 상단바 버튼과 공유
   onCoinPrices: (m: Record<string, number | null>) => void; // 알림 모달 rows 용 현재가 공유
+  briefSlot?: ReactNode; // 데일리 브리핑 — App 이 소유(주식/코인 공용), 코인 화면 상단에 표시
 }
 
-export function CryptoView({ coins: coinList, onAdd, onRemove, alerts, onCoinPrices }: Props) {
+export function CryptoView({ coins: coinList, onAdd, onRemove, alerts, onCoinPrices, briefSlot }: Props) {
   const [quotes, setQuotes] = useState<CoinQuote[]>([]);
   const [live, setLive] = useState<Record<string, UpbitTick>>({});
   const [news, setNews] = useState<CoinNewsItem[]>([]);
@@ -96,9 +97,12 @@ export function CryptoView({ coins: coinList, onAdd, onRemove, alerts, onCoinPri
   }, [coinList, quotes, live, onCoinPrices]);
 
   return (
-    <>
+    <div className="crypto-main">
       <CoinSearchBar onAdd={onAdd} />
       <div className="grid">
+        {/* 좌측 LNB: 데일리 브리핑 + 코인 시세 */}
+        <div className="area-watch-col">
+        {briefSlot}
         {/* 코인 리스트 */}
         <div className="panel area-watch focused">
           <div className="ptitle t-yellow">
@@ -132,6 +136,7 @@ export function CryptoView({ coins: coinList, onAdd, onRemove, alerts, onCoinPri
               </div>
             );
           })}
+        </div>
         </div>
 
         {/* 선택 코인 차트 */}
@@ -207,6 +212,6 @@ export function CryptoView({ coins: coinList, onAdd, onRemove, alerts, onCoinPri
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }

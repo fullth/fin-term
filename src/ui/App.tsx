@@ -174,12 +174,7 @@ export function App({ store, poller, onEnterCrypto }: Props) {
     const s = store.get();
     store.setOverlay({ kind: 'brief', text: null, loading: true });
     store.setStatus('AI 브리핑 생성 중…');
-    const text = await generateBrief({
-      watchlist: s.watchlist,
-      names: s.names,
-      quotes: s.quotes,
-      news: s.news,
-    });
+    const text = await generateBrief({ news: s.news });
     store.updateOverlay({ kind: 'brief', text, loading: false });
     store.setStatus(text ? 'AI 브리핑 완료' : 'AI 브리핑 실패');
   };
