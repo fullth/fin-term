@@ -5,9 +5,12 @@
 // 클라이언트가 N명이어도 외부 API 호출량은 클라 수와 무관하게 일정하다.
 import express from 'express';
 import type { Request, Response } from 'express';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { existsSync } from 'node:fs';
+import { recordVisit, getStats } from './db.js';
+import { ADMIN_HTML } from './admin-page.js';
 import { fetchQuotes } from '../../../src/sources/quote.js';
 import { fetchNews } from '../../../src/sources/rss.js';
 import { fetchDetail } from '../../../src/sources/detail.js';
@@ -29,6 +32,8 @@ const MARKETS_INTERVAL = Number(process.env.FIN_MARKETS_INTERVAL_MS ?? 300_000);
 const DEFAULT_WATCHLIST = ['AAPL', 'TSLA', 'NVDA', 'MSFT'];
 
 const app = express();
+// Railway 프록시 뒤 → X-Forwarded-For 를 신뢰해야 req.ip 가 실 IP 가 된다.
+app.set('trust proxy', 1);
 app.use(express.json());
 
 // 로컬 개발은 Vite(5173) 와 분리 포트라 CORS 허용. 운영은 동일 출처 서빙이라 무영향.
@@ -37,6 +42,41 @@ app.use((_req, res, next) => {
   res.header('Access-Control-Allow-Headers', 'Content-Type, X-AI-Key');
   next();
 });
+
+// ── 방문자 추적 ────────────────────────────────────────────────────
+// 개인정보 보호: 원시 IP 는 어디에도 저장하지 않고 해시(SHA-256 + 솔트)만 다룬다.
+const IP_HASH_SALT = process.env.IP_HASH_SALT ?? 'fin-term-default-salt';
+function clientIpHash(req: Request): string {
+  return createHash('sha256')
+    .update(IP_HASH_SALT + (req.ip ?? 'unknown'))
+    .digest('hex');
+}
+
+// 실시간 동시접속 — SSE 연결별 메타(메모리). DB 불필요.
+interface LiveConn {
+  ipHash: string;
+  connectedAt: number;
+}
+const liveConnections = new Set<LiveConn>();
+
+// 관리자 대시보드 Basic Auth. env 미설정 시 전체 비활성(무인증 노출 방지).
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+function adminAuth(req: Request, res: Response, next: () => void): void {
+  if (!ADMIN_USERNAME || !ADMIN_PASSWORD) {
+    res.status(503).json({ error: 'admin_disabled' });
+    return;
+  }
+  const header = req.header('Authorization') ?? '';
+  if (header.startsWith('Basic ')) {
+    const [user, pass] = Buffer.from(header.slice(6), 'base64').toString().split(':');
+    if (user === ADMIN_USERNAME && pass === ADMIN_PASSWORD) {
+      next();
+      return;
+    }
+  }
+  res.set('WWW-Authenticate', 'Basic realm="fin-term admin"').status(401).end();
+}
 
 // 헬스체크 — Railway healthcheckPath 와 일치
 app.get('/health', (_req, res) => res.json({ status: 'ok', ts: Date.now() }));
@@ -130,6 +170,23 @@ app.get('/api/hot', async (_req, res) => {
   res.json({ items });
 });
 
+// 방문 기록 — 클라이언트가 페이지 로드 시 1회 호출. 원시 IP 미저장(해시만).
+app.post('/api/visit', (req, res) => {
+  try {
+    recordVisit(
+      {
+        ipHash: clientIpHash(req),
+        userAgent: req.header('User-Agent') ?? null,
+        path: typeof req.body?.path === 'string' ? req.body.path.slice(0, 200) : null,
+      },
+      Date.now(),
+    );
+  } catch {
+    /* 추적 실패가 앱에 영향 주지 않게 무시 */
+  }
+  res.json({ ok: true });
+});
+
 // AI 기능 사용 가능 여부 — 서버 env 키 보유 여부만 알려줌(클라가 키 없을 때 fallback 판단용).
 app.get('/api/ai-status', (_req, res) => res.json({ serverKey: Boolean(process.env.ANTHROPIC_API_KEY) }));
 
@@ -217,6 +274,8 @@ app.get('/api/stream/quotes', async (req, res) => {
     .filter(Boolean);
   const sub: QuoteSub = { res, symbols: symbols.length ? symbols : DEFAULT_WATCHLIST };
   quoteSubs.add(sub);
+  const conn: LiveConn = { ipHash: clientIpHash(req), connectedAt: Date.now() };
+  liveConnections.add(conn);
 
   // 신규 구독자에게 캐시된 시세 즉시 전달 (없으면 다음 루프에서 채워짐)
   const cached = sub.symbols.map((s) => quoteCache.get(s)).filter((q): q is Quote => !!q);
@@ -245,6 +304,7 @@ app.get('/api/stream/quotes', async (req, res) => {
 
   req.on('close', () => {
     quoteSubs.delete(sub);
+    liveConnections.delete(conn);
     if (quoteSubs.size === 0 && quoteLoopTimer) {
       clearInterval(quoteLoopTimer);
       quoteLoopTimer = null;
@@ -306,10 +366,36 @@ app.get('/api/stream/crypto', (req, res) => {
     'Access-Control-Allow-Origin': '*',
   });
   res.write(': connected\n\n');
+  const conn: LiveConn = { ipHash: clientIpHash(req), connectedAt: Date.now() };
+  liveConnections.add(conn);
   const unsub = upbitFeed.subscribe((tick) => {
     res.write(`event: tick\ndata: ${JSON.stringify(tick)}\n\n`);
   });
-  req.on('close', unsub);
+  req.on('close', () => {
+    unsub();
+    liveConnections.delete(conn);
+  });
+});
+
+// ── 관리자 대시보드 (Basic Auth + 독립 HTML) ─────────────────────────
+// SPA fallback(아래)보다 먼저 등록해야 /admin 이 index.html 로 흡수되지 않는다.
+app.get('/admin', adminAuth, (_req, res) => {
+  res.type('html').send(ADMIN_HTML);
+});
+
+app.get('/api/admin/stats', adminAuth, (_req, res) => {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const stats = getStats(startOfToday);
+  const sessions = [...liveConnections].sort((a, b) => b.connectedAt - a.connectedAt);
+  res.json({
+    ...stats,
+    live: {
+      connections: sessions.length,
+      uniqueUsers: new Set(sessions.map((c) => c.ipHash)).size,
+      sessions,
+    },
+  });
 });
 
 // ── 정적 클라이언트 서빙 (운영: 단일 서비스) ─────────────────────────

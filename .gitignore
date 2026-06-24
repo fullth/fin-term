@@ -5,3 +5,14 @@ dist/
 
 # web 빌드 캐시
 web/client/tsconfig.tsbuildinfo
+
+# 환경변수 (비밀값) — 예시 파일만 추적
+.env
+.env.*
+!.env.example
+
+# 방문자 추적 SQLite (로컬·운영 모두 커밋 금지)
+web/server/data/
+*.db
+*.db-wal
+*.db-shm

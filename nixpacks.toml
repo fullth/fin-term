@@ -4,7 +4,9 @@
 # server 는 레포 루트 src/sources/* 를 상대 import 하므로 레포 전체가 빌드 컨텍스트에 있어야 한다.
 
 [phases.setup]
-nixPkgs = ["nodejs_20"]
+# better-sqlite3 는 prebuilt 바이너리를 우선 쓰지만, 없을 때 node-gyp 컴파일 폴백을
+# 대비해 python3/gcc/make 를 함께 둔다(prebuilt 있으면 미사용, 손해 없음).
+nixPkgs = ["nodejs_20", "python3", "gcc", "gnumake"]
 
 [phases.install]
 # 루트 install 필수: server 가 import 하는 src/sources/* 의 의존성(rss-parser, @anthropic-ai/sdk, ws)이

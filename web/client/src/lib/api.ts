@@ -59,4 +59,12 @@ export const api = {
     ),
 
   aiStatus: () => getJson<{ serverKey: boolean }>('/api/ai-status'),
+
+  // 방문 기록 — 페이지 로드 시 1회. 실패해도 앱에 영향 없도록 호출부에서 무시.
+  visit: () =>
+    fetch('/api/visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: location.pathname }),
+    }),
 };

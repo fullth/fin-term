@@ -112,10 +112,11 @@ export function App() {
   const addCoin = (c: CoinMeta) => setCoins((cs) => (cs.some((x) => x.id === c.id) ? cs : [...cs, c]));
   const removeCoin = (id: string) => setCoins((cs) => cs.filter((c) => c.id !== id));
 
-  // 라벨 + AI 키(서버 env 보유 여부) 1회 로드
+  // 라벨 + AI 키(서버 env 보유 여부) 1회 로드 + 방문 기록
   useEffect(() => {
     api.markets().then((m) => setLabels(m.labels)).catch(() => {});
     api.aiStatus().then((s) => setHasServerKey(s.serverKey)).catch(() => {});
+    api.visit().catch(() => {});
   }, []);
 
   const onAiKeyChange = () => setAiKeyVersion((v) => v + 1);
