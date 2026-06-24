@@ -43,6 +43,11 @@ const DEFAULT_FEEDS: Feed[] = [
   { source: 'Yahoo', url: 'https://finance.yahoo.com/news/rssindex', lang: 'en' },
   { source: 'CNBC', url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114', lang: 'en' },
   { source: 'MarketWatch', url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories', lang: 'en' },
+  // 유럽·아시아 — 세계 시장 흐름 커버리지 (영어, 날짜 정상 피드만)
+  { source: 'Guardian', url: 'https://www.theguardian.com/uk/business/rss', lang: 'en' },
+  { source: 'DW', url: 'https://rss.dw.com/rdf/rss-en-bus', lang: 'en' },
+  { source: 'SCMP', url: 'https://www.scmp.com/rss/92/feed', lang: 'en' },
+  { source: 'JapanTimes', url: 'https://www.japantimes.co.jp/feed/', lang: 'en' },
   // 한글 (원문 한글 → 번역 불필요)
   { source: '한경증권', url: 'https://www.hankyung.com/feed/finance', lang: 'ko' },
   { source: '한경경제', url: 'https://www.hankyung.com/feed/economy', lang: 'ko' },
