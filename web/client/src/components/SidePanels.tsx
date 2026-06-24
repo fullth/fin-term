@@ -64,8 +64,9 @@ export function HotPanel({ items, onSelect }: { items: HotItem[]; onSelect: (sym
               {it.news.map((n, j) => (
                 <li
                   key={j}
+                  className={n.url ? 'has-link' : 'no-link'}
                   onClick={(e) => {
-                    e.stopPropagation();
+                    e.stopPropagation(); // 뉴스 클릭이 종목 행(네이버 증권 이동)으로 번지지 않게
                     if (n.url) window.open(n.url, '_blank', 'noopener');
                   }}
                 >
@@ -73,7 +74,6 @@ export function HotPanel({ items, onSelect }: { items: HotItem[]; onSelect: (sym
                     <span className="hot-news-dot">·</span>
                     <span className="hot-news-title">{n.title}</span>
                   </div>
-                  {n.summary && <p className="hot-news-summary">{n.summary}</p>}
                 </li>
               ))}
             </ul>

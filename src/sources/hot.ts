@@ -22,8 +22,7 @@ const NEWS_FETCH = 8; // API 에서 받아 종목 관련도 정렬에 쓸 후보
 export interface HotNews {
   title: string;
   source: string;
-  url: string;
-  summary: string; // 본문 발췌 — 미리보기/상승 근거 파악용
+  url: string; // 빈 문자열이면 열 수 있는 원문이 없음(미국 종목 등) → 클라에서 클릭 비활성
 }
 
 export interface HotItem {
@@ -108,7 +107,7 @@ function rankByRelevance(news: HotNews[], name: string, symbol: string): HotNews
     .map((s) => s.trim().toLowerCase())
     .filter((s) => s.length >= 2);
   const relevant = (n: HotNews) => {
-    const hay = `${n.title} ${n.summary}`.toLowerCase();
+    const hay = n.title.toLowerCase();
     return needles.some((q) => hay.includes(q));
   };
   // 관련 기사 우선, 그 안에서는 원래(최신) 순서 유지
@@ -126,13 +125,13 @@ async function fetchItemNews(market: 'KR' | 'US', key: string, name: string, sym
         { headers: UA },
       );
       if (!res.ok) return [];
-      const arr = (await res.json()) as { tit?: string; ohnm?: string; oid?: string; aid?: string; subcontent?: string }[];
+      const arr = (await res.json()) as { tit?: string; ohnm?: string }[];
+      // 미국(해외) 기사는 네이버가 제휴(fnGuide 등) 콘텐츠라 외부에서 열 수 있는 원문 URL 이 없다.
+      // 어떤 경로(news/view, n.news.naver.com)도 SPA 셸만 반환 → 링크 없이 제목만 노출.
       news = arr.map((n) => ({
         title: (n.tit ?? '').trim(),
         source: n.ohnm ?? '',
-        // 미국(해외) 기사는 네이버 증권 내부 뷰어 경로. n.news.naver.com 은 fnGuide 등 제휴 oid 에 500.
-        url: n.oid && n.aid ? `https://m.stock.naver.com/worldstock/news/view/${n.oid}/${n.aid}` : '',
-        summary: (n.subcontent ?? '').trim(),
+        url: '',
       }));
     } else {
       // 국내: [{ total, items: [{ title, officeName, officeId, articleId, body, mobileNewsUrl }] }]
@@ -147,10 +146,10 @@ async function fetchItemNews(market: 'KR' | 'US', key: string, name: string, sym
           officeName?: string;
           officeId?: string;
           articleId?: string;
-          body?: string;
           mobileNewsUrl?: string;
         }[];
       }[];
+      // 국내 기사는 mobileNewsUrl(실제 n.news.naver.com 원문)이 와서 그대로 열린다.
       news = groups
         .flatMap((g) => g.items ?? [])
         .map((n) => ({
@@ -159,7 +158,6 @@ async function fetchItemNews(market: 'KR' | 'US', key: string, name: string, sym
           url:
             n.mobileNewsUrl ??
             (n.officeId && n.articleId ? `https://n.news.naver.com/mnews/article/${n.officeId}/${n.articleId}` : ''),
-          summary: (n.body ?? '').trim(),
         }));
     }
     return rankByRelevance(news, name, symbol).slice(0, NEWS_PER_ITEM);

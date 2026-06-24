@@ -50,8 +50,7 @@ export interface SearchResult {
 export interface HotNews {
   title: string;
   source: string;
-  url: string;
-  summary: string;
+  url: string; // 빈 문자열이면 원문 링크 없음 → 클릭 비활성
 }
 
 export interface HotItem {
