@@ -246,8 +246,9 @@ body {
     grid-template-areas: "watch" "quote" "side" "news"; height: auto; flex: none; min-height: 0;
   }
   .area-watch-col > .area-watch,
-  .grid > .area-watch,
-  .grid > .area-news { min-height: 320px; }
+  .grid > .area-watch { min-height: 320px; }
+  /* 코인 뉴스 패널 — 주식과 동일하게 화면 일부로 고정하고 내부 스크롤(아래 .area-news 규칙으로 height 지정) */
+  .grid > .area-news { flex: none; }
   .area-side { flex-direction: column; }
 
   /* 모바일: 뉴스는 제목 위주로 — 출처 숨기고 제목 전체 노출 */
@@ -372,8 +373,11 @@ body {
   .col-left, .col-mid, .col-right { overflow: visible; }
   /* flex:1 로 viewport 잔여 높이를 채우던 패널들 — 모바일에선 콘텐츠 높이로 풀고 최소 높이만 보장 */
   .col-left > .area-watch,
-  .col-right > .panel,
-  .col-mid > .area-news { flex: none; overflow: visible; min-height: 320px; }
+  .col-right > .panel { flex: none; overflow: visible; min-height: 320px; }
+
+  /* 모바일 뉴스 패널 — 헤드라인이 수백 개라 전부 펼치면 페이지가 끝없이 길어진다.
+     패널 높이를 화면 일부로 고정하고 그 안에서만 스크롤(약 50개 노출, 나머지는 내부 스크롤). */
+  .area-news { flex: none; height: 70vh; max-height: 70vh; min-height: 320px; overflow: auto; }
 }
 
 /* 모바일 — 상단바 버튼이 좁은 폭에서 짓눌리지 않고 다음 줄로 흐르도록 */
