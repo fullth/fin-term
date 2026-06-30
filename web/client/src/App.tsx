@@ -16,6 +16,7 @@ import { fmtPrice } from './lib/format';
 import { AiKeyManager } from './components/AiKeyManager';
 import { SearchBar } from './components/SearchBar';
 import { CryptoView } from './components/CryptoView';
+import { ExcelView } from './components/ExcelView';
 import './styles/app.css';
 
 type Mode = 'stock' | 'crypto';
@@ -37,6 +38,8 @@ export function App() {
   const [hasServerKey, setHasServerKey] = useState(false);
   const [, setAiKeyVersion] = useState(0); // 키 변경 시 AI 패널 리렌더 트리거
   const [theme, setTheme] = useState<'dark' | 'light'>(persisted.theme);
+  const [excel, setExcel] = useState(false); // 엑셀 위장 모드 — ` 키 / 버튼 토글
+  const [mono, setMono] = useState(false); // 단색 모드 — 등락 색 제거
   const stockAlerts = usePriceAlerts('stock');
   const cryptoAlerts = usePriceAlerts('crypto');
   const [cryptoAlertOpen, setCryptoAlertOpen] = useState(false);
@@ -69,30 +72,31 @@ export function App() {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
-  // 초기 URL 쿼리(mode, sym) 읽기 — 공유 링크 복원
+  // 단색 모드 — 등락 색 제거. CSS 가 [data-mono] 아래에서 --up/--down 을 무채색으로 덮는다.
   useEffect(() => {
-    const q = new URLSearchParams(window.location.search);
-    const m = q.get('mode');
-    if (m === 'crypto' || m === 'stock') setMode(m);
-    const sym = q.get('sym');
-    if (sym) setSelected(sym.toUpperCase());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    document.documentElement.toggleAttribute('data-mono', mono);
+  }, [mono]);
+
+  // 엑셀 위장 모드 — 탭 제목까지 스프레드시트로 바꿔 작업표시줄/탭에서도 티 안 나게.
+  useEffect(() => {
+    document.title = excel ? 'watchlist.xlsx - Excel' : 'fin-term · web';
+  }, [excel]);
+
+  // 쿼리스트링이 주소창에 남아 있으면 한 번 걷어낸다 (URL 동기화 폐지 — 위장 목적상 노출 금지).
+  useEffect(() => {
+    if (window.location.search) window.history.replaceState(null, '', window.location.pathname);
   }, []);
 
-  // 상태 → URL 동기화 (mode, 선택종목). 새로고침/공유 시 복원됨
-  useEffect(() => {
-    const q = new URLSearchParams();
-    q.set('mode', mode);
-    if (mode === 'stock' && selected) q.set('sym', selected);
-    const url = `${window.location.pathname}?${q.toString()}`;
-    window.history.replaceState(null, '', url);
-  }, [mode, selected]);
-
-  // 키보드 단축키 — / 검색, j/k 종목 이동, Esc 필터 해제, m 모드 토글
+  // 키보드 단축키 — / 검색, j/k 종목 이동, Esc 필터 해제, m 모드 토글, ` 엑셀 위장
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return; // 입력 중엔 무시
+      if (e.key === '`') {
+        e.preventDefault();
+        setExcel((x) => !x); // 엑셀 위장 모드 토글 (한 손 복귀)
+        return;
+      }
       if (e.key === '/') {
         e.preventDefault();
         document.querySelector<HTMLInputElement>('.searchbar input')?.focus();
@@ -290,6 +294,20 @@ export function App() {
           >
             {theme === 'dark' ? '☾ 다크' : '☀ 라이트'}
           </button>
+          <button
+            className={`mode-btn${mono ? ' active' : ''}`}
+            onClick={() => setMono((m) => !m)}
+            title="단색 모드 — 등락 색 숨김"
+          >
+            ◐ 단색
+          </button>
+          <button
+            className={`mode-btn${excel ? ' active' : ''}`}
+            onClick={() => setExcel((x) => !x)}
+            title="엑셀 모드 — ` 키로도 전환"
+          >
+            ▦ 엑셀
+          </button>
           <AiKeyManager onChange={onAiKeyChange} />
           <button className={`mode-btn${mode === 'stock' ? ' active' : ''}`} onClick={() => setMode('stock')}>
             주식
@@ -300,7 +318,18 @@ export function App() {
         </div>
       </div>
 
-      {mode === 'stock' ? (
+      {excel ? (
+        <ExcelView
+          watchlist={watchlist}
+          names={names}
+          quotes={quotes}
+          indices={indices}
+          markets={markets}
+          labels={labels}
+          news={news}
+          hot={hot}
+        />
+      ) : mode === 'stock' ? (
         <>
           <div className="topbars">
             <SearchBar onAdd={addSymbol} />
