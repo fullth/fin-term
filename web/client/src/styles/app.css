@@ -386,3 +386,64 @@ body {
   .modes { flex-wrap: wrap; justify-content: flex-end; row-gap: 6px; }
   .modes > * { flex: 0 0 auto; } /* 버튼·래퍼가 줄어들지 않고 원래 크기 유지 */
 }
+
+/* ===== 단색 모드 — 등락 색(--up/--down)만 텍스트색으로 덮는다. 나머지 테마는 그대로. ===== */
+:root[data-mono] { --up: var(--txt); --down: var(--txt); }
+
+/* ===== 엑셀 위장 모드 — 스프레드시트 골격. 테마와 무관하게 항상 고정 라이트 룩. ===== */
+.excel {
+  flex: 1; min-height: 0; display: flex; flex-direction: column;
+  background: #f3f2f1; color: #323130;
+  font-family: "Segoe UI", "Malgun Gothic", -apple-system, sans-serif; font-size: 13px;
+}
+.excel .excel-ribbon-tabs {
+  background: #217346; color: #fff; display: flex; gap: 2px; padding: 0 8px; height: 28px;
+  font-size: 12.5px; align-items: flex-end;
+}
+.excel .excel-ribbon-tabs .tab { padding: 5px 12px; cursor: default; }
+.excel .excel-ribbon-tabs .tab.active { background: #f3f2f1; color: #217346; border-radius: 4px 4px 0 0; font-weight: 600; }
+.excel .excel-ribbon {
+  background: #f3f2f1; border-bottom: 1px solid #d2d0ce; height: 56px;
+  display: flex; align-items: center; gap: 16px; padding: 0 14px;
+}
+.excel .rg { display: flex; flex-direction: column; align-items: center; gap: 4px; justify-content: center; }
+.excel .rrow { display: flex; gap: 4px; }
+.excel .rlabel { font-size: 11px; color: #888; }
+.excel .rib-btn { background: #fff; border: 1px solid #d2d0ce; border-radius: 3px; padding: 4px 8px; font-size: 12px; color: #444; }
+.excel .rsep { width: 1px; height: 40px; background: #d2d0ce; }
+.excel .excel-formula-bar {
+  background: #fff; border-bottom: 1px solid #d2d0ce; height: 24px; display: flex; align-items: center; font-size: 12px;
+}
+.excel .name-box { width: 90px; border-right: 1px solid #d2d0ce; padding: 0 8px; color: #555; height: 100%; display: flex; align-items: center; }
+.excel .fx { padding: 0 8px; color: #888; border-right: 1px solid #d2d0ce; height: 100%; display: flex; align-items: center; font-style: italic; }
+.excel .formula-input { padding: 0 8px; color: #323130; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.excel .excel-grid-wrap { flex: 1; overflow: auto; background: #fff; }
+.excel table.excel-sheet { border-collapse: collapse; font-size: 12.5px; width: 100%; }
+.excel table.excel-sheet th,
+.excel table.excel-sheet td {
+  border: 1px solid #e1dfdd; height: 21px; padding: 0 8px; white-space: nowrap; text-align: right; color: #323130;
+}
+.excel table.excel-sheet th { background: #f3f2f1; color: #605e5c; text-align: center; font-weight: 500; position: sticky; top: 0; z-index: 1; }
+.excel table.excel-sheet th.row-h,
+.excel table.excel-sheet td.row-h { min-width: 34px; width: 34px; background: #f3f2f1; color: #605e5c; text-align: center; }
+.excel table.excel-sheet td.left { text-align: left; }
+.excel table.excel-sheet td.head { font-weight: 600; background: #fafafa; }
+.excel table.excel-sheet td.section { font-weight: 700; background: #eef5f1; color: #217346; text-align: left; }
+/* 등락 색 — 엑셀 룩에 맞춘 고정 색(테마 변수 미사용: 골격이 항상 라이트라서). */
+.excel table.excel-sheet td.up { color: #0a7d33; }
+.excel table.excel-sheet td.down { color: #c0392b; }
+/* 단색 모드면 등락 색도 시트 본문색으로 통일 — 흘끗 봐선 주가표인지 모르게. */
+:root[data-mono] .excel table.excel-sheet td.up,
+:root[data-mono] .excel table.excel-sheet td.down { color: #323130; }
+.excel table.excel-sheet tr:hover td:not(.row-h):not(.section) { background: #f5f9f7; }
+.excel .excel-sheet-tabs {
+  background: #f3f2f1; border-top: 1px solid #d2d0ce; height: 28px; display: flex; align-items: center;
+  padding: 0 8px; gap: 2px; font-size: 12px;
+}
+.excel .sheet-tab { padding: 4px 12px; color: #605e5c; border-right: 1px solid #e1dfdd; cursor: pointer; }
+.excel .sheet-tab.active { background: #fff; color: #217346; font-weight: 600; border-top: 2px solid #217346; }
+.excel .excel-statusbar {
+  background: #217346; color: #fff; height: 22px; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 12px; font-size: 11.5px;
+}
+.excel .excel-statusbar .right { display: flex; gap: 18px; }
