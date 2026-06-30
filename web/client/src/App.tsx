@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Quote, NewsItem, NewsScope, Detail, HotItem, LabelEntry, CoinMeta } from './lib/types';
 import { api } from './lib/api';
 import { loadPersisted, savePersisted, loadStoredBrief, saveStoredBrief } from './lib/storage';
+import { bootChannelTalk } from './lib/channel-talk';
 import { Watchlist } from './components/Watchlist';
 import { QuotePanel } from './components/QuotePanel';
 import { NewsStream } from './components/NewsStream';
@@ -66,6 +67,11 @@ export function App() {
   useEffect(() => {
     savePersisted({ watchlist, names, scope, coins, theme });
   }, [watchlist, names, scope, coins, theme]);
+
+  // 채널톡 — 앱 마운트 시 1회 익명 boot
+  useEffect(() => {
+    bootChannelTalk();
+  }, []);
 
   // 테마를 <html data-theme> 에 반영
   useEffect(() => {
