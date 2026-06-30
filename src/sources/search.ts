@@ -14,9 +14,10 @@ export interface SearchResult {
 }
 
 // 네이버 종목 검색 (국내+해외). 국내는 .KS/.KQ, 해외(미국 등)는 순수 심볼(code) 사용 — quote.ts 가 reutersCode 내부 해석.
+// target 은 stock,index 만 허용 (worldstock 은 더 이상 허용되지 않아 400 유발). stock 이 이미 해외 종목을 포함한다.
 async function searchNaver(query: string, limit: number): Promise<SearchResult[]> {
   try {
-    const url = `${NAVER_SEARCH}?query=${encodeURIComponent(query)}&target=stock,worldstock,index`;
+    const url = `${NAVER_SEARCH}?query=${encodeURIComponent(query)}&target=stock,index`;
     const res = await fetch(url, { headers: { ...UA, Referer: 'https://m.stock.naver.com/' } });
     if (!res.ok) return [];
     const data = (await res.json()) as { result?: { items?: any[] } };
