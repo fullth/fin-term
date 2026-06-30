@@ -397,20 +397,20 @@ body {
   font-family: "Segoe UI", "Malgun Gothic", -apple-system, sans-serif; font-size: 13px;
 }
 .excel .excel-ribbon-tabs {
-  background: #217346; color: #fff; display: flex; gap: 2px; padding: 0 8px; height: 28px;
-  font-size: 12.5px; align-items: flex-end;
+  background: #217346; color: #fff; display: flex; flex-wrap: wrap; gap: 2px; padding: 0 8px;
+  font-size: 12.5px; align-items: flex-end; flex: none;
 }
-.excel .excel-ribbon-tabs .tab { padding: 5px 12px; cursor: default; }
+.excel .excel-ribbon-tabs .tab { padding: 6px 12px; cursor: default; line-height: 1; white-space: nowrap; }
 .excel .excel-ribbon-tabs .tab.active { background: #f3f2f1; color: #217346; border-radius: 4px 4px 0 0; font-weight: 600; }
 .excel .excel-ribbon {
-  background: #f3f2f1; border-bottom: 1px solid #d2d0ce; height: 56px;
-  display: flex; align-items: center; gap: 16px; padding: 0 14px;
+  background: #f3f2f1; border-bottom: 1px solid #d2d0ce; min-height: 56px; flex: none;
+  display: flex; align-items: stretch; gap: 16px; padding: 8px 14px; flex-wrap: wrap;
 }
-.excel .rg { display: flex; flex-direction: column; align-items: center; gap: 4px; justify-content: center; }
+.excel .rg { display: flex; flex-direction: column; align-items: center; gap: 4px; justify-content: center; flex: none; }
 .excel .rrow { display: flex; gap: 4px; }
 .excel .rlabel { font-size: 11px; color: #888; }
 .excel .rib-btn { background: #fff; border: 1px solid #d2d0ce; border-radius: 3px; padding: 4px 8px; font-size: 12px; color: #444; }
-.excel .rsep { width: 1px; height: 40px; background: #d2d0ce; }
+.excel .rsep { width: 1px; align-self: center; height: 40px; background: #d2d0ce; flex: none; }
 .excel .excel-formula-bar {
   background: #fff; border-bottom: 1px solid #d2d0ce; height: 24px; display: flex; align-items: center; font-size: 12px;
 }
