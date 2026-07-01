@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import type { Quote, NewsItem, HotItem, LabelEntry, Detail, SearchResult } from '../lib/types';
+import type { Quote, NewsItem, HotItem, LabelEntry, Detail, SearchResult, CoinMeta, CoinQuote, UpbitTick, CoinNewsItem, CoinSearchResult } from '../lib/types';
 import { fmtPriceCompact, fmtPct, fmtChange, fmtBig, fmtTime, changeClass, arrow } from '../lib/format';
 import { api } from '../lib/api';
 
@@ -18,16 +18,23 @@ interface TerminalViewProps {
   news: NewsItem[];
   hot: HotItem[];
   brief: string | null;
+  coins: CoinMeta[];
+  coinQuotes: CoinQuote[];
+  coinLive: Record<string, UpbitTick>;
+  coinNews: CoinNewsItem[];
   onAddSymbol: (sym: string, name: string) => void;
   onRemoveSymbol: (sym: string) => void;
+  onAddCoin: (c: CoinMeta) => void;
+  onRemoveCoin: (id: string) => void;
 }
 
 // 스트림 블록 — 명령 에코 / 명령별 출력. 데이터는 렌더 시점에 최신 props 로 그린다.
 type Block =
   | { kind: 'cmd'; raw: string }
-  | { kind: 'out'; render: 'watch' | 'idx' | 'hot' | 'brief' | 'help' }
+  | { kind: 'out'; render: 'watch' | 'idx' | 'hot' | 'brief' | 'help' | 'coin' | 'coinnews' }
   | { kind: 'news' } // news --tail N -f (스트리밍 여부는 streaming 상태로)
   | { kind: 'search'; q: string; results: SearchResult[]; loading?: boolean; err?: string }
+  | { kind: 'coinsearch'; q: string; results: CoinSearchResult[]; loading?: boolean; err?: string }
   | { kind: 'info'; symbol: string; detail: Detail | null; loading?: boolean; err?: string }
   | { kind: 'text'; html: string; cls?: string };
 
@@ -39,6 +46,8 @@ const HELP_LINES = [
   ['info <심볼>', '종목 상세', 'idx', '지수·환율'],
   ['hot', '급상승 종목', 'brief', 'AI 브리핑'],
   ['news', '뉴스 스트림(^X 중단)', 'clear', '화면 정리'],
+  ['coin', '코인 관심목록 시세', 'coin search <이름>', '코인 검색·추가'],
+  ['coin news', '코인 뉴스', '', ''],
 ];
 
 // 명령 버튼 바 — 마우스로도 실행. label 은 표시, cmd 는 실행할 명령.
@@ -49,12 +58,14 @@ const CMD_BUTTONS: { label: string; cmd: string }[] = [
   { label: 'brief', cmd: 'brief' },
   { label: 'news', cmd: `news --tail ${NEWS_TAIL} -f` },
   { label: 'search', cmd: 'search ' },
+  { label: 'coin', cmd: 'coin' },
+  { label: 'coin search', cmd: 'coin search ' },
   { label: 'help', cmd: 'help' },
   { label: 'clear', cmd: 'clear' },
 ];
 
 export function TerminalView(props: TerminalViewProps) {
-  const { watchlist, names, quotes, indices, markets, labels, news, hot, brief, onAddSymbol, onRemoveSymbol } = props;
+  const { watchlist, names, quotes, indices, markets, labels, news, hot, brief, coins, coinQuotes, coinLive, coinNews, onAddSymbol, onRemoveSymbol, onAddCoin, onRemoveCoin } = props;
 
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [input, setInput] = useState('');
@@ -135,6 +146,15 @@ export function TerminalView(props: TerminalViewProps) {
     }
   }, []);
 
+  const runCoinSearch = useCallback(async (q: string, idx: number) => {
+    try {
+      const { results } = await api.cryptoSearch(q);
+      setBlocks((prev) => prev.map((b, i) => (i === idx ? { kind: 'coinsearch', q, results } : b)));
+    } catch {
+      setBlocks((prev) => prev.map((b, i) => (i === idx ? { kind: 'coinsearch', q, results: [], err: '검색 실패' } : b)));
+    }
+  }, []);
+
   // 명령 실행
   const run = useCallback(
     (raw: string) => {
@@ -158,6 +178,26 @@ export function TerminalView(props: TerminalViewProps) {
             // 뉴스 스트리밍 재개 → 프롬프트 숨김
             setStreaming(true);
             return [...next, { kind: 'news' }];
+          case 'coin': {
+            const sub = (args[0] || '').toLowerCase();
+            if (sub === 'search' || sub === 's') {
+              const q = args.slice(1).join(' ');
+              if (!q) return [...next, { kind: 'text', html: '✗ 사용법: coin search &lt;이름 또는 심볼&gt;', cls: 'err' }];
+              const withPh = [...next, { kind: 'coinsearch', q, results: [], loading: true } as Block];
+              void runCoinSearch(q, withPh.length - 1);
+              return withPh;
+            }
+            if (sub === 'news') return [...next, { kind: 'out', render: 'coinnews' }];
+            if (sub === 'rm' || sub === 'remove') {
+              const sym = (args[1] || '').toUpperCase();
+              const target = coins.find((c) => c.symbol.toUpperCase() === sym);
+              if (!target) return [...next, { kind: 'text', html: `✗ <span class="cyan">${esc(sym)}</span> 코인 목록에 없음`, cls: 'err' }];
+              onRemoveCoin(target.id);
+              return [...next, { kind: 'text', html: `<span class="ok">✓</span> <span class="cyan">${esc(target.symbol)}</span> 코인 목록 제거`, cls: '' }];
+            }
+            // 인자 없음 → 코인 관심목록 시세
+            return [...next, { kind: 'out', render: 'coin' }];
+          }
           case 'help':
             return [...next, { kind: 'out', render: 'help' }];
           case 'clear':
@@ -211,7 +251,7 @@ export function TerminalView(props: TerminalViewProps) {
         }
       });
     },
-    [watchlist, onAddSymbol, onRemoveSymbol, runInfo, runSearch],
+    [watchlist, coins, onAddSymbol, onRemoveSymbol, onRemoveCoin, runInfo, runSearch, runCoinSearch],
   );
 
   // 명령 버튼 클릭 — search 처럼 인자가 필요한 건 입력창에 채우고 커서를 끝으로, 나머지는 즉시 실행
@@ -288,7 +328,12 @@ export function TerminalView(props: TerminalViewProps) {
             news={news}
             hot={hot}
             brief={brief}
+            coins={coins}
+            coinQuotes={coinQuotes}
+            coinLive={coinLive}
+            coinNews={coinNews}
             onPick={onAddSymbol}
+            onPickCoin={onAddCoin}
           />
         ))}
 
@@ -343,9 +388,14 @@ function BlockView(props: {
   news: NewsItem[];
   hot: HotItem[];
   brief: string | null;
+  coins: CoinMeta[];
+  coinQuotes: CoinQuote[];
+  coinLive: Record<string, UpbitTick>;
+  coinNews: CoinNewsItem[];
   onPick: (sym: string, name: string) => void;
+  onPickCoin: (c: CoinMeta) => void;
 }) {
-  const { b, streaming, watchlist, names, quotes, indices, markets, labels, news, hot, brief, onPick } = props;
+  const { b, streaming, watchlist, names, quotes, indices, markets, labels, news, hot, brief, coins, coinQuotes, coinLive, coinNews, onPick, onPickCoin } = props;
 
   if (b.kind === 'cmd')
     return (
@@ -538,6 +588,92 @@ function BlockView(props: {
             <span className="hl">{r.symbol}</span>
             <span className="dim">{r.type}</span>
             <span className="dim">{r.exchange}</span>
+            <span className="dim">{r.name}</span>
+          </div>
+        ))}
+      </>
+    );
+  }
+
+  if (b.kind === 'out' && b.render === 'coin') {
+    if (!coins.length) return <div className="tv-ln dim">코인 관심목록이 비어 있음 · coin search &lt;이름&gt; 으로 추가</div>;
+    const priceOf = (c: CoinMeta) => coinLive[c.upbitMarket]?.trade_price ?? coinQuotes.find((q) => q.symbol === c.symbol)?.price_krw ?? null;
+    const rateOf = (c: CoinMeta) => {
+      const t = coinLive[c.upbitMarket];
+      if (t) return t.change_rate * 100;
+      return coinQuotes.find((q) => q.symbol === c.symbol)?.change_24h ?? null;
+    };
+    return (
+      <>
+        <div className="tv-ln dim">
+          → <span className="cyan">{coins.length} coins</span> streaming (업비트) · <span className="dim">클릭 = 유지</span>
+        </div>
+        <div className="tv-tbl q4c head">
+          <span className="dim">SYM</span>
+          <span className="dim">PRICE(₩)</span>
+          <span className="dim">24H</span>
+          <span className="dim">NAME</span>
+        </div>
+        {coins.map((c) => {
+          const p = priceOf(c);
+          const r = rateOf(c);
+          const cc = changeClass(r);
+          return (
+            <div className="tv-pick tv-tbl q4c" key={c.id} onClick={() => onPickCoin(c)}>
+              <span className="hl">{c.symbol}</span>
+              <span>{p == null ? '—' : `₩${p.toLocaleString('ko-KR')}`}</span>
+              <span className={cc}>{r == null ? '—' : `${arrow(r)}${fmtPct(r)}`}</span>
+              <span className="dim">{c.name}</span>
+            </div>
+          );
+        })}
+      </>
+    );
+  }
+
+  if (b.kind === 'out' && b.render === 'coinnews') {
+    if (!coinNews.length) return <div className="tv-ln dim">코인 뉴스 불러오는 중…</div>;
+    return (
+      <>
+        <div className="tv-ln dim">→ 코인 뉴스</div>
+        {coinNews.slice(0, 10).map((n) => (
+          <div className="tv-nrow" key={n.id}>
+            <span className="tt">{fmtTime(n.published_at)}</span> {n.title}
+            {n.url && (
+              <>
+                {' '}
+                <a className="tv-link" href={n.url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+                  [link]
+                </a>
+              </>
+            )}
+            <span className="src"> · {n.source}</span>
+          </div>
+        ))}
+      </>
+    );
+  }
+
+  if (b.kind === 'coinsearch') {
+    if (b.loading) return <div className="tv-ln dim">→ "{b.q}" 코인 검색 중…</div>;
+    if (b.err) return <div className="tv-ln err">✗ "{b.q}" {b.err}</div>;
+    if (!b.results.length) return <div className="tv-ln dim">→ "{b.q}" 업비트 상장 코인 없음</div>;
+    return (
+      <>
+        <div className="tv-ln dim">
+          → "{b.q}" 코인 검색 · <span className="dim">클릭하면 코인 목록에 추가</span>
+        </div>
+        <div className="tv-tbl q4c head">
+          <span className="dim">SYM</span>
+          <span className="dim">MARKET</span>
+          <span className="dim"></span>
+          <span className="dim">NAME</span>
+        </div>
+        {b.results.map((r) => (
+          <div className="tv-pick tv-tbl q4c" key={r.id} onClick={() => onPickCoin({ id: r.id, symbol: r.symbol, name: r.name, upbitMarket: r.upbitMarket })}>
+            <span className="hl">{r.symbol}</span>
+            <span className="dim">{r.upbitMarket}</span>
+            <span></span>
             <span className="dim">{r.name}</span>
           </div>
         ))}
