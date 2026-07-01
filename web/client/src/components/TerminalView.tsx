@@ -17,11 +17,7 @@ interface TerminalViewProps {
   labels: { indices: LabelEntry[]; markets: LabelEntry[] };
   news: NewsItem[];
   hot: HotItem[];
-  brief: string | null;
-  briefLoading: boolean;
-  briefErr: string | null;
-  briefUsable: boolean;
-  onRunBrief: () => void;
+  onOpenBrief: () => void; // brief 명령/버튼 → 브리핑 모달 열기 (App 이 히스토리·생성 관리)
   coins: CoinMeta[];
   coinQuotes: CoinQuote[];
   coinLive: Record<string, UpbitTick>;
@@ -35,7 +31,7 @@ interface TerminalViewProps {
 // 스트림 블록 — 명령 에코 / 명령별 출력. 데이터는 렌더 시점에 최신 props 로 그린다.
 type Block =
   | { kind: 'cmd'; raw: string }
-  | { kind: 'out'; render: 'watch' | 'idx' | 'hot' | 'brief' | 'help' | 'coin' | 'coinnews' }
+  | { kind: 'out'; render: 'watch' | 'idx' | 'hot' | 'help' | 'coin' | 'coinnews' }
   | { kind: 'news' } // news --tail N -f (스트리밍 여부는 streaming 상태로)
   | { kind: 'search'; q: string; results: SearchResult[]; loading?: boolean; err?: string }
   | { kind: 'coinsearch'; q: string; results: CoinSearchResult[]; loading?: boolean; err?: string }
@@ -69,7 +65,7 @@ const CMD_BUTTONS: { label: string; cmd: string }[] = [
 ];
 
 export function TerminalView(props: TerminalViewProps) {
-  const { watchlist, names, quotes, indices, markets, labels, news, hot, brief, briefLoading, briefErr, briefUsable, onRunBrief, coins, coinQuotes, coinLive, coinNews, onAddSymbol, onRemoveSymbol, onAddCoin, onRemoveCoin } = props;
+  const { watchlist, names, quotes, indices, markets, labels, news, hot, onOpenBrief, coins, coinQuotes, coinLive, coinNews, onAddSymbol, onRemoveSymbol, onAddCoin, onRemoveCoin } = props;
 
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [input, setInput] = useState('');
@@ -91,35 +87,22 @@ export function TerminalView(props: TerminalViewProps) {
       { kind: 'out', render: 'idx' },
       { kind: 'cmd', raw: 'hot' },
       { kind: 'out', render: 'hot' },
-      { kind: 'cmd', raw: 'brief' },
-      { kind: 'out', render: 'brief' },
       { kind: 'cmd', raw: 'search 하이닉스' },
       { kind: 'search', q: '하이닉스', results: [], loading: true },
       { kind: 'cmd', raw: `news --tail ${NEWS_TAIL} -f` },
       { kind: 'news' },
     ]);
-    // 하이닉스 검색 실제 호출 → 결과 블록(인덱스 9) 갱신
+    // 하이닉스 검색 실제 호출 → 결과 블록(인덱스 7) 갱신
     void (async () => {
       try {
         const { results } = await api.search('하이닉스');
-        setBlocks((prev) => prev.map((b, i) => (i === 9 ? { kind: 'search', q: '하이닉스', results } : b)));
+        setBlocks((prev) => prev.map((b, i) => (i === 7 ? { kind: 'search', q: '하이닉스', results } : b)));
       } catch {
-        setBlocks((prev) => prev.map((b, i) => (i === 9 ? { kind: 'search', q: '하이닉스', results: [], err: '검색 실패' } : b)));
+        setBlocks((prev) => prev.map((b, i) => (i === 7 ? { kind: 'search', q: '하이닉스', results: [], err: '검색 실패' } : b)));
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // 초기 시드 brief 자동 생성 — 서버 키가 준비(briefUsable)되고 아직 브리핑이 없으면 1회 생성.
-  // ai-status 는 비동기 로드라 시딩 시점엔 briefUsable 이 false 일 수 있어, 준비된 뒤 트리거한다.
-  const briefTriggeredRef = useRef(false);
-  useEffect(() => {
-    if (briefTriggeredRef.current) return;
-    if (briefUsable && !brief && !briefLoading) {
-      briefTriggeredRef.current = true;
-      onRunBrief();
-    }
-  }, [briefUsable, brief, briefLoading, onRunBrief]);
 
   // 새 블록마다 하단으로 스크롤
   useEffect(() => {
@@ -192,9 +175,9 @@ export function TerminalView(props: TerminalViewProps) {
           case 'hot':
             return [...next, { kind: 'out', render: 'hot' }];
           case 'brief':
-            // 기존 브리핑이 없고 서버 키가 있으면 생성 트리거. 결과는 brief 블록이 loading/err/text 로 표시.
-            if (!brief && briefUsable) onRunBrief();
-            return [...next, { kind: 'out', render: 'brief' }];
+            // 스트림에 텍스트를 박지 않고 모달로 표시(지난 브리핑 탭 조회 + 새 생성).
+            onOpenBrief();
+            return [...next, { kind: 'text', html: '→ AI 시장 브리핑 모달을 열었습니다', cls: 'dim' }];
           case 'news':
             // 뉴스 스트리밍 재개 → 프롬프트 숨김
             setStreaming(true);
@@ -272,7 +255,7 @@ export function TerminalView(props: TerminalViewProps) {
         }
       });
     },
-    [watchlist, coins, brief, briefUsable, onRunBrief, onAddSymbol, onRemoveSymbol, onRemoveCoin, runInfo, runSearch, runCoinSearch],
+    [watchlist, coins, onOpenBrief, onAddSymbol, onRemoveSymbol, onRemoveCoin, runInfo, runSearch, runCoinSearch],
   );
 
   // 명령 버튼 클릭 — search 처럼 인자가 필요한 건 입력창에 채우고 커서를 끝으로, 나머지는 즉시 실행
@@ -348,9 +331,6 @@ export function TerminalView(props: TerminalViewProps) {
             labels={labels}
             news={news}
             hot={hot}
-            brief={brief}
-            briefLoading={briefLoading}
-            briefErr={briefErr}
             coins={coins}
             coinQuotes={coinQuotes}
             coinLive={coinLive}
@@ -410,9 +390,6 @@ function BlockView(props: {
   labels: { indices: LabelEntry[]; markets: LabelEntry[] };
   news: NewsItem[];
   hot: HotItem[];
-  brief: string | null;
-  briefLoading: boolean;
-  briefErr: string | null;
   coins: CoinMeta[];
   coinQuotes: CoinQuote[];
   coinLive: Record<string, UpbitTick>;
@@ -420,7 +397,7 @@ function BlockView(props: {
   onPick: (sym: string, name: string) => void;
   onPickCoin: (c: CoinMeta) => void;
 }) {
-  const { b, streaming, watchlist, names, quotes, indices, markets, labels, news, hot, brief, briefLoading, briefErr, coins, coinQuotes, coinLive, coinNews, onPick, onPickCoin } = props;
+  const { b, streaming, watchlist, names, quotes, indices, markets, labels, news, hot, coins, coinQuotes, coinLive, coinNews, onPick, onPickCoin } = props;
 
   if (b.kind === 'cmd')
     return (
@@ -502,23 +479,6 @@ function BlockView(props: {
             <span className="dim">{it.name}</span>
           </div>
         ))}
-      </>
-    );
-  }
-
-  if (b.kind === 'out' && b.render === 'brief') {
-    return (
-      <>
-        <div className="tv-ln dim">→ AI 시장 브리핑</div>
-        {briefLoading ? (
-          <div className="tv-ln dim">생성 중…</div>
-        ) : brief ? (
-          <div className="tv-brief">{brief}</div>
-        ) : briefErr ? (
-          <div className="tv-ln err">✗ {briefErr}</div>
-        ) : (
-          <div className="tv-ln dim">브리핑 없음 · AI 키 입력 후 생성</div>
-        )}
       </>
     );
   }

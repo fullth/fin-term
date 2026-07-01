@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Quote, NewsItem, NewsScope, Detail, HotItem, LabelEntry, CoinMeta } from './lib/types';
 import { api } from './lib/api';
-import { loadPersisted, savePersisted, loadStoredBrief, saveStoredBrief } from './lib/storage';
+import { loadPersisted, savePersisted, loadStoredBrief, saveStoredBrief, loadBriefHistory, appendBriefHistory, type BriefEntry } from './lib/storage';
 import { bootChannelTalk } from './lib/channel-talk';
 import { Watchlist } from './components/Watchlist';
 import { QuotePanel } from './components/QuotePanel';
@@ -21,6 +21,7 @@ import { useCryptoLive } from './lib/use-crypto-live';
 import { ExcelView } from './components/ExcelView';
 import { TerminalView } from './components/TerminalView';
 import { ManualModal } from './components/ManualModal';
+import { BriefModal } from './components/BriefModal';
 import './styles/app.css';
 
 type Mode = 'stock' | 'crypto';
@@ -46,6 +47,8 @@ export function App() {
   const [mono, setMono] = useState(false); // 단색 모드 — 등락 색 제거
   const [terminal, setTerminal] = useState(persisted.terminal); // 터미널 모드 — 명령 콘솔 룩
   const [manualOpen, setManualOpen] = useState(false); // 사용 안내 모달
+  const [briefModalOpen, setBriefModalOpen] = useState(false); // 브리핑 모달
+  const [briefHistory, setBriefHistory] = useState<BriefEntry[]>(loadBriefHistory); // 브리핑 히스토리(리포트용)
   const stockAlerts = usePriceAlerts('stock');
   const cryptoAlerts = usePriceAlerts('crypto');
   const [cryptoAlertOpen, setCryptoAlertOpen] = useState(false);
@@ -270,6 +273,7 @@ export function App() {
       else {
         setBrief({ text: r.text, loading: false, err: null });
         saveStoredBrief(r.text);
+        setBriefHistory(appendBriefHistory(r.text, new Date().toISOString())); // 히스토리 누적(리포트용)
       }
     } catch {
       setBrief((b) => ({ ...b, loading: false, err: '생성 실패' }));
@@ -374,11 +378,10 @@ export function App() {
           labels={labels}
           news={news}
           hot={hot}
-          brief={brief.text}
-          briefLoading={brief.loading}
-          briefErr={brief.err}
-          briefUsable={briefUsable}
-          onRunBrief={runBrief}
+          onOpenBrief={() => {
+            setBriefModalOpen(true);
+            if (!brief.text && briefUsable) runBrief(); // 브리핑 없으면 열면서 생성
+          }}
           coins={coins}
           coinQuotes={cryptoLive.quotes}
           coinLive={cryptoLive.live}
@@ -475,6 +478,17 @@ export function App() {
         />
       )}
       {manualOpen && <ManualModal onClose={() => setManualOpen(false)} />}
+      {briefModalOpen && (
+        <BriefModal
+          history={briefHistory}
+          current={brief.text}
+          loading={brief.loading}
+          err={brief.err}
+          usable={briefUsable}
+          onGenerate={runBrief}
+          onClose={() => setBriefModalOpen(false)}
+        />
+      )}
     </div>
   );
 }
