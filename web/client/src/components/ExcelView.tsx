@@ -19,10 +19,12 @@ interface ExcelViewProps {
   labels: { indices: LabelEntry[]; markets: LabelEntry[] };
   news: NewsItem[];
   hot: HotItem[];
+  onExit: () => void; // 엑셀 모드 해제 (리본 "보기" 옆 버튼)
 }
 
 // 한 셀 — 값 + 정렬/색/헤더 여부. 등락 색은 .up/.down 클래스로 (단색 모드면 CSS 에서 무채색 처리).
-type Cell = { v: string; cls?: string; left?: boolean; head?: boolean; section?: boolean; span?: number };
+// href 가 있으면 링크 버튼으로 렌더(뉴스 원문 등).
+type Cell = { v: string; cls?: string; left?: boolean; head?: boolean; section?: boolean; span?: number; href?: string };
 
 function row(cells: Cell[]): Cell[] {
   return cells;
@@ -83,7 +85,8 @@ function buildNews(news: NewsItem[]): Cell[][] {
     [{ v: '뉴스', section: true, span: 7 }],
     [
       { v: '시각', head: true, left: true },
-      { v: '제목', head: true, left: true, span: 5 },
+      { v: '제목', head: true, left: true, span: 4 },
+      { v: '링크', head: true },
       { v: '출처', head: true, left: true },
     ],
   ];
@@ -91,7 +94,8 @@ function buildNews(news: NewsItem[]): Cell[][] {
     rows.push(
       row([
         { v: fmtTime(n.published_at), left: true },
-        { v: n.title, left: true, span: 5 },
+        { v: n.title, left: true, span: 4 },
+        { v: n.url ? '열기' : '', href: n.url || undefined },
         { v: n.source, left: true },
       ]),
     );
@@ -163,6 +167,9 @@ export function ExcelView(props: ExcelViewProps) {
         <span className="tab">데이터</span>
         <span className="tab">검토</span>
         <span className="tab">보기</span>
+        <button className="excel-exit" onClick={props.onExit} title="엑셀 모드 해제 (` 키)">
+          테마 해제
+        </button>
       </div>
       <div className="excel-ribbon">
         <div className="rg">
@@ -214,10 +221,22 @@ export function ExcelView(props: ExcelViewProps) {
                       .join(' ')}
                     onClick={() => {
                       setSel(`${COLS[ci] ?? 'A'}${ri + 1}`);
-                      setFormula(cell.v || '');
+                      setFormula(cell.href || cell.v || '');
                     }}
                   >
-                    {cell.v}
+                    {cell.href ? (
+                      <a
+                        className="excel-link"
+                        href={cell.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {cell.v}
+                      </a>
+                    ) : (
+                      cell.v
+                    )}
                   </td>
                 ))}
               </tr>

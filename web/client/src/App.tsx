@@ -18,6 +18,7 @@ import { AiKeyManager } from './components/AiKeyManager';
 import { SearchBar } from './components/SearchBar';
 import { CryptoView } from './components/CryptoView';
 import { ExcelView } from './components/ExcelView';
+import { ManualModal } from './components/ManualModal';
 import './styles/app.css';
 
 type Mode = 'stock' | 'crypto';
@@ -41,6 +42,7 @@ export function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>(persisted.theme);
   const [excel, setExcel] = useState(false); // 엑셀 위장 모드 — ` 키 / 버튼 토글
   const [mono, setMono] = useState(false); // 단색 모드 — 등락 색 제거
+  const [manualOpen, setManualOpen] = useState(false); // 사용 안내 모달
   const stockAlerts = usePriceAlerts('stock');
   const cryptoAlerts = usePriceAlerts('crypto');
   const [cryptoAlertOpen, setCryptoAlertOpen] = useState(false);
@@ -84,8 +86,10 @@ export function App() {
   }, [mono]);
 
   // 엑셀 위장 모드 — 탭 제목까지 스프레드시트로 바꿔 작업표시줄/탭에서도 티 안 나게.
+  // 진입 시 매뉴얼 모달은 닫는다(위장 화면 위에 떠 있으면 안 됨).
   useEffect(() => {
     document.title = excel ? 'watchlist.xlsx - Excel' : 'fin-term · web';
+    if (excel) setManualOpen(false);
   }, [excel]);
 
   // 쿼리스트링이 주소창에 남아 있으면 한 번 걷어낸다 (URL 동기화 폐지 — 위장 목적상 노출 금지).
@@ -269,9 +273,13 @@ export function App() {
 
   return (
     <div className="app-shell">
+      {!excel && (
       <div className="topbar">
         <div className="brand">
           fin-term <span className="ver">v0.9.12 · web</span>
+          <button className="manual-btn" onClick={() => setManualOpen(true)} title="사용 안내">
+            ?
+          </button>
         </div>
         <div className="modes">
           {mode === 'stock' && (
@@ -323,6 +331,7 @@ export function App() {
           </button>
         </div>
       </div>
+      )}
 
       {excel ? (
         <ExcelView
@@ -334,6 +343,7 @@ export function App() {
           labels={labels}
           news={news}
           hot={hot}
+          onExit={() => setExcel(false)}
         />
       ) : mode === 'stock' ? (
         <>
@@ -386,14 +396,16 @@ export function App() {
         />
       )}
 
-      <div className="cmdbar">
-        <span>
-          {mode === 'stock'
-            ? '클릭 선택 · 우클릭 삭제 · / 검색 · j/k 이동 · m 모드전환 · Esc 필터해제'
-            : '클릭 코인 선택 · 업비트 실시간 · m 모드전환'}
-        </span>
-        <span className="dim">데이터: Naver · Upbit · RSS · Yahoo(폴백) · 키 없이 동작</span>
-      </div>
+      {!excel && (
+        <div className="cmdbar">
+          <span>
+            {mode === 'stock'
+              ? '클릭 선택 · 우클릭 삭제 · / 검색 · j/k 이동 · m 모드전환 · Esc 필터해제'
+              : '클릭 코인 선택 · 업비트 실시간 · m 모드전환'}
+          </span>
+          <span className="dim">데이터: Naver · Upbit · RSS · Yahoo(폴백) · 키 없이 동작</span>
+        </div>
+      )}
       {mode === 'stock' && stockAlerts.toast && (
         <div className="alert-toast" onClick={() => stockAlerts.setToast(null)}>
           🔔 {stockAlerts.toast}
@@ -418,6 +430,7 @@ export function App() {
           onClearHistory={cryptoAlerts.clearHistory}
         />
       )}
+      {manualOpen && <ManualModal onClose={() => setManualOpen(false)} />}
     </div>
   );
 }
