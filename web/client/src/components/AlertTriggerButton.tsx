@@ -12,7 +12,7 @@ export function AlertTriggerButton({ enabled, onClick }: Props) {
       onClick={onClick}
       title="변동 알림 설정"
     >
-      🔔 변동 알림{enabled ? ' ●' : ''}
+      alert{enabled ? ' ●' : ''}
     </button>
   );
 }

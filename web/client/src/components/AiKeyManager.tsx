@@ -29,7 +29,7 @@ export function AiKeyManager({ onChange }: Props) {
     onChange();
   };
 
-  const label = active ? `AI 키 ✓` : expired ? `AI 키 만료` : `AI 키 필요`;
+  const label = active ? `ai-key ✓` : expired ? `ai-key !` : `ai-key`;
   const cls = active ? 'aikey-ok' : 'aikey-need';
 
   return (
