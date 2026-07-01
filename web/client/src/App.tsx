@@ -17,6 +17,7 @@ import { fmtPrice } from './lib/format';
 import { AiKeyManager } from './components/AiKeyManager';
 import { SearchBar } from './components/SearchBar';
 import { CryptoView } from './components/CryptoView';
+import { useCryptoLive } from './lib/use-crypto-live';
 import { ExcelView } from './components/ExcelView';
 import { TerminalView } from './components/TerminalView';
 import { ManualModal } from './components/ManualModal';
@@ -55,7 +56,9 @@ export function App() {
     loading: false,
     err: null,
   }));
-  const [coinPrices, setCoinPrices] = useState<Record<string, number | null>>({}); // upbitMarket → 현재가 (알림 모달 rows 용)
+  // 코인 실시간 — App 레벨에서 1회 연결(coins 있을 때만). CryptoView·TerminalView 공유 + 알림 발동.
+  const cryptoLive = useCryptoLive(coins, cryptoAlerts);
+  const coinPrices = cryptoLive.coinPrices; // upbitMarket → 현재가 (알림 모달 rows 용)
 
   const [quotes, setQuotes] = useState<Record<string, Quote>>({});
   const [indices, setIndices] = useState<Quote[]>([]);
@@ -365,8 +368,14 @@ export function App() {
           news={news}
           hot={hot}
           brief={brief.text}
+          coins={coins}
+          coinQuotes={cryptoLive.quotes}
+          coinLive={cryptoLive.live}
+          coinNews={cryptoLive.news}
           onAddSymbol={addSymbol}
           onRemoveSymbol={removeSymbol}
+          onAddCoin={addCoin}
+          onRemoveCoin={removeCoin}
         />
       ) : mode === 'stock' ? (
         <>
@@ -413,8 +422,9 @@ export function App() {
           coins={coins}
           onAdd={addCoin}
           onRemove={removeCoin}
-          alerts={cryptoAlerts}
-          onCoinPrices={setCoinPrices}
+          quotes={cryptoLive.quotes}
+          live={cryptoLive.live}
+          news={cryptoLive.news}
           briefSlot={<BriefPanel text={brief.text} loading={brief.loading} err={brief.err} usable={briefUsable} onRun={runBrief} />}
         />
       )}

@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { CoinQuote, UpbitTick, CoinMeta, CoinNewsItem } from '../lib/types';
-import { api } from '../lib/api';
 import { fmtPct, arrow, changeClass, fmtTime } from '../lib/format';
 import { Sparkline } from './Sparkline';
 import { CoinSearchBar } from './CoinSearchBar';
-import type { usePriceAlerts } from '../lib/alerts';
 
 function fmtKrw(n: number | null): string {
   if (n == null) return '—';
@@ -27,36 +25,18 @@ interface Props {
   coins: CoinMeta[];
   onAdd: (c: CoinMeta) => void;
   onRemove: (id: string) => void;
-  alerts: ReturnType<typeof usePriceAlerts>; // 알림 훅은 App 에서 끌어올려 상단바 버튼과 공유
-  onCoinPrices: (m: Record<string, number | null>) => void; // 알림 모달 rows 용 현재가 공유
+  quotes: CoinQuote[]; // 대시보드 시세 — App(useCryptoLive) 소유
+  live: Record<string, UpbitTick>; // 업비트 실시간 체결 — App 소유
+  news: CoinNewsItem[]; // 코인 뉴스 — App 소유
   briefSlot?: ReactNode; // 데일리 브리핑 — App 이 소유(주식/코인 공용), 코인 화면 상단에 표시
 }
 
-export function CryptoView({ coins: coinList, onAdd, onRemove, alerts, onCoinPrices, briefSlot }: Props) {
-  const [quotes, setQuotes] = useState<CoinQuote[]>([]);
-  const [live, setLive] = useState<Record<string, UpbitTick>>({});
-  const [news, setNews] = useState<CoinNewsItem[]>([]);
+export function CryptoView({ coins: coinList, onAdd, onRemove, quotes, live, news, briefSlot }: Props) {
   const [selected, setSelected] = useState<string | null>(coinList[0]?.symbol ?? null);
   // 급변동 피드 — 직전 수신가 대비 SURGE_PCT 이상 튄 순간만 기록(최근 MAX_SURGES 개)
   const [surges, setSurges] = useState<Surge[]>([]);
   const lastPriceRef = useRef<Record<string, number>>({}); // market → 직전 수신 체결가
   const surgeSeqRef = useRef(0); // 피드 항목 고유 키(수신 순서)
-
-  // CoinGecko 대시보드 폴링 — coinList 바뀌면 재조회
-  useEffect(() => {
-    if (coinList.length === 0) {
-      setQuotes([]);
-      return;
-    }
-    let alive = true;
-    const load = () => api.crypto(coinList).then((r) => alive && setQuotes(r.coins)).catch(() => {});
-    load();
-    const t = setInterval(load, 120_000);
-    return () => {
-      alive = false;
-      clearInterval(t);
-    };
-  }, [coinList]);
 
   // 선택 코인이 목록에서 빠지면 첫 항목으로
   useEffect(() => {
@@ -64,46 +44,24 @@ export function CryptoView({ coins: coinList, onAdd, onRemove, alerts, onCoinPri
     else if (!selected && coinList.length) setSelected(coinList[0].symbol);
   }, [coinList, selected]);
 
-  // 업비트 실시간 SSE — coinList 마켓 구독
-  const esRef = useRef<EventSource | null>(null);
+  // 급변동 피드 — App(useCryptoLive)이 넘긴 live 체결 변화를 감시해, 직전가 대비 SURGE_PCT 이상 튄 순간만 기록.
   useEffect(() => {
-    const markets = coinList.map((c) => c.upbitMarket).join(',');
-    const es = new EventSource(`/api/stream/crypto?markets=${encodeURIComponent(markets)}`);
-    esRef.current = es;
-    es.addEventListener('tick', (e) => {
-      const tick = JSON.parse((e as MessageEvent).data) as UpbitTick;
-      setLive((prev) => ({ ...prev, [tick.market]: tick }));
-      const sym = coinList.find((c) => c.upbitMarket === tick.market)?.symbol ?? tick.market;
-      alerts.onPrice(tick.market, tick.trade_price, sym);
-
-      // 급변동 감지 — 직전 수신가 대비 순간 변동률이 임계값 이상이면 피드에 추가.
-      const prevPrice = lastPriceRef.current[tick.market];
-      lastPriceRef.current[tick.market] = tick.trade_price;
+    for (const [market, tick] of Object.entries(live)) {
+      const prevPrice = lastPriceRef.current[market];
+      if (prevPrice === tick.trade_price) continue; // 변화 없으면 skip
+      lastPriceRef.current[market] = tick.trade_price;
       if (prevPrice && prevPrice > 0) {
         const deltaPct = ((tick.trade_price - prevPrice) / prevPrice) * 100;
         if (Math.abs(deltaPct) >= SURGE_PCT) {
+          const sym = coinList.find((c) => c.upbitMarket === market)?.symbol ?? market;
           surgeSeqRef.current += 1;
           const surge: Surge = { id: surgeSeqRef.current, symbol: sym, price: tick.trade_price, deltaPct, at: Date.now() };
           setSurges((prev) => [surge, ...prev].slice(0, MAX_SURGES));
         }
       }
-    });
-    return () => es.close();
-    // alerts.onPrice 는 useCallback 으로 안정적 — coinList 만 재연결 트리거 (무한 재연결 방지)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [coinList]);
-
-  // 코인 뉴스 폴링
-  useEffect(() => {
-    let alive = true;
-    const load = () => api.cryptoNews().then((r) => alive && setNews(r.news)).catch(() => {});
-    load();
-    const t = setInterval(load, 60_000);
-    return () => {
-      alive = false;
-      clearInterval(t);
-    };
-  }, []);
+  }, [live]);
 
   const sel = quotes.find((c) => c.symbol === selected) ?? null;
   const selMeta = coinList.find((c) => c.symbol === selected) ?? null;
@@ -112,16 +70,6 @@ export function CryptoView({ coins: coinList, onAdd, onRemove, alerts, onCoinPri
     const t = live[c.upbitMarket];
     return t ? t.change_rate * 100 : null;
   };
-
-  // 알림 모달(상단바)에서 쓸 현재가 맵을 App 으로 올린다. 실시간/대시보드 시세 갱신 시 동기화.
-  useEffect(() => {
-    const m: Record<string, number | null> = {};
-    for (const c of coinList) {
-      const q = quotes.find((x) => x.symbol === c.symbol);
-      m[c.upbitMarket] = live[c.upbitMarket]?.trade_price ?? q?.price_krw ?? null;
-    }
-    onCoinPrices(m);
-  }, [coinList, quotes, live, onCoinPrices]);
 
   return (
     <div className="crypto-main">

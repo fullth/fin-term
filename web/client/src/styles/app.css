@@ -527,6 +527,7 @@ body {
 .tv-tbl { display: grid; gap: 0 16px; margin: 1px 0; width: fit-content; align-items: baseline; }
 .tv-tbl.q5 { grid-template-columns: 78px 62px 76px 82px auto; }
 .tv-tbl.q5s { grid-template-columns: 96px 72px 90px auto; }
+.tv-tbl.q4c { grid-template-columns: 64px 130px 84px auto; }
 .tv-tbl.head { margin-top: 2px; }
 .tv-idx { display: grid; margin: 2px 0; width: fit-content; }
 .tv-idx-row { display: grid; grid-template-columns: 100px 100px 78px; }
