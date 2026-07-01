@@ -25,7 +25,7 @@ const DEFAULT: Persisted = {
   scope: 'domestic',
   coins: DEFAULT_COINS,
   theme: 'dark',
-  terminal: false,
+  terminal: true,
 };
 
 export function loadPersisted(): Persisted {
