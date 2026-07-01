@@ -287,6 +287,45 @@ export function App() {
           </button>
         </div>
         <div className="modes">
+          {/* 표시 모드 */}
+          <button
+            className={`mode-btn${terminal ? ' active' : ''}`}
+            onClick={() => setTerminal((t) => !t)}
+            title="터미널 모드 — 명령 콘솔"
+          >
+            term
+          </button>
+          <button
+            className={`mode-btn${excel ? ' active' : ''}`}
+            onClick={() => setExcel((x) => !x)}
+            title="엑셀 모드 — ` 키로도 전환"
+          >
+            xlsx
+          </button>
+          <span className="nav-sep">│</span>
+          {/* 종목 모드 */}
+          <button className={`mode-btn${mode === 'stock' ? ' active' : ''}`} onClick={() => setMode('stock')}>
+            주식
+          </button>
+          <button className={`mode-btn${mode === 'crypto' ? ' active' : ''}`} onClick={() => setMode('crypto')}>
+            코인
+          </button>
+          <span className="nav-sep">│</span>
+          {/* 설정 */}
+          <button
+            className="mode-btn"
+            onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+            title="테마 전환 (다크/라이트)"
+          >
+            theme
+          </button>
+          <button
+            className={`mode-btn${mono ? ' active' : ''}`}
+            onClick={() => setMono((m) => !m)}
+            title="단색 모드 — 등락 색 숨김"
+          >
+            mono
+          </button>
           {mode === 'stock' && (
             <AlertButton
               settings={stockAlerts.settings}
@@ -305,42 +344,10 @@ export function App() {
               <AlertTriggerButton enabled={cryptoAlerts.settings.enabled} onClick={() => setCryptoAlertOpen(true)} />
             </div>
           )}
-          <InstallButton />
-          <button
-            className="mode-btn"
-            onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
-            title="테마 전환"
-          >
-            {theme === 'dark' ? '☾ 다크' : '☀ 라이트'}
-          </button>
-          <button
-            className={`mode-btn${mono ? ' active' : ''}`}
-            onClick={() => setMono((m) => !m)}
-            title="단색 모드 — 등락 색 숨김"
-          >
-            ◐ 단색
-          </button>
-          <button
-            className={`mode-btn${terminal ? ' active' : ''}`}
-            onClick={() => setTerminal((t) => !t)}
-            title="터미널 모드 — 명령 콘솔"
-          >
-            ▶ 터미널
-          </button>
-          <button
-            className={`mode-btn${excel ? ' active' : ''}`}
-            onClick={() => setExcel((x) => !x)}
-            title="엑셀 모드 — ` 키로도 전환"
-          >
-            ▦ 엑셀
-          </button>
           <AiKeyManager onChange={onAiKeyChange} />
-          <button className={`mode-btn${mode === 'stock' ? ' active' : ''}`} onClick={() => setMode('stock')}>
-            주식
-          </button>
-          <button className={`mode-btn${mode === 'crypto' ? ' active' : ''}`} onClick={() => setMode('crypto')}>
-            코인
-          </button>
+          <InstallButton />
+          <span className="nav-sep">│</span>
+          <span className="nav-live">● live</span>
         </div>
       </div>
       )}
