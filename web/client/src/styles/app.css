@@ -547,13 +547,16 @@ body {
 
 /* 입력 라인 (스트리밍 중단 후) */
 .tv-inputline { display: flex; align-items: center; margin-top: 12px; }
-.tv-inputline input { flex: 1; background: transparent; border: none; outline: none; color: var(--txt); font: inherit; caret-color: #3fb950; }
-.tv-inputline input::placeholder { color: var(--dim2); }
+/* 입력 커서 — 흰색 + 굵게(폰트를 살짝 키워 caret 두께·높이도 함께 커진다) */
+.tv-inputline input { flex: 1; background: transparent; border: none; outline: none; color: var(--txt);
+  font-family: var(--mono); font-size: 15px; caret-color: #ffffff; }
+.tv-inputline input::placeholder { color: var(--dim2); font-size: 13.5px; }
 
 /* 스트리밍 중 안내 — 프롬프트 대신 표시. Ctrl+X 로 중단 */
 .tv-streamhint { margin-top: 12px; color: var(--dim); }
 .tv-streamhint .k { color: var(--yellow); border: 1px solid var(--dim2); border-radius: 3px; padding: 0 5px; }
-.tv-blink { color: #3fb950; animation: tv-blink 1s steps(1) infinite; }
+/* 블록 커서 — 크고 흰색 */
+.tv-blink { display: inline-block; color: #ffffff; font-size: 17px; line-height: 1; animation: tv-blink 1s steps(1) infinite; }
 @keyframes tv-blink { 50% { opacity: 0; } }
 .tv-live { color: #3fb950; }
 

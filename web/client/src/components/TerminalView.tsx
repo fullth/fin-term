@@ -117,9 +117,13 @@ export function TerminalView(props: TerminalViewProps) {
   }, [streaming]);
 
   // Ctrl+X — 스트리밍 중단(프롬프트 열기). 뉴스 흐름을 멈춘 시점으로 고정한다.
+  // 물리 키(e.code)로 잡아 한글 IME·레이아웃·대소문자 영향을 피한다. Esc 로도 중단 가능.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (streaming && e.ctrlKey && (e.key === 'x' || e.key === 'X')) {
+      if (!streaming) return;
+      const isCtrlX = e.ctrlKey && (e.code === 'KeyX' || e.key === 'x' || e.key === 'X');
+      const isEsc = e.key === 'Escape';
+      if (isCtrlX || isEsc) {
         e.preventDefault();
         setStreaming(false);
       }
@@ -340,7 +344,7 @@ export function TerminalView(props: TerminalViewProps) {
         {/* 스트리밍 중이면 프롬프트 대신 중단 안내 · 아니면 입력 프롬프트 */}
         {streaming ? (
           <div className="tv-streamhint">
-            <span className="tv-blink">▮</span> 실시간 스트리밍 중… <span className="k">Ctrl+X</span> 눌러 중단하고 검색
+            <span className="tv-blink">▮</span> 실시간 스트리밍 중… <span className="k">Ctrl+X</span> 또는 <span className="k">Esc</span> 눌러 중단하고 검색
           </div>
         ) : (
           <div className="tv-inputline">
