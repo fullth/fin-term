@@ -16,14 +16,16 @@ interface Persisted {
   scope: NewsScope;
   coins: CoinMeta[];
   theme: 'dark' | 'light';
+  terminal: boolean; // 터미널 모드 on/off — 새로고침에도 유지
 }
 
 const DEFAULT: Persisted = {
   watchlist: ['AAPL', 'TSLA', 'NVDA', 'MSFT'],
   names: { AAPL: 'Apple', TSLA: 'Tesla', NVDA: 'NVIDIA', MSFT: 'Microsoft' },
-  scope: 'all',
+  scope: 'domestic',
   coins: DEFAULT_COINS,
   theme: 'dark',
+  terminal: false,
 };
 
 export function loadPersisted(): Persisted {
@@ -38,6 +40,7 @@ export function loadPersisted(): Persisted {
       scope: p.scope ?? DEFAULT.scope,
       coins: p.coins?.length ? p.coins : DEFAULT.coins,
       theme: p.theme === 'light' ? 'light' : 'dark',
+      terminal: p.terminal === true,
     };
   } catch {
     return DEFAULT;
