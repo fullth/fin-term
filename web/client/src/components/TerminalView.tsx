@@ -18,6 +18,10 @@ interface TerminalViewProps {
   news: NewsItem[];
   hot: HotItem[];
   brief: string | null;
+  briefLoading: boolean;
+  briefErr: string | null;
+  briefUsable: boolean;
+  onRunBrief: () => void;
   coins: CoinMeta[];
   coinQuotes: CoinQuote[];
   coinLive: Record<string, UpbitTick>;
@@ -65,7 +69,7 @@ const CMD_BUTTONS: { label: string; cmd: string }[] = [
 ];
 
 export function TerminalView(props: TerminalViewProps) {
-  const { watchlist, names, quotes, indices, markets, labels, news, hot, brief, coins, coinQuotes, coinLive, coinNews, onAddSymbol, onRemoveSymbol, onAddCoin, onRemoveCoin } = props;
+  const { watchlist, names, quotes, indices, markets, labels, news, hot, brief, briefLoading, briefErr, briefUsable, onRunBrief, coins, coinQuotes, coinLive, coinNews, onAddSymbol, onRemoveSymbol, onAddCoin, onRemoveCoin } = props;
 
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [input, setInput] = useState('');
@@ -177,6 +181,8 @@ export function TerminalView(props: TerminalViewProps) {
           case 'hot':
             return [...next, { kind: 'out', render: 'hot' }];
           case 'brief':
+            // 기존 브리핑이 없고 서버 키가 있으면 생성 트리거. 결과는 brief 블록이 loading/err/text 로 표시.
+            if (!brief && briefUsable) onRunBrief();
             return [...next, { kind: 'out', render: 'brief' }];
           case 'news':
             // 뉴스 스트리밍 재개 → 프롬프트 숨김
@@ -255,7 +261,7 @@ export function TerminalView(props: TerminalViewProps) {
         }
       });
     },
-    [watchlist, coins, onAddSymbol, onRemoveSymbol, onRemoveCoin, runInfo, runSearch, runCoinSearch],
+    [watchlist, coins, brief, briefUsable, onRunBrief, onAddSymbol, onRemoveSymbol, onRemoveCoin, runInfo, runSearch, runCoinSearch],
   );
 
   // 명령 버튼 클릭 — search 처럼 인자가 필요한 건 입력창에 채우고 커서를 끝으로, 나머지는 즉시 실행
@@ -332,6 +338,8 @@ export function TerminalView(props: TerminalViewProps) {
             news={news}
             hot={hot}
             brief={brief}
+            briefLoading={briefLoading}
+            briefErr={briefErr}
             coins={coins}
             coinQuotes={coinQuotes}
             coinLive={coinLive}
@@ -392,6 +400,8 @@ function BlockView(props: {
   news: NewsItem[];
   hot: HotItem[];
   brief: string | null;
+  briefLoading: boolean;
+  briefErr: string | null;
   coins: CoinMeta[];
   coinQuotes: CoinQuote[];
   coinLive: Record<string, UpbitTick>;
@@ -399,7 +409,7 @@ function BlockView(props: {
   onPick: (sym: string, name: string) => void;
   onPickCoin: (c: CoinMeta) => void;
 }) {
-  const { b, streaming, watchlist, names, quotes, indices, markets, labels, news, hot, brief, coins, coinQuotes, coinLive, coinNews, onPick, onPickCoin } = props;
+  const { b, streaming, watchlist, names, quotes, indices, markets, labels, news, hot, brief, briefLoading, briefErr, coins, coinQuotes, coinLive, coinNews, onPick, onPickCoin } = props;
 
   if (b.kind === 'cmd')
     return (
@@ -489,7 +499,15 @@ function BlockView(props: {
     return (
       <>
         <div className="tv-ln dim">→ AI 시장 브리핑</div>
-        {brief ? <div className="tv-brief">{brief}</div> : <div className="tv-ln dim">브리핑 없음 · AI 키 입력 후 생성</div>}
+        {briefLoading ? (
+          <div className="tv-ln dim">생성 중…</div>
+        ) : brief ? (
+          <div className="tv-brief">{brief}</div>
+        ) : briefErr ? (
+          <div className="tv-ln err">✗ {briefErr}</div>
+        ) : (
+          <div className="tv-ln dim">브리핑 없음 · AI 키 입력 후 생성</div>
+        )}
       </>
     );
   }
