@@ -110,6 +110,17 @@ export function TerminalView(props: TerminalViewProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 초기 시드 brief 자동 생성 — 서버 키가 준비(briefUsable)되고 아직 브리핑이 없으면 1회 생성.
+  // ai-status 는 비동기 로드라 시딩 시점엔 briefUsable 이 false 일 수 있어, 준비된 뒤 트리거한다.
+  const briefTriggeredRef = useRef(false);
+  useEffect(() => {
+    if (briefTriggeredRef.current) return;
+    if (briefUsable && !brief && !briefLoading) {
+      briefTriggeredRef.current = true;
+      onRunBrief();
+    }
+  }, [briefUsable, brief, briefLoading, onRunBrief]);
+
   // 새 블록마다 하단으로 스크롤
   useEffect(() => {
     if (streamRef.current) streamRef.current.scrollTop = streamRef.current.scrollHeight;
