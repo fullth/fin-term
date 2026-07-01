@@ -581,3 +581,34 @@ body {
 .tv-cmdbtn { cursor: pointer; font-family: var(--mono); font-size: 12px; color: var(--txt);
   background: transparent; border: 1px solid var(--dim2); border-radius: 5px; padding: 2px 10px; }
 .tv-cmdbtn:hover { border-color: var(--cyan); color: var(--cyan); background: rgba(57,197,207,.1); }
+
+/* ===== AI 브리핑 모달 — 탭으로 지난 브리핑 조회 ===== */
+.brief-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 1100;
+  display: flex; align-items: center; justify-content: center; padding: 20px; }
+.brief-modal { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  width: min(640px, 100%); max-height: 86vh; display: flex; flex-direction: column;
+  box-shadow: 0 12px 40px rgba(0,0,0,.55); }
+.brief-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px 10px; }
+.brief-title { color: var(--magenta); font-weight: 700; font-size: 15px; }
+.brief-close { background: transparent; border: 1px solid var(--btn-border); color: var(--dim);
+  border-radius: 6px; width: 26px; height: 26px; cursor: pointer; font-size: 13px; }
+.brief-close:hover { border-color: var(--border-foc); color: var(--cyan); }
+/* 탭 */
+.brief-tabs { display: flex; gap: 4px; padding: 0 18px 8px; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
+.brief-tab { cursor: pointer; font-family: var(--mono); font-size: 11.5px; color: var(--dim);
+  background: transparent; border: 1px solid var(--dim2, #3d444d); border-radius: 5px; padding: 2px 9px; }
+.brief-tab:hover { border-color: var(--cyan); color: var(--cyan); }
+.brief-tab.on { border-color: var(--magenta); color: var(--magenta); background: rgba(192,38,211,.1); font-weight: 600; }
+/* 본문 */
+.brief-body { padding: 14px 18px; overflow: auto; flex: 1; min-height: 80px; }
+.brief-text { color: var(--txt); font-size: 13px; line-height: 1.7; white-space: pre-wrap; }
+.brief-err { color: var(--red); }
+.brief-body .dim { color: var(--dim); }
+/* 하단 */
+.brief-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 18px 14px; border-top: 1px solid var(--border); }
+.brief-at { color: var(--dim); font-size: 11px; }
+.brief-gen { margin-left: auto; cursor: pointer; font-family: var(--mono); font-size: 12px; color: var(--txt);
+  background: transparent; border: 1px solid var(--btn-border); border-radius: 6px; padding: 4px 12px; }
+.brief-gen:hover:not(:disabled) { border-color: var(--magenta); color: var(--magenta); background: rgba(192,38,211,.1); }
+.brief-gen:disabled { opacity: .5; cursor: not-allowed; }

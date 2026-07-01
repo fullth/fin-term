@@ -57,6 +57,14 @@ export function savePersisted(p: Persisted): void {
 
 // 데일리 브리핑 — 마지막 생성 결과를 별도 키에 보관해 새로고침 후 복원한다.
 const BRIEF_KEY = 'fin-term:brief';
+// 브리핑 히스토리 — 생성한 브리핑들을 시각과 함께 누적(최근 N개). 모달 탭 조회 + 추후 리포트 생성용.
+const BRIEF_HISTORY_KEY = 'fin-term:brief-history';
+const BRIEF_HISTORY_MAX = 10;
+
+export interface BriefEntry {
+  text: string;
+  at: string; // ISO 생성 시각
+}
 
 export function loadStoredBrief(): string | null {
   try {
@@ -74,6 +82,29 @@ export function saveStoredBrief(text: string): void {
     localStorage.setItem(BRIEF_KEY, JSON.stringify({ text, savedAt: new Date().toISOString() }));
   } catch {
     /* quota 등 무시 */
+  }
+}
+
+// 히스토리 로드 — 최신순 배열.
+export function loadBriefHistory(): BriefEntry[] {
+  try {
+    const raw = localStorage.getItem(BRIEF_HISTORY_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw) as BriefEntry[];
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
+// 새 브리핑을 히스토리 맨 앞에 추가(최근 N개 유지)하고, 갱신된 배열을 반환.
+export function appendBriefHistory(text: string, at: string): BriefEntry[] {
+  try {
+    const next = [{ text, at }, ...loadBriefHistory()].slice(0, BRIEF_HISTORY_MAX);
+    localStorage.setItem(BRIEF_HISTORY_KEY, JSON.stringify(next));
+    return next;
+  } catch {
+    return loadBriefHistory();
   }
 }
 
