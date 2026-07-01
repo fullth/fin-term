@@ -18,6 +18,7 @@ import { AiKeyManager } from './components/AiKeyManager';
 import { SearchBar } from './components/SearchBar';
 import { CryptoView } from './components/CryptoView';
 import { ExcelView } from './components/ExcelView';
+import { TerminalView } from './components/TerminalView';
 import { ManualModal } from './components/ManualModal';
 import './styles/app.css';
 
@@ -42,6 +43,7 @@ export function App() {
   const [theme, setTheme] = useState<'dark' | 'light'>(persisted.theme);
   const [excel, setExcel] = useState(false); // 엑셀 위장 모드 — ` 키 / 버튼 토글
   const [mono, setMono] = useState(false); // 단색 모드 — 등락 색 제거
+  const [terminal, setTerminal] = useState(persisted.terminal); // 터미널 모드 — 명령 콘솔 룩
   const [manualOpen, setManualOpen] = useState(false); // 사용 안내 모달
   const stockAlerts = usePriceAlerts('stock');
   const cryptoAlerts = usePriceAlerts('crypto');
@@ -65,10 +67,10 @@ export function App() {
   const [hotLoaded, setHotLoaded] = useState(false); // 최초 응답 도착 여부 — 로딩 vs 빈 결과(장 마감) 구분
   const [detail, setDetail] = useState<Detail | null>(null);
 
-  // 영속화 — 주식 watchlist + 코인 목록 + 테마
+  // 영속화 — 주식 watchlist + 코인 목록 + 테마 + 터미널 모드
   useEffect(() => {
-    savePersisted({ watchlist, names, scope, coins, theme });
-  }, [watchlist, names, scope, coins, theme]);
+    savePersisted({ watchlist, names, scope, coins, theme, terminal });
+  }, [watchlist, names, scope, coins, theme, terminal]);
 
   // 채널톡 — 앱 마운트 시 1회 익명 boot
   useEffect(() => {
@@ -316,6 +318,13 @@ export function App() {
             ◐ 단색
           </button>
           <button
+            className={`mode-btn${terminal ? ' active' : ''}`}
+            onClick={() => setTerminal((t) => !t)}
+            title="터미널 모드 — 명령 콘솔"
+          >
+            ▶ 터미널
+          </button>
+          <button
             className={`mode-btn${excel ? ' active' : ''}`}
             onClick={() => setExcel((x) => !x)}
             title="엑셀 모드 — ` 키로도 전환"
@@ -344,6 +353,20 @@ export function App() {
           news={news}
           hot={hot}
           onExit={() => setExcel(false)}
+        />
+      ) : terminal ? (
+        <TerminalView
+          watchlist={watchlist}
+          names={names}
+          quotes={quotes}
+          indices={indices}
+          markets={markets}
+          labels={labels}
+          news={news}
+          hot={hot}
+          brief={brief.text}
+          onAddSymbol={addSymbol}
+          onRemoveSymbol={removeSymbol}
         />
       ) : mode === 'stock' ? (
         <>
@@ -396,7 +419,7 @@ export function App() {
         />
       )}
 
-      {!excel && (
+      {!excel && !terminal && (
         <div className="cmdbar">
           <span>
             {mode === 'stock'
