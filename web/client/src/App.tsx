@@ -368,6 +368,10 @@ export function App() {
           news={news}
           hot={hot}
           brief={brief.text}
+          briefLoading={brief.loading}
+          briefErr={brief.err}
+          briefUsable={briefUsable}
+          onRunBrief={runBrief}
           coins={coins}
           coinQuotes={cryptoLive.quotes}
           coinLive={cryptoLive.live}
