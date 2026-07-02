@@ -3,6 +3,7 @@ import type { Quote, NewsItem, NewsScope, Detail, HotItem, LabelEntry, CoinMeta 
 import { api } from './lib/api';
 import { loadPersisted, savePersisted, loadStoredBrief, saveStoredBrief, loadBriefHistory, appendBriefHistory, type BriefEntry } from './lib/storage';
 import { bootChannelTalk } from './lib/channel-talk';
+import { bootDonate } from './lib/donate';
 import { Watchlist } from './components/Watchlist';
 import { QuotePanel } from './components/QuotePanel';
 import { NewsStream } from './components/NewsStream';
@@ -78,9 +79,10 @@ export function App() {
     savePersisted({ watchlist, names, scope, coins, theme, terminal });
   }, [watchlist, names, scope, coins, theme, terminal]);
 
-  // 채널톡 — 앱 마운트 시 1회 익명 boot
+  // 채널톡 · 후원 위젯 — 앱 마운트 시 1회 boot
   useEffect(() => {
     bootChannelTalk();
+    bootDonate();
   }, []);
 
   // 테마를 <html data-theme> 에 반영
