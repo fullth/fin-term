@@ -13,9 +13,14 @@ export function bootDonate(): void {
   SMTC('boot', {
     kakaoPayUrl: KAKAO_PAY_URL,
     name: '임태환',
-    label: '커피 한 잔 후원하기',
+    label: '커피 후원하기',
     title: '개발자에게 커피 한 잔 ☕',
     description: 'fin-term이 도움이 됐다면 커피값으로 응원해주세요!',
+    position: 'br', // 우하단 — 채널톡 버튼 왼쪽에 나란히
+    offsetX: 90, // 채널톡 버튼(우하단) 폭만큼 왼쪽으로
+    offsetY: 24, // 채널톡 버튼과 같은 높이
+    accentColor: '#1A1A1A', // 채널톡 버튼과 동일한 검정
+    textColor: '#ffffff',
     siteKey: 'fin-term',
     analytics: true,
   });
