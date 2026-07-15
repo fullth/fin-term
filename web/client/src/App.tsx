@@ -267,10 +267,14 @@ export function App() {
       onNeedKey();
       return;
     }
-    setBrief((b) => ({ ...b, loading: true, err: null }));
+    // 스트리밍 시작 — 델타 도착마다 본문을 이어붙여 실시간 표시.
+    setBrief({ text: '', loading: true, err: null });
     try {
-      const r = await api.brief();
+      const r = await api.brief((delta) => {
+        setBrief((b) => ({ ...b, text: (b.text ?? '') + delta }));
+      });
       if (r.status === 401) setBrief({ text: null, loading: false, err: '브리핑은 현재 사용할 수 없습니다' });
+      else if (r.error) setBrief({ text: null, loading: false, err: '생성 중 오류 — 다시 시도하세요' });
       else if (!r.text) setBrief({ text: null, loading: false, err: '생성 실패 — 잠시 후 다시 시도하세요' });
       else {
         setBrief({ text: r.text, loading: false, err: null });
@@ -380,10 +384,7 @@ export function App() {
           labels={labels}
           news={news}
           hot={hot}
-          onOpenBrief={() => {
-            setBriefModalOpen(true);
-            if (!brief.text && briefUsable) runBrief(); // 브리핑 없으면 열면서 생성
-          }}
+          onOpenBrief={() => setBriefModalOpen(true)}
           coins={coins}
           coinQuotes={cryptoLive.quotes}
           coinLive={cryptoLive.live}

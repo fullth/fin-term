@@ -17,7 +17,7 @@ import { fetchNews } from '../../../src/sources/rss.js';
 import { fetchDetail } from '../../../src/sources/detail.js';
 import { searchSymbols } from '../../../src/sources/search.js';
 import { fetchHot } from '../../../src/sources/hot.js';
-import { resolveUserKey, explainTermWith, generateBriefWith } from './ai.js';
+import { resolveUserKey, explainTermWith, streamBriefWith } from './ai.js';
 import type { Quote, NewsScope } from '../../../src/core/types.js';
 import { DEFAULT_FEEDS, INDICES, MARKETS } from './feeds.js';
 import { fetchCoinDashboard, upbitFeed, DEFAULT_COINS, searchCoins, fetchCoinNews, type CoinMeta } from './crypto.js';
@@ -207,6 +207,7 @@ app.get('/api/ai-status', (_req, res) => res.json({ serverKey: Boolean(process.e
 
 // AI 데일리 브리핑 — 서버 키 전용. 주식+코인 시장 전반(개인화 없음). 서버가 시장 데이터를 직접 모은다.
 const labelOf = (defs: { symbol: string; label: string }[], sym: string) => defs.find((d) => d.symbol === sym)?.label ?? sym;
+// SSE 스트리밍 — 델타를 chunk 이벤트로 실시간 push, 완료 시 done, 실패 시 error.
 app.post('/api/brief', async (req, res) => {
   const key = process.env.ANTHROPIC_API_KEY || null;
   if (!key) return res.status(401).json({ text: null, error: 'no_server_key' });
@@ -215,19 +216,31 @@ app.post('/api/brief', async (req, res) => {
   } catch {
     /* 집계 실패 무시 */
   }
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  });
+  res.write(': connected\n\n');
   const [hot, coins, news] = await Promise.all([
     fetchHot().catch(() => []),
     fetchCoinDashboard(DEFAULT_COINS).catch(() => [] as Awaited<ReturnType<typeof fetchCoinDashboard>>),
     fetchNews(DEFAULT_FEEDS, [], 'all').catch(() => []),
   ]);
-  const text = await generateBriefWith(key, {
-    indices: marketCache.indices.map((q) => ({ label: labelOf(INDICES, q.symbol), change_pct: q.change_pct })),
-    markets: marketCache.markets.map((q) => ({ label: labelOf(MARKETS, q.symbol), change_pct: q.change_pct })),
-    hot: hot.map((h) => ({ name: h.name, change_pct: h.change_pct })),
-    coins: coins.map((c) => ({ symbol: c.symbol, change_24h: c.change_24h })),
-    news: news.map((n) => ({ title: n.title, source: n.source })),
-  });
-  res.json({ text });
+  const ok = await streamBriefWith(
+    key,
+    {
+      indices: marketCache.indices.map((q) => ({ label: labelOf(INDICES, q.symbol), change_pct: q.change_pct })),
+      markets: marketCache.markets.map((q) => ({ label: labelOf(MARKETS, q.symbol), change_pct: q.change_pct })),
+      hot: hot.map((h) => ({ name: h.name, change_pct: h.change_pct })),
+      coins: coins.map((c) => ({ symbol: c.symbol, change_24h: c.change_24h })),
+      news: news.map((n) => ({ title: n.title, source: n.source })),
+    },
+    (delta) => res.write(`event: chunk\ndata: ${JSON.stringify({ delta })}\n\n`),
+  );
+  res.write(ok ? 'event: done\ndata: {}\n\n' : 'event: error\ndata: {}\n\n');
+  res.end();
 });
 
 // 용어 풀이 — 사용자 키 전용. 임의 문자열을 받으므로 서버 키로 열어주면 무제한 프롬프트 악용 위험.

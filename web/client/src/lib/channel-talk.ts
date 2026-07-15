@@ -11,4 +11,13 @@ export function bootChannelTalk(): void {
   booted = true;
   ChannelService.loadScript();
   ChannelService.boot({ pluginKey: PLUGIN_KEY });
+
+  // 메신저가 열리면 커피 후원 버튼을 숨긴다(특히 모바일: 채널톡이 전체화면으로 뜨는데 커피 버튼이 위에 남는 문제).
+  // 닫히면 다시 표시. smtc-root 는 show-me-the-coffee 위젯 컨테이너.
+  const toggleDonate = (hidden: boolean) => {
+    const el = document.getElementById('smtc-root');
+    if (el) el.style.display = hidden ? 'none' : '';
+  };
+  ChannelService.onShowMessenger(() => toggleDonate(true));
+  ChannelService.onHideMessenger(() => toggleDonate(false));
 }

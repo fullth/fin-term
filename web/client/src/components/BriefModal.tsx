@@ -39,8 +39,9 @@ export function BriefModal({ history, current, loading, err, usable, onGenerate,
     setSel(0);
   }, [history.length]);
 
-  // 표시 본문 — 히스토리 있으면 선택 탭, 없으면 current fallback
-  const body = history.length ? history[Math.min(sel, history.length - 1)]?.text : current;
+  // 생성 중에는 current 에 스트리밍 델타가 누적된다. 기존 히스토리가 있어도
+  // 새 브리핑 본문을 우선해야 실시간 생성 결과가 보인다.
+  const body = loading ? current : history.length ? history[Math.min(sel, history.length - 1)]?.text : current;
 
   return (
     <div className="brief-overlay" onClick={onClose}>
@@ -64,10 +65,13 @@ export function BriefModal({ history, current, loading, err, usable, onGenerate,
         )}
 
         <div className="brief-body">
-          {loading ? (
+          {body ? (
+            <div className="brief-text">
+              {body}
+              {loading && <span className="brief-stream-cursor" aria-label="생성 중" />}
+            </div>
+          ) : loading ? (
             <div className="dim">생성 중…</div>
-          ) : body ? (
-            <div className="brief-text">{body}</div>
           ) : err ? (
             <div className="brief-err">✗ {err}</div>
           ) : (
@@ -81,8 +85,13 @@ export function BriefModal({ history, current, loading, err, usable, onGenerate,
           {history.length > 0 && sel < history.length && (
             <span className="brief-at">{fmtAt(history[Math.min(sel, history.length - 1)].at)} 생성</span>
           )}
-          <button className="brief-gen" onClick={onGenerate} disabled={loading || !usable} title={usable ? '' : '서버 AI 키 없음'}>
-            {loading ? '생성 중…' : '＋ 새 브리핑 생성'}
+          <button
+            className={`brief-gen${!body && !loading && usable ? ' pulse' : ''}`}
+            onClick={onGenerate}
+            disabled={loading || !usable}
+            title={usable ? '' : '서버 AI 키 없음'}
+          >
+            {loading ? '생성 중…' : body ? '＋ 새 브리핑 생성' : '데일리 브리핑 생성하기'}
           </button>
         </div>
       </div>
