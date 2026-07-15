@@ -31,7 +31,7 @@ interface TerminalViewProps {
 // 스트림 블록 — 명령 에코 / 명령별 출력. 데이터는 렌더 시점에 최신 props 로 그린다.
 type Block =
   | { kind: 'cmd'; raw: string }
-  | { kind: 'out'; render: 'watch' | 'idx' | 'hot' | 'help' | 'coin' | 'coinnews' }
+  | { kind: 'out'; render: 'watch' | 'idx' | 'hot' | 'help' | 'coin' | 'coinnews' | 'brief' }
   | { kind: 'news' } // news --tail N -f (스트리밍 여부는 streaming 상태로)
   | { kind: 'search'; q: string; results: SearchResult[]; loading?: boolean; err?: string }
   | { kind: 'coinsearch'; q: string; results: CoinSearchResult[]; loading?: boolean; err?: string }
@@ -81,6 +81,8 @@ export function TerminalView(props: TerminalViewProps) {
     if (seededRef.current) return;
     seededRef.current = true;
     setBlocks([
+      { kind: 'cmd', raw: 'brief' },
+      { kind: 'out', render: 'brief' },
       { kind: 'cmd', raw: `watch ${watchlist.join(' ')} --sse` },
       { kind: 'out', render: 'watch' },
       { kind: 'cmd', raw: 'idx' },
@@ -92,13 +94,13 @@ export function TerminalView(props: TerminalViewProps) {
       { kind: 'cmd', raw: `news --tail ${NEWS_TAIL} -f` },
       { kind: 'news' },
     ]);
-    // 하이닉스 검색 실제 호출 → 결과 블록(인덱스 7) 갱신
+    // 하이닉스 검색 실제 호출 → 로딩 중인 검색 블록 갱신
     void (async () => {
       try {
         const { results } = await api.search('하이닉스');
-        setBlocks((prev) => prev.map((b, i) => (i === 7 ? { kind: 'search', q: '하이닉스', results } : b)));
+        setBlocks((prev) => prev.map((b) => (b.kind === 'search' && b.loading ? { kind: 'search', q: '하이닉스', results } : b)));
       } catch {
-        setBlocks((prev) => prev.map((b, i) => (i === 7 ? { kind: 'search', q: '하이닉스', results: [], err: '검색 실패' } : b)));
+        setBlocks((prev) => prev.map((b) => (b.kind === 'search' && b.loading ? { kind: 'search', q: '하이닉스', results: [], err: '검색 실패' } : b)));
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -337,6 +339,7 @@ export function TerminalView(props: TerminalViewProps) {
             coinNews={coinNews}
             onPick={onAddSymbol}
             onPickCoin={onAddCoin}
+            onOpenBrief={onOpenBrief}
           />
         ))}
 
@@ -396,8 +399,9 @@ function BlockView(props: {
   coinNews: CoinNewsItem[];
   onPick: (sym: string, name: string) => void;
   onPickCoin: (c: CoinMeta) => void;
+  onOpenBrief: () => void;
 }) {
-  const { b, streaming, watchlist, names, quotes, indices, markets, labels, news, hot, coins, coinQuotes, coinLive, coinNews, onPick, onPickCoin } = props;
+  const { b, streaming, watchlist, names, quotes, indices, markets, labels, news, hot, coins, coinQuotes, coinLive, coinNews, onPick, onPickCoin, onOpenBrief } = props;
 
   if (b.kind === 'cmd')
     return (
@@ -407,6 +411,21 @@ function BlockView(props: {
     );
 
   if (b.kind === 'text') return <div className={`tv-ln ${b.cls || ''}`} dangerouslySetInnerHTML={{ __html: b.html }} />;
+
+  // AI 브리핑 — 클릭하면 모달. 실제 생성/스트리밍은 모달의 생성 버튼에서.
+  if (b.kind === 'out' && b.render === 'brief') {
+    return (
+      <div
+        className="tv-ln tv-briefline"
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpenBrief();
+        }}
+      >
+        → <span className="tv-brieflink">클릭해서 AI 브리핑을 확인하세요</span>
+      </div>
+    );
+  }
 
   if (b.kind === 'out' && b.render === 'watch') {
     return (

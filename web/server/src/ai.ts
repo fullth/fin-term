@@ -92,3 +92,26 @@ function buildBriefPrompt(input: BriefInput): string {
 export function generateBriefWith(apiKey: string, input: BriefInput): Promise<string | null> {
   return ask(apiKey, buildBriefPrompt(input), 1024, 'medium');
 }
+
+// 브리핑 스트리밍 — 텍스트 델타를 onChunk 로 흘려보낸다. SSE 라우트에서 사용.
+// 반환값: 정상 완료 여부(false 면 에러). 에러도 예외 없이 false 로 알려 라우트가 이벤트로 마무리하게 한다.
+export async function streamBriefWith(
+  apiKey: string,
+  input: BriefInput,
+  onChunk: (delta: string) => void,
+): Promise<boolean> {
+  try {
+    const client = new Anthropic({ apiKey });
+    const stream = client.messages.stream({
+      model: 'claude-opus-4-8',
+      max_tokens: 1024,
+      output_config: { effort: 'medium' },
+      messages: [{ role: 'user', content: buildBriefPrompt(input) }],
+    });
+    stream.on('text', (delta) => onChunk(delta));
+    await stream.finalMessage();
+    return true;
+  } catch {
+    return false;
+  }
+}

@@ -46,12 +46,47 @@ export const api = {
 
   cryptoNews: () => getJson<{ news: CoinNewsItem[] }>('/api/crypto/news'),
 
-  // AI 데일리 브리핑 — 시장 전반(개인화 없음). 서버가 시장 데이터를 직접 모으므로 입력 불필요.
-  brief: () =>
-    fetch('/api/brief', {
+  // AI 데일리 브리핑 — SSE 스트리밍. 델타를 onChunk 로 흘리고, 완료 시 누적 본문을 반환.
+  // 서버 키 없음(401)이면 status=401, text=null. 스트림 에러면 error 세팅.
+  brief: async (onChunk: (delta: string) => void) => {
+    const res = await fetch('/api/brief', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...aiHeaders() },
-    }).then(async (r) => ({ status: r.status, ...(await r.json()) } as { status: number; text: string | null; error?: string })),
+    });
+    if (res.status !== 200 || !res.body) {
+      return { status: res.status, text: null, error: 'no_server_key' } as { status: number; text: string | null; error?: string };
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    let text = '';
+    let error: string | undefined;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      // CRLF 가 네트워크 청크 경계에서 나뉘어도 합친 버퍼에서 정규화한다.
+      buf = (buf + decoder.decode(value, { stream: true })).replace(/\r\n/g, '\n');
+      // SSE 이벤트는 빈 줄로 구분. 완성된 이벤트만 처리하고 나머지는 버퍼에 남긴다.
+      const parts = buf.split('\n\n');
+      buf = parts.pop() ?? '';
+      for (const part of parts) {
+        const ev = /event:\s*(\w+)/.exec(part)?.[1];
+        const dataLine = /data:\s*(.*)/.exec(part)?.[1];
+        if (ev === 'chunk' && dataLine) {
+          try {
+            const delta = (JSON.parse(dataLine) as { delta: string }).delta;
+            text += delta;
+            onChunk(delta);
+          } catch {
+            /* 파싱 실패한 이벤트는 무시 */
+          }
+        } else if (ev === 'error') {
+          error = 'stream_error';
+        }
+      }
+    }
+    return { status: 200, text: text || null, error } as { status: number; text: string | null; error?: string };
+  },
 
   explain: (term: string) =>
     fetch(`/api/explain?term=${encodeURIComponent(term)}`, { headers: aiHeaders() }).then(
