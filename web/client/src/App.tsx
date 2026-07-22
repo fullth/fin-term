@@ -21,11 +21,11 @@ import { CryptoView } from './components/CryptoView';
 import { useCryptoLive } from './lib/use-crypto-live';
 import { ExcelView } from './components/ExcelView';
 import { TerminalView } from './components/TerminalView';
+import { DiaryView } from './components/DiaryView';
 import { ManualModal } from './components/ManualModal';
-import { BriefModal } from './components/BriefModal';
 import './styles/app.css';
 
-type Mode = 'stock' | 'crypto';
+type Mode = 'stock' | 'crypto' | 'diary';
 
 const NEWS_INTERVAL = 60_000;
 const HOT_INTERVAL = 120_000;
@@ -43,13 +43,11 @@ export function App() {
   const [newsFilter, setNewsFilter] = useState<string | null>(null);
   const [hasServerKey, setHasServerKey] = useState(false);
   const [, setAiKeyVersion] = useState(0); // 키 변경 시 AI 패널 리렌더 트리거
-  const [theme, setTheme] = useState<'dark' | 'light'>(persisted.theme);
   const [excel, setExcel] = useState(false); // 엑셀 위장 모드 — ` 키 / 버튼 토글
-  const [mono, setMono] = useState(false); // 단색 모드 — 등락 색 제거
+  const [mono, setMono] = useState(false); // 단색 모드 — 전체 화면 흑백 전환
   const [terminal, setTerminal] = useState(persisted.terminal); // 터미널 모드 — 명령 콘솔 룩
   const [manualOpen, setManualOpen] = useState(false); // 사용 안내 모달
-  const [briefModalOpen, setBriefModalOpen] = useState(false); // 브리핑 모달
-  const [briefHistory, setBriefHistory] = useState<BriefEntry[]>(loadBriefHistory); // 브리핑 히스토리(리포트용)
+  const [briefHistory, setBriefHistory] = useState<BriefEntry[]>(loadBriefHistory);
   const stockAlerts = usePriceAlerts('stock');
   const cryptoAlerts = usePriceAlerts('crypto');
   const [cryptoAlertOpen, setCryptoAlertOpen] = useState(false);
@@ -60,6 +58,7 @@ export function App() {
     loading: false,
     err: null,
   }));
+  const briefRunningRef = useRef(false);
   // 코인 실시간 — App 레벨에서 1회 연결(coins 있을 때만). CryptoView·TerminalView 공유 + 알림 발동.
   const cryptoLive = useCryptoLive(coins, cryptoAlerts);
   const coinPrices = cryptoLive.coinPrices; // upbitMarket → 현재가 (알림 모달 rows 용)
@@ -74,10 +73,10 @@ export function App() {
   const [hotLoaded, setHotLoaded] = useState(false); // 최초 응답 도착 여부 — 로딩 vs 빈 결과(장 마감) 구분
   const [detail, setDetail] = useState<Detail | null>(null);
 
-  // 영속화 — 주식 watchlist + 코인 목록 + 테마 + 터미널 모드
+  // 영속화 — 주식 watchlist + 코인 목록 + 터미널 모드
   useEffect(() => {
-    savePersisted({ watchlist, names, scope, coins, theme, terminal });
-  }, [watchlist, names, scope, coins, theme, terminal]);
+    savePersisted({ watchlist, names, scope, coins, terminal });
+  }, [watchlist, names, scope, coins, terminal]);
 
   // 채널톡 · 후원 위젯 — 앱 마운트 시 1회 boot
   useEffect(() => {
@@ -85,12 +84,7 @@ export function App() {
     bootDonate();
   }, []);
 
-  // 테마를 <html data-theme> 에 반영
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
-
-  // 단색 모드 — 등락 색 제거. CSS 가 [data-mono] 아래에서 --up/--down 을 무채색으로 덮는다.
+  // 단색 모드 — 앱 전체를 흑백으로 바꾸고 등락 색도 텍스트색으로 통일한다.
   useEffect(() => {
     document.documentElement.toggleAttribute('data-mono', mono);
   }, [mono]);
@@ -124,6 +118,7 @@ export function App() {
         setNewsFilter(null);
       } else if (e.key === 'm') {
         setMode((mo) => (mo === 'stock' ? 'crypto' : 'stock'));
+        setTerminal(false);
       } else if ((e.key === 'j' || e.key === 'k') && mode === 'stock' && watchlist.length) {
         const idx = selected ? watchlist.indexOf(selected) : -1;
         const next = e.key === 'j' ? Math.min(idx + 1, watchlist.length - 1) : Math.max(idx - 1, 0);
@@ -262,27 +257,48 @@ export function App() {
 
   // 브리핑 생성 — 명시적 호출에만(생성/다시 버튼). 결과는 모드 전환과 무관하게 유지.
   const briefUsable = hasServerKey;
-  const runBrief = async () => {
+  const runBrief = async (onChunk?: (delta: string) => void): Promise<{ text: string | null; err: string | null }> => {
+    if (briefRunningRef.current) return { text: null, err: '이미 브리핑을 생성하고 있습니다' };
     if (!briefUsable) {
       onNeedKey();
-      return;
+      return { text: null, err: '브리핑 기능이 비활성화되어 있습니다' };
     }
+    briefRunningRef.current = true;
     // 스트리밍 시작 — 델타 도착마다 본문을 이어붙여 실시간 표시.
     setBrief({ text: '', loading: true, err: null });
     try {
       const r = await api.brief((delta) => {
+        onChunk?.(delta);
         setBrief((b) => ({ ...b, text: (b.text ?? '') + delta }));
       });
-      if (r.status === 401) setBrief({ text: null, loading: false, err: '브리핑은 현재 사용할 수 없습니다' });
-      else if (r.error) setBrief({ text: null, loading: false, err: '생성 중 오류 — 다시 시도하세요' });
-      else if (!r.text) setBrief({ text: null, loading: false, err: '생성 실패 — 잠시 후 다시 시도하세요' });
-      else {
-        setBrief({ text: r.text, loading: false, err: null });
-        saveStoredBrief(r.text);
-        setBriefHistory(appendBriefHistory(r.text, new Date().toISOString())); // 히스토리 누적(리포트용)
+      if (r.status === 401) {
+        const err = '브리핑은 현재 사용할 수 없습니다';
+        setBrief({ text: null, loading: false, err });
+        return { text: null, err };
       }
+      if (r.error) {
+        const err = '생성 중 오류 — 다시 시도하세요';
+        setBrief({ text: null, loading: false, err });
+        return { text: null, err };
+      }
+      if (!r.text) {
+        const err = '생성 실패 — 잠시 후 다시 시도하세요';
+        setBrief({ text: null, loading: false, err });
+        return { text: null, err };
+      }
+      const generatedAt = new Date().toISOString();
+      const latestSaved = saveStoredBrief(r.text, generatedAt);
+      const historyResult = appendBriefHistory(r.text, generatedAt);
+      setBriefHistory(historyResult.history); // Diary에서 사용할 브리핑 히스토리 누적
+      const storageErr = latestSaved && historyResult.saved ? null : '브리핑은 생성됐지만 브라우저 저장에 실패했습니다';
+      setBrief({ text: r.text, loading: false, err: storageErr });
+      return { text: r.text, err: storageErr };
     } catch {
-      setBrief((b) => ({ ...b, loading: false, err: '생성 실패' }));
+      const err = '생성 실패';
+      setBrief({ text: null, loading: false, err });
+      return { text: null, err };
+    } finally {
+      briefRunningRef.current = false;
     }
   };
 
@@ -296,12 +312,13 @@ export function App() {
             ?
           </button>
         </div>
-        <div className="modes">
+        <nav className="modes" aria-label="주요 화면">
           {/* 표시 모드 */}
           <button
             className={`mode-btn${terminal ? ' active' : ''}`}
             onClick={() => setTerminal((t) => !t)}
             title="터미널 모드 — 명령 콘솔"
+            aria-current={terminal ? 'page' : undefined}
           >
             term
           </button>
@@ -314,25 +331,43 @@ export function App() {
           </button>
           <span className="nav-sep">│</span>
           {/* 종목 모드 */}
-          <button className={`mode-btn${mode === 'stock' ? ' active' : ''}`} onClick={() => setMode('stock')}>
+          <button
+            className={`mode-btn${!terminal && mode === 'stock' ? ' active' : ''}`}
+            onClick={() => {
+              setMode('stock');
+              setTerminal(false);
+            }}
+            aria-current={!terminal && mode === 'stock' ? 'page' : undefined}
+          >
             주식
           </button>
-          <button className={`mode-btn${mode === 'crypto' ? ' active' : ''}`} onClick={() => setMode('crypto')}>
+          <button
+            className={`mode-btn${!terminal && mode === 'crypto' ? ' active' : ''}`}
+            onClick={() => {
+              setMode('crypto');
+              setTerminal(false);
+            }}
+            aria-current={!terminal && mode === 'crypto' ? 'page' : undefined}
+          >
             코인
+          </button>
+          <button
+            className={`mode-btn${!terminal && mode === 'diary' ? ' active' : ''}`}
+            onClick={() => {
+              setMode('diary');
+              setTerminal(false);
+            }}
+            aria-current={!terminal && mode === 'diary' ? 'page' : undefined}
+            title="브리핑 이력과 투자 일지"
+          >
+            diary
           </button>
           <span className="nav-sep">│</span>
           {/* 설정 */}
           <button
-            className="mode-btn"
-            onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
-            title="테마 전환 (다크/라이트)"
-          >
-            theme
-          </button>
-          <button
             className={`mode-btn${mono ? ' active' : ''}`}
             onClick={() => setMono((m) => !m)}
-            title="단색 모드 — 등락 색 숨김"
+            title="단색 모드 — 전체 화면 흑백 전환"
           >
             mono
           </button>
@@ -358,7 +393,7 @@ export function App() {
           <InstallButton />
           <span className="nav-sep">│</span>
           <span className="nav-live">● live</span>
-        </div>
+        </nav>
       </div>
       )}
 
@@ -384,7 +419,9 @@ export function App() {
           labels={labels}
           news={news}
           hot={hot}
-          onOpenBrief={() => setBriefModalOpen(true)}
+          briefState={brief}
+          briefHistory={briefHistory}
+          onRunBrief={runBrief}
           coins={coins}
           coinQuotes={cryptoLive.quotes}
           coinLive={cryptoLive.live}
@@ -403,7 +440,7 @@ export function App() {
           {/* 3열: 좌(브리핑+WATCHLIST) · 중앙(지수·환율+QUOTE+NEWS) · 우(급상승) */}
           <div className="layout3">
             <div className="col-left">
-              <BriefPanel text={brief.text} loading={brief.loading} err={brief.err} usable={briefUsable} onRun={runBrief} />
+              <BriefPanel text={brief.text} loading={brief.loading} err={brief.err} usable={briefUsable} onRun={() => void runBrief()} />
               <Watchlist
                 watchlist={watchlist}
                 names={names}
@@ -434,7 +471,7 @@ export function App() {
             </div>
           </div>
         </>
-      ) : (
+      ) : mode === 'crypto' ? (
         <CryptoView
           coins={coins}
           onAdd={addCoin}
@@ -442,11 +479,13 @@ export function App() {
           quotes={cryptoLive.quotes}
           live={cryptoLive.live}
           news={cryptoLive.news}
-          briefSlot={<BriefPanel text={brief.text} loading={brief.loading} err={brief.err} usable={briefUsable} onRun={runBrief} />}
+          briefSlot={<BriefPanel text={brief.text} loading={brief.loading} err={brief.err} usable={briefUsable} onRun={() => void runBrief()} />}
         />
+      ) : (
+        <DiaryView history={briefHistory} onOpenTerminal={() => setTerminal(true)} />
       )}
 
-      {!excel && !terminal && (
+      {!excel && !terminal && mode !== 'diary' && (
         <div className="cmdbar">
           <span>
             {mode === 'stock'
@@ -481,17 +520,6 @@ export function App() {
         />
       )}
       {manualOpen && <ManualModal onClose={() => setManualOpen(false)} />}
-      {briefModalOpen && (
-        <BriefModal
-          history={briefHistory}
-          current={brief.text}
-          loading={brief.loading}
-          err={brief.err}
-          usable={briefUsable}
-          onGenerate={runBrief}
-          onClose={() => setBriefModalOpen(false)}
-        />
-      )}
     </div>
   );
 }

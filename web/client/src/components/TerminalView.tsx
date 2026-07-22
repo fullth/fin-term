@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { Quote, NewsItem, HotItem, LabelEntry, Detail, SearchResult, CoinMeta, CoinQuote, UpbitTick, CoinNewsItem, CoinSearchResult } from '../lib/types';
+import type { BriefEntry } from '../lib/storage';
 import { fmtPriceCompact, fmtPct, fmtChange, fmtBig, fmtTime, changeClass, arrow } from '../lib/format';
 import { api } from '../lib/api';
 
 // 터미널 모드 — 앱을 개발자 콘솔(zsh)처럼. 단일 스트림.
-// 기본 상태: 여러 명령(watch/idx/hot/brief/search) 실행 후, 맨 아래 news --tail 5 -f 가 스트리밍 중.
+// 기본 상태: brief/watch/search 실행 결과와 맨 아래 news --tail 5 -f가 스트리밍 중.
 // 스트리밍 중엔 프롬프트를 숨기고, Ctrl+X 로 중단해야 입력이 열린다(진짜 tail -f).
 // 종목 클릭 = 관심목록 추가, 명령어 입력 + 명령 버튼 바(마우스)로도 실행.
 
@@ -17,7 +18,9 @@ interface TerminalViewProps {
   labels: { indices: LabelEntry[]; markets: LabelEntry[] };
   news: NewsItem[];
   hot: HotItem[];
-  onOpenBrief: () => void; // brief 명령/버튼 → 브리핑 모달 열기 (App 이 히스토리·생성 관리)
+  briefState: { text: string | null; loading: boolean; err: string | null };
+  briefHistory: BriefEntry[];
+  onRunBrief: (onChunk: (delta: string) => void) => Promise<{ text: string | null; err: string | null }>;
   coins: CoinMeta[];
   coinQuotes: CoinQuote[];
   coinLive: Record<string, UpbitTick>;
@@ -31,7 +34,9 @@ interface TerminalViewProps {
 // 스트림 블록 — 명령 에코 / 명령별 출력. 데이터는 렌더 시점에 최신 props 로 그린다.
 type Block =
   | { kind: 'cmd'; raw: string }
-  | { kind: 'out'; render: 'watch' | 'idx' | 'hot' | 'help' | 'coin' | 'coinnews' | 'brief' }
+  | { kind: 'out'; render: 'watch' | 'idx' | 'hot' | 'help' | 'coin' | 'coinnews' }
+  | { kind: 'brief'; id: number; text: string; loading: boolean; err?: string | null; restored?: boolean; syncApp?: boolean }
+  | { kind: 'briefHistory'; entries: BriefEntry[] }
   | { kind: 'news' } // news --tail N -f (스트리밍 여부는 streaming 상태로)
   | { kind: 'search'; q: string; results: SearchResult[]; loading?: boolean; err?: string }
   | { kind: 'coinsearch'; q: string; results: CoinSearchResult[]; loading?: boolean; err?: string }
@@ -45,6 +50,7 @@ const HELP_LINES = [
   ['watch', '관심종목 실시간', 'rm <심볼>', '관심목록 제거'],
   ['info <심볼>', '종목 상세', 'idx', '지수·환율'],
   ['hot', '급상승 종목', 'brief', 'AI 브리핑'],
+  ['brief history', '지난 브리핑 조회', '', ''],
   ['news', '뉴스 스트림(^X 중단)', 'clear', '화면 정리'],
   ['coin', '코인 관심목록 시세', 'coin search <이름>', '코인 검색·추가'],
   ['coin news', '코인 뉴스', '', ''],
@@ -56,6 +62,7 @@ const CMD_BUTTONS: { label: string; cmd: string }[] = [
   { label: 'idx', cmd: 'idx' },
   { label: 'hot', cmd: 'hot' },
   { label: 'brief', cmd: 'brief' },
+  { label: 'brief log', cmd: 'brief history' },
   { label: 'news', cmd: `news --tail ${NEWS_TAIL} -f` },
   { label: 'search', cmd: 'search ' },
   { label: 'coin', cmd: 'coin' },
@@ -65,13 +72,15 @@ const CMD_BUTTONS: { label: string; cmd: string }[] = [
 ];
 
 export function TerminalView(props: TerminalViewProps) {
-  const { watchlist, names, quotes, indices, markets, labels, news, hot, onOpenBrief, coins, coinQuotes, coinLive, coinNews, onAddSymbol, onRemoveSymbol, onAddCoin, onRemoveCoin } = props;
+  const { watchlist, names, quotes, indices, markets, labels, news, hot, briefState, briefHistory, onRunBrief, coins, coinQuotes, coinLive, coinNews, onAddSymbol, onRemoveSymbol, onAddCoin, onRemoveCoin } = props;
 
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(true); // 기본: 뉴스 스트리밍 중 → 프롬프트 숨김
   const historyRef = useRef<string[]>([]);
   const hidxRef = useRef(-1);
+  const briefSeqRef = useRef(0);
+  const briefRunningRef = useRef(false);
   const seededRef = useRef(false);
   const streamRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -82,13 +91,17 @@ export function TerminalView(props: TerminalViewProps) {
     seededRef.current = true;
     setBlocks([
       { kind: 'cmd', raw: 'brief' },
-      { kind: 'out', render: 'brief' },
+      {
+        kind: 'brief',
+        id: 0,
+        text: briefState.text ?? '',
+        loading: briefState.loading,
+        err: briefState.err,
+        restored: Boolean(briefState.text) && !briefState.loading,
+        syncApp: briefState.loading,
+      },
       { kind: 'cmd', raw: `watch ${watchlist.join(' ')} --sse` },
       { kind: 'out', render: 'watch' },
-      { kind: 'cmd', raw: 'idx' },
-      { kind: 'out', render: 'idx' },
-      { kind: 'cmd', raw: 'hot' },
-      { kind: 'out', render: 'hot' },
       { kind: 'cmd', raw: 'search 하이닉스' },
       { kind: 'search', q: '하이닉스', results: [], loading: true },
       { kind: 'cmd', raw: `news --tail ${NEWS_TAIL} -f` },
@@ -105,6 +118,25 @@ export function TerminalView(props: TerminalViewProps) {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 다른 화면에서 시작한 브리핑 생성 중 터미널로 들어온 경우, 해당 seed 블록만 App 상태를 따라간다.
+  useEffect(() => {
+    setBlocks((prev) => {
+      if (!prev.some((b) => b.kind === 'brief' && b.syncApp)) return prev;
+      return prev.map((b) =>
+        b.kind === 'brief' && b.syncApp
+          ? {
+              ...b,
+              text: briefState.text ?? b.text,
+              loading: briefState.loading,
+              err: briefState.err,
+              restored: false,
+              syncApp: briefState.loading,
+            }
+          : b,
+      );
+    });
+  }, [briefState.text, briefState.loading, briefState.err]);
 
   // 새 블록마다 하단으로 스크롤
   useEffect(() => {
@@ -159,12 +191,64 @@ export function TerminalView(props: TerminalViewProps) {
     }
   }, []);
 
+  // brief는 네트워크 호출을 상태 updater 밖에서 정확히 한 번 시작한다.
+  // 각 실행을 고유 id 블록에 묶어 과거 터미널 출력이 새 결과로 덮이지 않게 한다.
+  const runBrief = useCallback(
+    (raw: string) => {
+      if (briefRunningRef.current || briefState.loading) {
+        setBlocks((prev) => [
+          ...prev,
+          { kind: 'cmd', raw },
+          { kind: 'text', html: '→ 이미 AI 시장 브리핑을 생성하고 있습니다', cls: 'dim' },
+        ]);
+        return;
+      }
+
+      const id = ++briefSeqRef.current;
+      briefRunningRef.current = true;
+      setBlocks((prev) => [...prev, { kind: 'cmd', raw }, { kind: 'brief', id, text: '', loading: true }]);
+
+      void onRunBrief((delta) => {
+        setBlocks((prev) =>
+          prev.map((b) => (b.kind === 'brief' && b.id === id ? { ...b, text: b.text + delta } : b)),
+        );
+      })
+        .then(({ text, err }) => {
+          setBlocks((prev) =>
+            prev.map((b) =>
+              b.kind === 'brief' && b.id === id
+                ? { ...b, text: text ?? b.text, loading: false, err }
+                : b,
+            ),
+          );
+        })
+        .catch(() => {
+          setBlocks((prev) =>
+            prev.map((b) => (b.kind === 'brief' && b.id === id ? { ...b, loading: false, err: '생성 실패' } : b)),
+          );
+        })
+        .finally(() => {
+          briefRunningRef.current = false;
+        });
+    },
+    [briefState.loading, onRunBrief],
+  );
+
   // 명령 실행
   const run = useCallback(
     (raw: string) => {
       const parts = raw.trim().split(/\s+/);
       const cmd = (parts[0] || '').toLowerCase();
       const args = parts.slice(1);
+      if (cmd === 'brief') {
+        const sub = (args[0] || '').toLowerCase();
+        if (sub === 'history' || sub === 'log' || sub === '--history') {
+          setBlocks((prev) => [...prev, { kind: 'cmd', raw }, { kind: 'briefHistory', entries: [...briefHistory] }]);
+          return;
+        }
+        runBrief(raw);
+        return;
+      }
       setBlocks((prev) => {
         const next = [...prev, { kind: 'cmd', raw } as Block];
         switch (cmd) {
@@ -176,10 +260,6 @@ export function TerminalView(props: TerminalViewProps) {
             return [...next, { kind: 'out', render: 'idx' }];
           case 'hot':
             return [...next, { kind: 'out', render: 'hot' }];
-          case 'brief':
-            // 스트림에 텍스트를 박지 않고 모달로 표시(지난 브리핑 탭 조회 + 새 생성).
-            onOpenBrief();
-            return [...next, { kind: 'text', html: '→ AI 시장 브리핑 모달을 열었습니다', cls: 'dim' }];
           case 'news':
             // 뉴스 스트리밍 재개 → 프롬프트 숨김
             setStreaming(true);
@@ -257,7 +337,7 @@ export function TerminalView(props: TerminalViewProps) {
         }
       });
     },
-    [watchlist, coins, onOpenBrief, onAddSymbol, onRemoveSymbol, onRemoveCoin, runInfo, runSearch, runCoinSearch],
+    [watchlist, coins, briefHistory, onAddSymbol, onRemoveSymbol, onRemoveCoin, runInfo, runSearch, runCoinSearch, runBrief],
   );
 
   // 명령 버튼 클릭 — search 처럼 인자가 필요한 건 입력창에 채우고 커서를 끝으로, 나머지는 즉시 실행
@@ -339,7 +419,6 @@ export function TerminalView(props: TerminalViewProps) {
             coinNews={coinNews}
             onPick={onAddSymbol}
             onPickCoin={onAddCoin}
-            onOpenBrief={onOpenBrief}
           />
         ))}
 
@@ -382,6 +461,17 @@ function esc(s: string): string {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 }
 
+function fmtBriefAt(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+function briefSummary(text: string): string {
+  const line = text.split('\n').map((part) => part.trim()).find(Boolean) ?? '내용 없음';
+  return line.length > 56 ? `${line.slice(0, 56)}…` : line;
+}
+
 function BlockView(props: {
   b: Block;
   streaming: boolean;
@@ -399,9 +489,8 @@ function BlockView(props: {
   coinNews: CoinNewsItem[];
   onPick: (sym: string, name: string) => void;
   onPickCoin: (c: CoinMeta) => void;
-  onOpenBrief: () => void;
 }) {
-  const { b, streaming, watchlist, names, quotes, indices, markets, labels, news, hot, coins, coinQuotes, coinLive, coinNews, onPick, onPickCoin, onOpenBrief } = props;
+  const { b, streaming, watchlist, names, quotes, indices, markets, labels, news, hot, coins, coinQuotes, coinLive, coinNews, onPick, onPickCoin } = props;
 
   if (b.kind === 'cmd')
     return (
@@ -412,17 +501,44 @@ function BlockView(props: {
 
   if (b.kind === 'text') return <div className={`tv-ln ${b.cls || ''}`} dangerouslySetInnerHTML={{ __html: b.html }} />;
 
-  // AI 브리핑 — 클릭하면 모달. 실제 생성/스트리밍은 모달의 생성 버튼에서.
-  if (b.kind === 'out' && b.render === 'brief') {
+  // AI 브리핑 — SSE 델타를 현재 터미널 블록 안에 그대로 누적한다.
+  if (b.kind === 'brief') {
     return (
-      <div
-        className="tv-ln tv-briefline"
-        onClick={(e) => {
-          e.stopPropagation();
-          onOpenBrief();
-        }}
-      >
-        → <span className="tv-brieflink">클릭해서 AI 브리핑을 확인하세요</span>
+      <div className="tv-brief-block">
+        <div className="tv-ln tv-brief-head">
+          → AI 시장 브리핑{b.restored ? <span className="dim"> · 마지막 저장본</span> : ''}
+        </div>
+        {b.text ? (
+          <div className="tv-brief">
+            {b.text}
+            {b.loading && <span className="brief-stream-cursor" aria-label="생성 중" />}
+          </div>
+        ) : b.loading ? (
+          <div className="tv-ln dim" role="status" aria-live="polite">
+            <span className="tv-blink">▮</span> 시장 뉴스와 지표를 정리하는 중…
+          </div>
+        ) : b.err ? null : (
+          <div className="tv-ln dim">저장된 브리핑 없음 · brief 명령으로 생성</div>
+        )}
+        {b.err && <div className="tv-ln err" role="alert">✗ {b.err}</div>}
+        {!b.loading && b.text && !b.err && !b.restored && <div className="tv-ln tv-brief-done" role="status">✓ 브리핑 저장 완료</div>}
+      </div>
+    );
+  }
+
+  if (b.kind === 'briefHistory') {
+    if (!b.entries.length) return <div className="tv-ln dim">저장된 브리핑 이력이 없습니다</div>;
+    return (
+      <div className="tv-brief-history">
+        <div className="tv-ln dim">→ 저장된 브리핑 {b.entries.length}건 · 항목을 눌러 펼치기</div>
+        {b.entries.map((entry, index) => (
+          <details key={entry.id}>
+            <summary>
+              <span className="cyan">[{index + 1}]</span> {fmtBriefAt(entry.at)} · {briefSummary(entry.text)}
+            </summary>
+            <div className="tv-brief">{entry.text}</div>
+          </details>
+        ))}
       </div>
     );
   }
