@@ -36,8 +36,8 @@ export function ManualModal({ onClose }: Props) {
           <h4>모드</h4>
           <ul>
             <li><b>주식 / 코인</b> — 상단 버튼 또는 <code>m</code> 키로 전환</li>
-            <li><b>다크 / 라이트</b> — 테마 전환</li>
-            <li><b>단색</b> — 등락 색(빨강/파랑)을 숨겨 흘끗 봐도 티 안 나게</li>
+            <li><b>Diary</b> — 생성한 브리핑을 다시 읽고 내 판단·실행 계획을 함께 기록</li>
+            <li><b>단색</b> — 현재 화면 전체를 흑백으로 바꾸고 등락 색도 숨김</li>
             <li><b>엑셀</b> — 화면을 스프레드시트로 위장. <code>`</code> 키 또는 버튼, 엑셀 화면의 <b>닫기</b>로 복귀</li>
           </ul>
         </div>
@@ -64,6 +64,7 @@ export function ManualModal({ onClose }: Props) {
             <li>관심종목의 <b>뉴스</b> 태그로 해당 종목 뉴스만 필터링</li>
             <li>변동 알림은 상단 <b>변동 알림</b>에서 종목별 기준가 설정</li>
             <li>AI 브리핑·용어 풀이는 상단 <b>AI 키</b> 입력 시 활성화</li>
+            <li>터미널의 <code>brief</code> 결과는 Diary에 누적되며, 투자 일지는 현재 브라우저에 자동 저장</li>
           </ul>
         </div>
 
