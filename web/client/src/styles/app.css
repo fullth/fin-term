@@ -600,10 +600,15 @@ body {
 .diary-hero h1 { margin: 0; color: var(--txt); font-size: clamp(17px, 2vw, 22px); letter-spacing: -.02em; }
 .diary-hero h1 span { color: var(--magenta); }
 .diary-hero p { margin: 3px 0 0; color: var(--dim); font-size: 11.5px; }
+.diary-hero-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .diary-local-badge {
   flex: none; border: 1px solid var(--yellow); border-radius: 999px; padding: 4px 9px;
   color: var(--yellow); font-size: 10px; letter-spacing: .08em;
 }
+.diary-generate-btn { border-color: var(--magenta); background: rgba(192, 38, 211, .09); color: var(--magenta); }
+.diary-generate-btn:hover:not(:disabled) { background: rgba(192, 38, 211, .17); }
+.diary-generate-btn:disabled { cursor: wait; opacity: .62; }
+.diary-generate-error { flex-basis: 100%; color: var(--red); font-size: 10.5px; text-align: right; }
 .diary-workspace {
   flex: 1; min-height: 0; display: grid;
   grid-template-columns: minmax(210px, .66fr) minmax(340px, 1.45fr) minmax(320px, 1.1fr);
@@ -713,6 +718,8 @@ body {
 .diary-empty-box h1 { margin: 7px 0; color: var(--txt); font-size: 20px; }
 .diary-empty-box p { margin: 0 auto 18px; color: var(--dim); line-height: 1.7; }
 .diary-empty-box code { color: var(--magenta); }
+.diary-empty-actions { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.diary-empty-box > .diary-generate-error { display: block; margin-top: 10px; text-align: center; }
 
 @media (max-width: 1040px) {
   .diary-workspace { grid-template-columns: 220px minmax(0, 1fr); grid-template-rows: minmax(420px, 1fr) auto; overflow: auto; }
@@ -721,6 +728,8 @@ body {
 @media (max-width: 700px) {
   .diary-main { overflow: auto; }
   .diary-hero { align-items: flex-start; flex-direction: column; gap: 9px; }
+  .diary-hero-actions { align-items: flex-start; justify-content: flex-start; }
+  .diary-generate-error { text-align: left; }
   .diary-workspace { flex: none; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; overflow: visible; padding: 8px; }
   .diary-panel { min-height: 0; }
   .diary-journal { grid-column: auto; min-height: 0; }

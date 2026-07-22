@@ -16,6 +16,7 @@ import { InstallButton } from './components/InstallButton';
 import { usePriceAlerts, fireAlert } from './lib/alerts';
 import { fmtPrice } from './lib/format';
 import { AiKeyManager } from './components/AiKeyManager';
+import { activeAiKey } from './lib/ai-key';
 import { SearchBar } from './components/SearchBar';
 import { CryptoView } from './components/CryptoView';
 import { useCryptoLive } from './lib/use-crypto-live';
@@ -26,6 +27,7 @@ import { ManualModal } from './components/ManualModal';
 import './styles/app.css';
 
 type Mode = 'stock' | 'crypto' | 'diary';
+type BriefRunResult = { text: string | null; err: string | null; entryId?: string };
 
 const NEWS_INTERVAL = 60_000;
 const HOT_INTERVAL = 120_000;
@@ -256,8 +258,8 @@ export function App() {
   const removeSymbol = (sym: string) => setWatchlist((w) => w.filter((s) => s !== sym));
 
   // 브리핑 생성 — 명시적 호출에만(생성/다시 버튼). 결과는 모드 전환과 무관하게 유지.
-  const briefUsable = hasServerKey;
-  const runBrief = async (onChunk?: (delta: string) => void): Promise<{ text: string | null; err: string | null }> => {
+  const briefUsable = hasServerKey || Boolean(activeAiKey());
+  const runBrief = async (onChunk?: (delta: string) => void): Promise<BriefRunResult> => {
     if (briefRunningRef.current) return { text: null, err: '이미 브리핑을 생성하고 있습니다' };
     if (!briefUsable) {
       onNeedKey();
@@ -287,12 +289,17 @@ export function App() {
         return { text: null, err };
       }
       const generatedAt = new Date().toISOString();
+      const entryId = `brief:${generatedAt}`;
       const latestSaved = saveStoredBrief(r.text, generatedAt);
       const historyResult = appendBriefHistory(r.text, generatedAt);
       setBriefHistory(historyResult.history); // Diary에서 사용할 브리핑 히스토리 누적
       const storageErr = latestSaved && historyResult.saved ? null : '브리핑은 생성됐지만 브라우저 저장에 실패했습니다';
       setBrief({ text: r.text, loading: false, err: storageErr });
-      return { text: r.text, err: storageErr };
+      return {
+        text: r.text,
+        err: storageErr,
+        entryId: historyResult.history.some((entry) => entry.id === entryId) ? entryId : undefined,
+      };
     } catch {
       const err = '생성 실패';
       setBrief({ text: null, loading: false, err });
@@ -482,7 +489,12 @@ export function App() {
           briefSlot={<BriefPanel text={brief.text} loading={brief.loading} err={brief.err} usable={briefUsable} onRun={() => void runBrief()} />}
         />
       ) : (
-        <DiaryView history={briefHistory} onOpenTerminal={() => setTerminal(true)} />
+        <DiaryView
+          history={briefHistory}
+          briefLoading={brief.loading}
+          onGenerateBrief={runBrief}
+          onOpenTerminal={() => setTerminal(true)}
+        />
       )}
 
       {!excel && !terminal && mode !== 'diary' && (
