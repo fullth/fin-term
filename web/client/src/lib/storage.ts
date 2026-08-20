@@ -3,6 +3,8 @@ import type { NewsScope, CoinMeta } from './types';
 
 const KEY = 'fin-term:state';
 
+export type MarketMode = 'combined' | 'stock' | 'crypto';
+
 const DEFAULT_COINS: CoinMeta[] = [
   { id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin', upbitMarket: 'KRW-BTC' },
   { id: 'ethereum', symbol: 'ETH', name: 'Ethereum', upbitMarket: 'KRW-ETH' },
@@ -15,6 +17,7 @@ interface Persisted {
   names: Record<string, string>;
   scope: NewsScope;
   coins: CoinMeta[];
+  marketMode: MarketMode;
   terminal: boolean; // 터미널 모드 on/off — 새로고침에도 유지
 }
 
@@ -23,8 +26,13 @@ const DEFAULT: Persisted = {
   names: { AAPL: 'Apple', TSLA: 'Tesla', NVDA: 'NVIDIA', MSFT: 'Microsoft' },
   scope: 'domestic',
   coins: DEFAULT_COINS,
-  terminal: true,
+  marketMode: 'combined',
+  terminal: false,
 };
+
+function isMarketMode(value: unknown): value is MarketMode {
+  return value === 'combined' || value === 'stock' || value === 'crypto';
+}
 
 export function loadPersisted(): Persisted {
   try {
@@ -37,6 +45,7 @@ export function loadPersisted(): Persisted {
       names: p.names ?? DEFAULT.names,
       scope: p.scope ?? DEFAULT.scope,
       coins: p.coins?.length ? p.coins : DEFAULT.coins,
+      marketMode: isMarketMode(p.marketMode) ? p.marketMode : DEFAULT.marketMode,
       terminal: p.terminal === true,
     };
   } catch {

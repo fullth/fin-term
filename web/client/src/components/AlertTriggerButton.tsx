@@ -3,16 +3,18 @@
 interface Props {
   enabled: boolean;
   onClick: () => void;
+  label?: string;
+  title?: string;
 }
 
-export function AlertTriggerButton({ enabled, onClick }: Props) {
+export function AlertTriggerButton({ enabled, onClick, label = 'alert', title = '변동 알림 설정' }: Props) {
   return (
     <button
       className={'mode-btn alert-trigger' + (enabled ? ' on' : '')}
       onClick={onClick}
-      title="변동 알림 설정"
+      title={title}
     >
-      alert{enabled ? ' ●' : ''}
+      {label}{enabled ? ' ●' : ''}
     </button>
   );
 }
