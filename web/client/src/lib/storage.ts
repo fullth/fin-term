@@ -17,8 +17,12 @@ interface Persisted {
   names: Record<string, string>;
   scope: NewsScope;
   coins: CoinMeta[];
+  selectedSymbol: string | null;
+  selectedCoin: string | null;
+  combinedSplit: number;
   marketMode: MarketMode;
   terminal: boolean; // 터미널 모드 on/off — 새로고침에도 유지
+  officeMode: boolean; // 업무 화면 — 차분한 색과 위젯 숨김 상태 유지
 }
 
 const DEFAULT: Persisted = {
@@ -26,8 +30,12 @@ const DEFAULT: Persisted = {
   names: { AAPL: 'Apple', TSLA: 'Tesla', NVDA: 'NVIDIA', MSFT: 'Microsoft' },
   scope: 'domestic',
   coins: DEFAULT_COINS,
+  selectedSymbol: 'AAPL',
+  selectedCoin: 'BTC',
+  combinedSplit: 50,
   marketMode: 'combined',
   terminal: false,
+  officeMode: false,
 };
 
 function isMarketMode(value: unknown): value is MarketMode {
@@ -45,8 +53,14 @@ export function loadPersisted(): Persisted {
       names: p.names ?? DEFAULT.names,
       scope: p.scope ?? DEFAULT.scope,
       coins: p.coins?.length ? p.coins : DEFAULT.coins,
+      selectedSymbol: typeof p.selectedSymbol === 'string' ? p.selectedSymbol : DEFAULT.selectedSymbol,
+      selectedCoin: typeof p.selectedCoin === 'string' ? p.selectedCoin : DEFAULT.selectedCoin,
+      combinedSplit: typeof p.combinedSplit === 'number' && p.combinedSplit >= 35 && p.combinedSplit <= 65
+        ? p.combinedSplit
+        : DEFAULT.combinedSplit,
       marketMode: isMarketMode(p.marketMode) ? p.marketMode : DEFAULT.marketMode,
       terminal: p.terminal === true,
+      officeMode: p.officeMode === true,
     };
   } catch {
     return DEFAULT;

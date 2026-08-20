@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:ui": "node scripts/ui-smoke.mjs"
   },
   "dependencies": {
     "@channel.io/channel-web-sdk-loader": "^2.0.2",
