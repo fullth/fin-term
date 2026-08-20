@@ -4,12 +4,12 @@ import type { BriefEntry } from '../lib/storage';
 import { fmtPriceCompact, fmtPct, fmtChange, fmtBig, fmtTime, changeClass, arrow } from '../lib/format';
 import { api } from '../lib/api';
 
-// 터미널 모드 — 앱을 개발자 콘솔(zsh)처럼. 단일 스트림.
-// 기본 상태: brief/watch/search 실행 결과와 맨 아래 news --tail 5 -f가 스트리밍 중.
-// 스트리밍 중엔 프롬프트를 숨기고, Ctrl+X 로 중단해야 입력이 열린다(진짜 tail -f).
-// 종목 클릭 = 관심목록 추가, 명령어 입력 + 명령 버튼 바(마우스)로도 실행.
+// 터미널 모드 — 선택한 시장에 맞는 시세와 뉴스를 개발자 콘솔처럼 한 스트림에 표시한다.
+// 스트리밍 중에는 프롬프트를 숨기고, Ctrl+X로 중단하면 명령 입력이 열린다.
+// 종목과 코인 검색, 관심목록 관리, 브리핑을 키보드 또는 하단 명령 버튼으로 실행한다.
 
 interface TerminalViewProps {
+  marketMode: 'combined' | 'stock' | 'crypto';
   watchlist: string[];
   names: Record<string, string>;
   quotes: Record<string, Quote>;
@@ -45,7 +45,7 @@ type Block =
 
 const NEWS_TAIL = 5;
 
-const HELP_LINES = [
+const STOCK_HELP_LINES = [
   ['search <종목>', '종목 검색·추가', 'add <종목>', '관심목록 추가'],
   ['watch', '관심종목 실시간', 'rm <심볼>', '관심목록 제거'],
   ['info <심볼>', '종목 상세', 'idx', '지수·환율'],
@@ -56,8 +56,15 @@ const HELP_LINES = [
   ['coin news', '코인 뉴스', '', ''],
 ];
 
+const CRYPTO_HELP_LINES = [
+  ['coin', '코인 실시간 시세', 'coin search <이름>', '코인 검색/추가'],
+  ['coin rm <심볼>', '코인 목록 제거', 'coin news', '코인 뉴스'],
+  ['brief', 'AI 시장 브리핑', 'brief history', '지난 브리핑 조회'],
+  ['help', '명령 목록', 'clear', '화면 정리'],
+];
+
 // 명령 버튼 바 — 마우스로도 실행. label 은 표시, cmd 는 실행할 명령.
-const CMD_BUTTONS: { label: string; cmd: string }[] = [
+const STOCK_CMD_BUTTONS: { label: string; cmd: string }[] = [
   { label: 'watch', cmd: 'watch' },
   { label: 'idx', cmd: 'idx' },
   { label: 'hot', cmd: 'hot' },
@@ -71,8 +78,18 @@ const CMD_BUTTONS: { label: string; cmd: string }[] = [
   { label: 'clear', cmd: 'clear' },
 ];
 
+const CRYPTO_CMD_BUTTONS: { label: string; cmd: string }[] = [
+  { label: 'coin', cmd: 'coin' },
+  { label: 'coin news', cmd: 'coin news' },
+  { label: 'coin search', cmd: 'coin search ' },
+  { label: 'brief', cmd: 'brief' },
+  { label: 'brief log', cmd: 'brief history' },
+  { label: 'help', cmd: 'help' },
+  { label: 'clear', cmd: 'clear' },
+];
+
 export function TerminalView(props: TerminalViewProps) {
-  const { watchlist, names, quotes, indices, markets, labels, news, hot, briefState, briefHistory, onRunBrief, coins, coinQuotes, coinLive, coinNews, onAddSymbol, onRemoveSymbol, onAddCoin, onRemoveCoin } = props;
+  const { marketMode, watchlist, names, quotes, indices, markets, labels, news, hot, briefState, briefHistory, onRunBrief, coins, coinQuotes, coinLive, coinNews, onAddSymbol, onRemoveSymbol, onAddCoin, onRemoveCoin } = props;
 
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [input, setInput] = useState('');
@@ -85,11 +102,11 @@ export function TerminalView(props: TerminalViewProps) {
   const streamRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // 초기 시딩 — 여러 명령 실행된 상태 + search 하이닉스 결과 + 맨 아래 뉴스 스트리밍
+  // 진입한 시장 모드에 맞는 실시간 시세와 뉴스로 터미널을 시작한다.
   useEffect(() => {
     if (seededRef.current) return;
     seededRef.current = true;
-    setBlocks([
+    const briefBlocks: Block[] = [
       { kind: 'cmd', raw: 'brief' },
       {
         kind: 'brief',
@@ -100,6 +117,33 @@ export function TerminalView(props: TerminalViewProps) {
         restored: Boolean(briefState.text) && !briefState.loading,
         syncApp: briefState.loading,
       },
+    ];
+    if (marketMode === 'crypto') {
+      setBlocks([
+        ...briefBlocks,
+        { kind: 'cmd', raw: 'coin --live' },
+        { kind: 'out', render: 'coin' },
+        { kind: 'cmd', raw: 'coin news --tail 10 -f' },
+        { kind: 'out', render: 'coinnews' },
+      ]);
+      return;
+    }
+    if (marketMode === 'combined') {
+      setBlocks([
+        ...briefBlocks,
+        { kind: 'cmd', raw: `watch ${watchlist.join(' ')} --sse` },
+        { kind: 'out', render: 'watch' },
+        { kind: 'cmd', raw: 'coin --live' },
+        { kind: 'out', render: 'coin' },
+        { kind: 'cmd', raw: `news --tail ${NEWS_TAIL} -f` },
+        { kind: 'news' },
+        { kind: 'cmd', raw: 'coin news --tail 10 -f' },
+        { kind: 'out', render: 'coinnews' },
+      ]);
+      return;
+    }
+    setBlocks([
+      ...briefBlocks,
       { kind: 'cmd', raw: `watch ${watchlist.join(' ')} --sse` },
       { kind: 'out', render: 'watch' },
       { kind: 'cmd', raw: 'search 하이닉스' },
@@ -116,6 +160,7 @@ export function TerminalView(props: TerminalViewProps) {
         setBlocks((prev) => prev.map((b) => (b.kind === 'search' && b.loading ? { kind: 'search', q: '하이닉스', results: [], err: '검색 실패' } : b)));
       }
     })();
+    // 진입 시점의 모드와 데이터로 한 번만 시딩한다. 재진입하면 컴포넌트가 다시 마운트된다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -387,7 +432,9 @@ export function TerminalView(props: TerminalViewProps) {
       }
     } else if (e.key === 'Tab') {
       e.preventDefault();
-      const cmds = ['search', 'watch', 'add', 'rm', 'info', 'idx', 'news', 'hot', 'brief', 'clear', 'help'];
+      const cmds = marketMode === 'crypto'
+        ? ['coin', 'brief', 'clear', 'help']
+        : ['search', 'watch', 'add', 'rm', 'info', 'idx', 'news', 'hot', 'coin', 'brief', 'clear', 'help'];
       const m = cmds.filter((c) => c.startsWith(input.trim()));
       if (m.length === 1) setInput(m[0] + ' ');
     }
@@ -417,6 +464,7 @@ export function TerminalView(props: TerminalViewProps) {
             coinQuotes={coinQuotes}
             coinLive={coinLive}
             coinNews={coinNews}
+            marketMode={marketMode}
             onPick={onAddSymbol}
             onPickCoin={onAddCoin}
           />
@@ -436,7 +484,9 @@ export function TerminalView(props: TerminalViewProps) {
               autoFocus
               autoComplete="off"
               spellCheck={false}
-              placeholder="종목명 입력 후 Enter (예: 삼성 · AAPL) · help 로 명령 목록"
+              placeholder={marketMode === 'crypto'
+                ? '코인 명령 입력 (예: coin search 비트코인) | help 로 명령 목록'
+                : '종목명 입력 후 Enter (예: 삼성, AAPL) | help 로 명령 목록'}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onKeyDown}
             />
@@ -447,7 +497,7 @@ export function TerminalView(props: TerminalViewProps) {
       {/* 명령 버튼 바 — 마우스로도 모든 명령 실행 */}
       <div className="tv-cmdbar" onClick={(e) => e.stopPropagation()}>
         <span className="tv-cmdbar-label">명령:</span>
-        {CMD_BUTTONS.map((btn) => (
+        {(marketMode === 'crypto' ? CRYPTO_CMD_BUTTONS : STOCK_CMD_BUTTONS).map((btn) => (
           <button key={btn.label} className="tv-cmdbtn" onClick={() => onCmdButton(btn.cmd)}>
             {btn.label}
           </button>
@@ -487,10 +537,11 @@ function BlockView(props: {
   coinQuotes: CoinQuote[];
   coinLive: Record<string, UpbitTick>;
   coinNews: CoinNewsItem[];
+  marketMode: 'combined' | 'stock' | 'crypto';
   onPick: (sym: string, name: string) => void;
   onPickCoin: (c: CoinMeta) => void;
 }) {
-  const { b, streaming, watchlist, names, quotes, indices, markets, labels, news, hot, coins, coinQuotes, coinLive, coinNews, onPick, onPickCoin } = props;
+  const { b, streaming, watchlist, names, quotes, indices, markets, labels, news, hot, coins, coinQuotes, coinLive, coinNews, marketMode, onPick, onPickCoin } = props;
 
   if (b.kind === 'cmd')
     return (
@@ -621,7 +672,7 @@ function BlockView(props: {
   if (b.kind === 'out' && b.render === 'help') {
     return (
       <>
-        {HELP_LINES.map((row, i) => (
+        {(marketMode === 'crypto' ? CRYPTO_HELP_LINES : STOCK_HELP_LINES).map((row, i) => (
           <div className="tv-ln dim tv-help" key={i}>
             <span className="hcmd">{row[0]}</span>
             <span>{row[1]}</span>
@@ -763,7 +814,9 @@ function BlockView(props: {
     if (!coinNews.length) return <div className="tv-ln dim">코인 뉴스 불러오는 중…</div>;
     return (
       <>
-        <div className="tv-ln dim">→ 코인 뉴스</div>
+        <div className="tv-ln dim">
+          → 코인 뉴스{streaming ? <span className="tv-live"> | ● live</span> : <span className="dim"> | 중단됨</span>}
+        </div>
         {coinNews.slice(0, 10).map((n) => (
           <div className="tv-nrow" key={n.id}>
             <span className="tt">{fmtTime(n.published_at)}</span> {n.title}

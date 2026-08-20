@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Quote, NewsItem, NewsScope, Detail, HotItem, LabelEntry, CoinMeta } from './lib/types';
 import { api } from './lib/api';
-import { loadPersisted, savePersisted, loadStoredBrief, saveStoredBrief, loadBriefHistory, appendBriefHistory, type BriefEntry } from './lib/storage';
+import { loadPersisted, savePersisted, loadStoredBrief, saveStoredBrief, loadBriefHistory, appendBriefHistory, type BriefEntry, type MarketMode } from './lib/storage';
 import { bootChannelTalk } from './lib/channel-talk';
 import { bootDonate } from './lib/donate';
 import { Watchlist } from './components/Watchlist';
@@ -24,9 +24,10 @@ import { ExcelView } from './components/ExcelView';
 import { TerminalView } from './components/TerminalView';
 import { DiaryView } from './components/DiaryView';
 import { ManualModal } from './components/ManualModal';
+import { CombinedView } from './components/CombinedView';
 import './styles/app.css';
 
-type Mode = 'stock' | 'crypto' | 'diary';
+type Mode = MarketMode | 'diary';
 type BriefRunResult = { text: string | null; err: string | null; entryId?: string };
 
 const NEWS_INTERVAL = 60_000;
@@ -34,7 +35,8 @@ const HOT_INTERVAL = 120_000;
 
 export function App() {
   const persisted = useMemo(loadPersisted, []);
-  const [mode, setMode] = useState<Mode>('stock');
+  const [mode, setMode] = useState<Mode>(persisted.marketMode);
+  const lastMarketModeRef = useRef<MarketMode>(persisted.marketMode);
   const [watchlist, setWatchlist] = useState<string[]>(persisted.watchlist);
   const [names, setNames] = useState<Record<string, string>>(persisted.names);
   const namesRef = useRef(names); // 알림 표시명용 — SSE 클로저에서 최신 종목명 참조
@@ -75,10 +77,11 @@ export function App() {
   const [hotLoaded, setHotLoaded] = useState(false); // 최초 응답 도착 여부 — 로딩 vs 빈 결과(장 마감) 구분
   const [detail, setDetail] = useState<Detail | null>(null);
 
-  // 영속화 — 주식 watchlist + 코인 목록 + 터미널 모드
+  // 영속화 — 목록, 뉴스 범위, 마지막 시장 모드, 터미널 모드
   useEffect(() => {
-    savePersisted({ watchlist, names, scope, coins, terminal });
-  }, [watchlist, names, scope, coins, terminal]);
+    if (mode !== 'diary') lastMarketModeRef.current = mode;
+    savePersisted({ watchlist, names, scope, coins, marketMode: lastMarketModeRef.current, terminal });
+  }, [watchlist, names, scope, coins, mode, terminal]);
 
   // 채널톡 · 후원 위젯 — 앱 마운트 시 1회 boot
   useEffect(() => {
@@ -103,7 +106,7 @@ export function App() {
     if (window.location.search) window.history.replaceState(null, '', window.location.pathname);
   }, []);
 
-  // 키보드 단축키 — / 검색, j/k 종목 이동, Esc 필터 해제, m 모드 토글, ` 엑셀 위장
+  // 키보드 단축키 — / 검색, j/k 종목 이동, Esc 필터 해제, m 시장 모드 순환, ` 엑셀 위장
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
@@ -119,9 +122,12 @@ export function App() {
       } else if (e.key === 'Escape') {
         setNewsFilter(null);
       } else if (e.key === 'm') {
-        setMode((mo) => (mo === 'stock' ? 'crypto' : 'stock'));
+        setMode((current) => {
+          if (current === 'combined' || current === 'diary') return 'stock';
+          return current === 'stock' ? 'crypto' : 'combined';
+        });
         setTerminal(false);
-      } else if ((e.key === 'j' || e.key === 'k') && mode === 'stock' && watchlist.length) {
+      } else if ((e.key === 'j' || e.key === 'k') && (mode === 'stock' || mode === 'combined') && watchlist.length) {
         const idx = selected ? watchlist.indexOf(selected) : -1;
         const next = e.key === 'j' ? Math.min(idx + 1, watchlist.length - 1) : Math.max(idx - 1, 0);
         setSelected(watchlist[next] ?? watchlist[0]);
@@ -337,7 +343,17 @@ export function App() {
             xlsx
           </button>
           <span className="nav-sep">│</span>
-          {/* 종목 모드 */}
+          {/* 시장 모드 */}
+          <button
+            className={`mode-btn${!terminal && mode === 'combined' ? ' active' : ''}`}
+            onClick={() => {
+              setMode('combined');
+              setTerminal(false);
+            }}
+            aria-current={!terminal && mode === 'combined' ? 'page' : undefined}
+          >
+            혼합
+          </button>
           <button
             className={`mode-btn${!terminal && mode === 'stock' ? ' active' : ''}`}
             onClick={() => {
@@ -378,7 +394,7 @@ export function App() {
           >
             mono
           </button>
-          {mode === 'stock' && (
+          {(mode === 'stock' || mode === 'combined') && (
             <AlertButton
               settings={stockAlerts.settings}
               bases={stockAlerts.bases}
@@ -389,11 +405,17 @@ export function App() {
               onApply={stockAlerts.applyBatch}
               history={stockAlerts.history}
               onClearHistory={stockAlerts.clearHistory}
+              triggerLabel={mode === 'combined' ? '주식 alert' : undefined}
             />
           )}
-          {mode === 'crypto' && (
+          {(mode === 'crypto' || mode === 'combined') && (
             <div className="alert-btn-wrap" style={{ position: 'relative' }}>
-              <AlertTriggerButton enabled={cryptoAlerts.settings.enabled} onClick={() => setCryptoAlertOpen(true)} />
+              <AlertTriggerButton
+                enabled={cryptoAlerts.settings.enabled}
+                onClick={() => setCryptoAlertOpen(true)}
+                label={mode === 'combined' ? '코인 alert' : undefined}
+                title="코인 변동 알림 설정"
+              />
             </div>
           )}
           <AiKeyManager onChange={onAiKeyChange} />
@@ -418,6 +440,7 @@ export function App() {
         />
       ) : terminal ? (
         <TerminalView
+          marketMode={mode === 'diary' ? lastMarketModeRef.current : mode}
           watchlist={watchlist}
           names={names}
           quotes={quotes}
@@ -435,6 +458,32 @@ export function App() {
           coinNews={cryptoLive.news}
           onAddSymbol={addSymbol}
           onRemoveSymbol={removeSymbol}
+          onAddCoin={addCoin}
+          onRemoveCoin={removeCoin}
+        />
+      ) : mode === 'combined' ? (
+        <CombinedView
+          watchlist={watchlist}
+          names={names}
+          quotes={quotes}
+          selected={selected}
+          detail={detail}
+          indices={indices}
+          markets={markets}
+          labels={labels}
+          news={news}
+          scope={scope}
+          newsFilter={newsFilter}
+          coins={coins}
+          coinQuotes={cryptoLive.quotes}
+          coinLive={cryptoLive.live}
+          coinNews={cryptoLive.news}
+          onAddSymbol={addSymbol}
+          onRemoveSymbol={removeSymbol}
+          onSelectSymbol={setSelected}
+          onFilterNews={(symbol) => setNewsFilter((filter) => (filter === symbol ? null : symbol))}
+          onClearNewsFilter={() => setNewsFilter(null)}
+          onScopeChange={setScope}
           onAddCoin={addCoin}
           onRemoveCoin={removeCoin}
         />
@@ -500,20 +549,25 @@ export function App() {
       {!excel && !terminal && mode !== 'diary' && (
         <div className="cmdbar">
           <span>
-            {mode === 'stock'
-              ? '클릭 선택 · 우클릭 삭제 · / 검색 · j/k 이동 · m 모드전환 · Esc 필터해제'
-              : '클릭 코인 선택 · 업비트 실시간 · m 모드전환'}
+            {mode === 'combined'
+              ? '주식/코인 동시 모니터링 | m 시장전환 | 우클릭 목록삭제'
+              : mode === 'stock'
+                ? '클릭 선택 | 우클릭 삭제 | / 검색 | j/k 이동 | m 시장전환 | Esc 필터해제'
+                : '클릭 코인 선택 | 업비트 실시간 | m 시장전환'}
           </span>
           <span className="dim">데이터: Naver · Upbit · RSS · Yahoo(폴백) · 키 없이 동작</span>
         </div>
       )}
-      {mode === 'stock' && stockAlerts.toast && (
+      {(mode === 'stock' || mode === 'combined') && stockAlerts.toast && (
         <div className="alert-toast" onClick={() => stockAlerts.setToast(null)}>
           🔔 {stockAlerts.toast}
         </div>
       )}
-      {mode === 'crypto' && cryptoAlerts.toast && (
-        <div className="alert-toast" onClick={() => cryptoAlerts.setToast(null)}>
+      {(mode === 'crypto' || mode === 'combined') && cryptoAlerts.toast && (
+        <div
+          className={`alert-toast${mode === 'combined' && stockAlerts.toast ? ' alert-toast-secondary' : ''}`}
+          onClick={() => cryptoAlerts.setToast(null)}
+        >
           🔔 {cryptoAlerts.toast}
         </div>
       )}

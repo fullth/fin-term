@@ -14,14 +14,15 @@ interface Props {
   onApply: (patch: { threshold?: number; bases?: Record<string, number>; overrides?: Record<string, AlertOverride> }) => void;
   history: AlertEvent[];
   onClearHistory: () => void;
+  triggerLabel?: string;
 }
 
 // 상단바용 - 알림 버튼 + 클릭 시 설정 모달 (테마/AI키 칩 옆)
-export function AlertButton({ settings, bases, overrides, rows, fmt, onToggle, onApply, history, onClearHistory }: Props) {
+export function AlertButton({ settings, bases, overrides, rows, fmt, onToggle, onApply, history, onClearHistory, triggerLabel }: Props) {
   const [open, setOpen] = useState(false);
   return (
     <div className="alert-btn-wrap" style={{ position: 'relative' }}>
-      <AlertTriggerButton enabled={settings.enabled} onClick={() => setOpen(true)} />
+      <AlertTriggerButton enabled={settings.enabled} onClick={() => setOpen(true)} label={triggerLabel} title={triggerLabel ? `${triggerLabel} 설정` : undefined} />
       {open && (
         <AlertSettingsModal
           settings={settings}
