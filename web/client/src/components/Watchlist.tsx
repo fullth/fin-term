@@ -40,6 +40,16 @@ export function Watchlist({ watchlist, names, quotes, selected, newsFilter, onSe
               <span className="sym">{sym}</span>
               {q?.halted && <span className="halt-badge" title="거래정지/중단 (서킷브레이커·VI 등)">⛔ 정지</span>}
               <button
+                className="list-remove-btn"
+                aria-label={`${sym} 관심종목 삭제`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemove(sym);
+                }}
+              >
+                ×
+              </button>
+              <button
                 className={`newsbtn${newsFilter === sym ? ' on' : ''}`}
                 title="이 종목 뉴스만 보기"
                 onClick={(e) => {

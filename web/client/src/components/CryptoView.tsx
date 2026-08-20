@@ -3,6 +3,7 @@ import type { CoinQuote, UpbitTick, CoinMeta, CoinNewsItem } from '../lib/types'
 import { fmtPct, arrow, changeClass, fmtTime } from '../lib/format';
 import { Sparkline } from './Sparkline';
 import { CoinSearchBar } from './CoinSearchBar';
+import { CoinNewsStream } from './CoinNewsStream';
 
 function fmtKrw(n: number | null): string {
   if (n == null) return '—';
@@ -28,21 +29,16 @@ interface Props {
   quotes: CoinQuote[]; // 대시보드 시세 — App(useCryptoLive) 소유
   live: Record<string, UpbitTick>; // 업비트 실시간 체결 — App 소유
   news: CoinNewsItem[]; // 코인 뉴스 — App 소유
+  selected: string | null;
+  onSelect: (symbol: string) => void;
   briefSlot?: ReactNode; // 데일리 브리핑 — App 이 소유(주식/코인 공용), 코인 화면 상단에 표시
 }
 
-export function CryptoView({ coins: coinList, onAdd, onRemove, quotes, live, news, briefSlot }: Props) {
-  const [selected, setSelected] = useState<string | null>(coinList[0]?.symbol ?? null);
+export function CryptoView({ coins: coinList, onAdd, onRemove, quotes, live, news, selected, onSelect, briefSlot }: Props) {
   // 급변동 피드 — 직전 수신가 대비 SURGE_PCT 이상 튄 순간만 기록(최근 MAX_SURGES 개)
   const [surges, setSurges] = useState<Surge[]>([]);
   const lastPriceRef = useRef<Record<string, number>>({}); // market → 직전 수신 체결가
   const surgeSeqRef = useRef(0); // 피드 항목 고유 키(수신 순서)
-
-  // 선택 코인이 목록에서 빠지면 첫 항목으로
-  useEffect(() => {
-    if (selected && !coinList.some((c) => c.symbol === selected)) setSelected(coinList[0]?.symbol ?? null);
-    else if (!selected && coinList.length) setSelected(coinList[0].symbol);
-  }, [coinList, selected]);
 
   // 급변동 피드 — App(useCryptoLive)이 넘긴 live 체결 변화를 감시해, 직전가 대비 SURGE_PCT 이상 튄 순간만 기록.
   useEffect(() => {
@@ -93,7 +89,7 @@ export function CryptoView({ coins: coinList, onAdd, onRemove, quotes, live, new
               <div
                 key={meta.id}
                 className={`listrow${isSel ? ' sel' : ''}`}
-                onClick={() => setSelected(meta.symbol)}
+                onClick={() => onSelect(meta.symbol)}
                 onContextMenu={(e) => {
                   e.preventDefault();
                   onRemove(meta.id);
@@ -103,6 +99,16 @@ export function CryptoView({ coins: coinList, onAdd, onRemove, quotes, live, new
                 <div className="listrow-top">
                   <span className="caret">{isSel ? '▶' : ''}</span>
                   <span className="sym">{meta.symbol}</span>
+                  <button
+                    className="list-remove-btn"
+                    aria-label={`${meta.symbol} 코인 삭제`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onRemove(meta.id);
+                    }}
+                  >
+                    ×
+                  </button>
                   <span className={`val ${changeClass(pct)}`}>
                     {fmtKrw(c ? priceOf(c) : null)} {arrow(pct)}{fmtPct(pct)}
                   </span>
@@ -138,22 +144,7 @@ export function CryptoView({ coins: coinList, onAdd, onRemove, quotes, live, new
           )}
         </div>
 
-        {/* 코인 뉴스 */}
-        <div className="panel area-news">
-          <div className="ptitle t-yellow">
-            코인 뉴스 <span className="sub">[{news.length}]</span>
-          </div>
-          {news.length === 0 && <div className="dim">불러오는 중…</div>}
-          {news.map((n, i) => (
-            <div key={n.id} className="news-row" onClick={() => window.open(n.url, '_blank', 'noopener')}>
-              <span className="num">{i + 1}</span>
-              <span className="time">{fmtTime(n.published_at)}</span>
-              <span className="tag mkt">[COIN]</span>
-              <span className="title">{n.title}</span>
-              <span className="src">({n.source})</span>
-            </div>
-          ))}
-        </div>
+        <CoinNewsStream news={news} />
 
         {/* 우측: USD 시세 + 24h 요약 */}
         <div className="area-side">
@@ -161,7 +152,7 @@ export function CryptoView({ coins: coinList, onAdd, onRemove, quotes, live, new
             <div className="ptitle t-blue">24시간 시세 <span className="sub">KRW</span></div>
             {quotes.length === 0 && <div className="dim">불러오는 중…</div>}
             {quotes.map((c) => (
-              <div key={c.id} className="row" style={{ cursor: 'pointer' }} onClick={() => setSelected(c.symbol)}>
+              <div key={c.id} className="row" style={{ cursor: 'pointer' }} onClick={() => onSelect(c.symbol)}>
                 <span className="sym">{c.symbol}</span>
                 <span className={`val ${changeClass(c.change_24h)}`}>{fmtKrw(priceOf(c))} {arrow(c.change_24h)}{fmtPct(c.change_24h)}</span>
               </div>
@@ -170,7 +161,7 @@ export function CryptoView({ coins: coinList, onAdd, onRemove, quotes, live, new
           <div className="panel">
             <div className="ptitle t-magenta">기간별 변동</div>
             {quotes.map((c) => (
-              <div key={c.id} className="row" style={{ cursor: 'pointer' }} onClick={() => setSelected(c.symbol)}>
+              <div key={c.id} className="row" style={{ cursor: 'pointer' }} onClick={() => onSelect(c.symbol)}>
                 <span className="sym" style={{ minWidth: 46 }}>{c.symbol}</span>
                 <span className={changeClass(c.change_1h)} style={{ flex: 1, textAlign: 'center' }}>{fmtPct(c.change_1h)}</span>
                 <span className={changeClass(c.change_24h)} style={{ flex: 1, textAlign: 'center' }}>{fmtPct(c.change_24h)}</span>

@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
 import type { CoinMeta, CoinNewsItem, CoinQuote, Detail, LabelEntry, NewsItem, NewsScope, Quote, UpbitTick } from '../lib/types';
-import { arrow, changeClass, fmtPct, fmtTime } from '../lib/format';
+import { arrow, changeClass, fmtPct, fmtPriceCompact, fmtTime } from '../lib/format';
+import type { ConnectionInfo, ConnectionState } from '../lib/connection';
 import { CoinSearchBar } from './CoinSearchBar';
 import { IndicesPanel, MarketsPanel } from './SidePanels';
 import { NewsStream } from './NewsStream';
@@ -8,6 +9,7 @@ import { QuotePanel } from './QuotePanel';
 import { SearchBar } from './SearchBar';
 import { Sparkline } from './Sparkline';
 import { Watchlist } from './Watchlist';
+import { CoinNewsStream } from './CoinNewsStream';
 
 interface Props {
   watchlist: string[];
@@ -25,6 +27,10 @@ interface Props {
   coinQuotes: CoinQuote[];
   coinLive: Record<string, UpbitTick>;
   coinNews: CoinNewsItem[];
+  selectedCoin: string | null;
+  stockConnection: ConnectionInfo;
+  coinConnection: ConnectionInfo;
+  combinedSplit: number;
   onAddSymbol: (symbol: string, name: string) => void;
   onRemoveSymbol: (symbol: string) => void;
   onSelectSymbol: (symbol: string) => void;
@@ -33,6 +39,8 @@ interface Props {
   onScopeChange: (scope: NewsScope) => void;
   onAddCoin: (coin: CoinMeta) => void;
   onRemoveCoin: (id: string) => void;
+  onSelectCoin: (symbol: string) => void;
+  onCombinedSplitChange: (value: number) => void;
 }
 
 function fmtKrw(value: number | null): string {
@@ -82,6 +90,16 @@ function CoinWatchlist({
             <div className="listrow-top">
               <span className="caret">{isSelected ? '▶' : ''}</span>
               <span className="sym">{coin.symbol}</span>
+              <button
+                className="list-remove-btn"
+                aria-label={`${coin.symbol} 코인 삭제`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onRemove(coin.id);
+                }}
+              >
+                ×
+              </button>
               <span className={`val ${changeClass(change)}`}>
                 {fmtKrw(price)} {arrow(change)}{fmtPct(change)}
               </span>
@@ -137,23 +155,89 @@ function CoinQuotePanel({
   );
 }
 
-function CoinNews({ news }: { news: CoinNewsItem[] }) {
+const CONNECTION_LABEL: Record<ConnectionState, string> = {
+  idle: '대기',
+  connecting: '연결 중',
+  live: '실시간',
+  reconnecting: '재연결 중',
+  stale: '데이터 지연',
+};
+
+function ConnectionBadge({ connection, source }: { connection: ConnectionInfo; source: string }) {
+  const updated = connection.lastUpdated ? fmtTime(connection.lastUpdated) : null;
   return (
-    <div className="panel area-news">
-      <div className="ptitle t-yellow">
-        COIN NEWS <span className="sub">[{news.length}]</span>
+    <span className={`connection-badge state-${connection.state}`} title={connection.issue ?? undefined}>
+      <i /> {source} {CONNECTION_LABEL[connection.state]}
+      {updated && <small>{updated}</small>}
+      {connection.issue && <b>!</b>}
+    </span>
+  );
+}
+
+function CrossMarketSummary({
+  indices,
+  markets,
+  coinQuotes,
+  split,
+  onSplitChange,
+}: {
+  indices: Quote[];
+  markets: Quote[];
+  coinQuotes: CoinQuote[];
+  split: number;
+  onSplitChange: (value: number) => void;
+}) {
+  const quoteOf = (symbol: string) => [...indices, ...markets].find((quote) => quote.symbol === symbol);
+  const sp = quoteOf('^GSPC');
+  const nasdaq = quoteOf('^IXIC');
+  const dollar = quoteOf('KRW=X');
+  const gold = quoteOf('GC=F');
+  const btc = coinQuotes.find((coin) => coin.symbol === 'BTC');
+  const riskInputs = [sp?.change_pct, nasdaq?.change_pct, btc?.change_24h].filter((value): value is number => value != null);
+  const riskScore = riskInputs.length ? riskInputs.reduce((sum, value) => sum + value, 0) / riskInputs.length : null;
+  const signal = riskScore == null
+    ? '시장 신호 계산 중'
+    : riskScore > 0.35
+      ? '위험선호 우세'
+      : riskScore < -0.35
+        ? '방어 흐름 우세'
+        : '주요 시장 혼조';
+  const metrics = [
+    { label: 'S&P500', value: fmtPriceCompact(sp?.price ?? null), change: sp?.change_pct ?? null },
+    { label: 'NASDAQ', value: fmtPriceCompact(nasdaq?.price ?? null), change: nasdaq?.change_pct ?? null },
+    { label: '원달러', value: fmtPriceCompact(dollar?.price ?? null), change: dollar?.change_pct ?? null },
+    { label: '금', value: fmtPriceCompact(gold?.price ?? null), change: gold?.change_pct ?? null },
+    { label: 'BTC', value: fmtKrw(btc?.price_krw ?? null), change: btc?.change_24h ?? null },
+  ];
+
+  return (
+    <section className="cross-market-summary" aria-label="교차시장 요약">
+      <div className="cross-market-signal">
+        <span>CROSS MARKET</span>
+        <strong>{signal}</strong>
+        <small>미국 지수와 BTC 흐름 기준</small>
       </div>
-      {news.length === 0 && <div className="dim">불러오는 중…</div>}
-      {news.map((item, index) => (
-        <div key={item.id} className="news-row" onClick={() => window.open(item.url, '_blank', 'noopener')}>
-          <span className="num">{index + 1}</span>
-          <span className="time">{fmtTime(item.published_at)}</span>
-          <span className="tag mkt">[COIN]</span>
-          <span className="title">{item.title}</span>
-          <span className="src">({item.source})</span>
-        </div>
-      ))}
-    </div>
+      <div className="cross-market-metrics">
+        {metrics.map((metric) => (
+          <div key={metric.label}>
+            <span>{metric.label}</span>
+            <strong>{metric.value}</strong>
+            <em className={changeClass(metric.change)}>{arrow(metric.change)}{fmtPct(metric.change)}</em>
+          </div>
+        ))}
+      </div>
+      <label className="combined-split-control">
+        <span>화면 비율</span>
+        <input
+          type="range"
+          min="35"
+          max="65"
+          value={split}
+          onChange={(event) => onSplitChange(Number(event.target.value))}
+        />
+        <output>주식 {split} / 코인 {100 - split}</output>
+      </label>
+    </section>
   );
 }
 
@@ -174,6 +258,10 @@ export function CombinedView(props: Props) {
     coinQuotes,
     coinLive,
     coinNews,
+    selectedCoin,
+    stockConnection,
+    coinConnection,
+    combinedSplit,
     onAddSymbol,
     onRemoveSymbol,
     onSelectSymbol,
@@ -182,16 +270,9 @@ export function CombinedView(props: Props) {
     onScopeChange,
     onAddCoin,
     onRemoveCoin,
+    onSelectCoin,
+    onCombinedSplitChange,
   } = props;
-  const [selectedCoin, setSelectedCoin] = useState<string | null>(coins[0]?.symbol ?? null);
-
-  useEffect(() => {
-    if (selectedCoin && !coins.some((coin) => coin.symbol === selectedCoin)) {
-      setSelectedCoin(coins[0]?.symbol ?? null);
-    } else if (!selectedCoin && coins.length) {
-      setSelectedCoin(coins[0].symbol);
-    }
-  }, [coins, selectedCoin]);
 
   const selectedCoinMeta = coins.find((coin) => coin.symbol === selectedCoin) ?? null;
   const selectedCoinQuote = coinQuotes.find((coin) => coin.symbol === selectedCoin) ?? null;
@@ -210,14 +291,25 @@ export function CombinedView(props: Props) {
         </div>
       </div>
 
-      <div className="combined-market-grid">
+      <CrossMarketSummary
+        indices={indices}
+        markets={markets}
+        coinQuotes={coinQuotes}
+        split={combinedSplit}
+        onSplitChange={onCombinedSplitChange}
+      />
+
+      <div
+        className="combined-market-grid"
+        style={{ '--stock-share': `${combinedSplit}fr`, '--coin-share': `${100 - combinedSplit}fr` } as CSSProperties}
+      >
         <section className="combined-lane stock-lane" aria-labelledby="combined-stock-title">
           <header className="combined-lane-head">
             <div>
               <span className="combined-eyebrow">EQUITY MARKET</span>
               <h2 id="combined-stock-title">주식</h2>
             </div>
-            <span className="combined-live"><i /> SSE 실시간</span>
+            <ConnectionBadge connection={stockConnection} source="SSE" />
           </header>
           <div className="combined-overview">
             <Watchlist
@@ -253,7 +345,7 @@ export function CombinedView(props: Props) {
               <span className="combined-eyebrow">DIGITAL ASSET MARKET</span>
               <h2 id="combined-crypto-title">코인</h2>
             </div>
-            <span className="combined-live"><i /> 업비트 실시간</span>
+            <ConnectionBadge connection={coinConnection} source="업비트" />
           </header>
           <div className="combined-overview">
             <CoinWatchlist
@@ -261,12 +353,12 @@ export function CombinedView(props: Props) {
               quotes={coinQuotes}
               live={coinLive}
               selected={selectedCoin}
-              onSelect={setSelectedCoin}
+              onSelect={onSelectCoin}
               onRemove={onRemoveCoin}
             />
             <CoinQuotePanel coin={selectedCoinMeta} quote={selectedCoinQuote} tick={selectedCoinTick} />
           </div>
-          <CoinNews news={coinNews} />
+          <CoinNewsStream news={coinNews} />
         </section>
       </div>
     </main>
