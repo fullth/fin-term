@@ -9,9 +9,7 @@ import { QuotePanel } from './components/QuotePanel';
 import { NewsStream } from './components/NewsStream';
 import { IndicesPanel, MarketsPanel, HotPanel } from './components/SidePanels';
 import { BriefPanel, ExplainPanel } from './components/AiPanels';
-import { AlertButton } from './components/AlertButton';
 import { AlertSettingsModal } from './components/AlertSettingsModal';
-import { AlertTriggerButton } from './components/AlertTriggerButton';
 import { InstallButton } from './components/InstallButton';
 import { usePriceAlerts, fireAlert } from './lib/alerts';
 import { fmtPrice } from './lib/format';
@@ -25,6 +23,8 @@ import { TerminalView } from './components/TerminalView';
 import { DiaryView } from './components/DiaryView';
 import { ManualModal } from './components/ManualModal';
 import { CombinedView } from './components/CombinedView';
+import { WelcomeLanding } from './components/WelcomeLanding';
+import { INITIAL_CONNECTION, type ConnectionInfo } from './lib/connection';
 import './styles/app.css';
 
 type Mode = MarketMode | 'diary';
@@ -32,6 +32,7 @@ type BriefRunResult = { text: string | null; err: string | null; entryId?: strin
 
 const NEWS_INTERVAL = 60_000;
 const HOT_INTERVAL = 120_000;
+const WELCOME_KEY = 'fin-term:welcome-seen';
 
 export function App() {
   const persisted = useMemo(loadPersisted, []);
@@ -42,18 +43,36 @@ export function App() {
   const namesRef = useRef(names); // 알림 표시명용 — SSE 클로저에서 최신 종목명 참조
   namesRef.current = names;
   const [scope, setScope] = useState<NewsScope>(persisted.scope);
-  const [selected, setSelected] = useState<string | null>(persisted.watchlist[0] ?? null);
+  const [selected, setSelected] = useState<string | null>(
+    persisted.selectedSymbol && persisted.watchlist.includes(persisted.selectedSymbol)
+      ? persisted.selectedSymbol
+      : persisted.watchlist[0] ?? null,
+  );
   const [coins, setCoins] = useState<CoinMeta[]>(persisted.coins);
+  const [selectedCoin, setSelectedCoin] = useState<string | null>(
+    persisted.selectedCoin && persisted.coins.some((coin) => coin.symbol === persisted.selectedCoin)
+      ? persisted.selectedCoin
+      : persisted.coins[0]?.symbol ?? null,
+  );
+  const [combinedSplit, setCombinedSplit] = useState(persisted.combinedSplit);
   const [newsFilter, setNewsFilter] = useState<string | null>(null);
   const [hasServerKey, setHasServerKey] = useState(false);
   const [, setAiKeyVersion] = useState(0); // 키 변경 시 AI 패널 리렌더 트리거
   const [excel, setExcel] = useState(false); // 엑셀 위장 모드 — ` 키 / 버튼 토글
-  const [mono, setMono] = useState(false); // 단색 모드 — 전체 화면 흑백 전환
+  const [office, setOffice] = useState(persisted.officeMode); // 업무 화면 — 차분한 색과 개인 위젯 숨김
   const [terminal, setTerminal] = useState(persisted.terminal); // 터미널 모드 — 명령 콘솔 룩
   const [manualOpen, setManualOpen] = useState(false); // 사용 안내 모달
+  const [welcomeOpen, setWelcomeOpen] = useState(() => {
+    try {
+      return localStorage.getItem(WELCOME_KEY) !== '1';
+    } catch {
+      return true;
+    }
+  });
   const [briefHistory, setBriefHistory] = useState<BriefEntry[]>(loadBriefHistory);
   const stockAlerts = usePriceAlerts('stock');
   const cryptoAlerts = usePriceAlerts('crypto');
+  const [stockAlertOpen, setStockAlertOpen] = useState(false);
   const [cryptoAlertOpen, setCryptoAlertOpen] = useState(false);
   // 데일리 브리핑 — 주식/코인 공용, 모드 전환·새로고침에도 유지. 생성 버튼 누를 때만 갱신.
   // 마지막 생성 결과를 localStorage 에 보관해 새로고침 후에도 복원한다.
@@ -76,12 +95,25 @@ export function App() {
   const [hot, setHot] = useState<HotItem[]>([]);
   const [hotLoaded, setHotLoaded] = useState(false); // 최초 응답 도착 여부 — 로딩 vs 빈 결과(장 마감) 구분
   const [detail, setDetail] = useState<Detail | null>(null);
+  const [stockConnection, setStockConnection] = useState<ConnectionInfo>(INITIAL_CONNECTION);
+  const lastStockEventRef = useRef<number | null>(null);
 
   // 영속화 — 목록, 뉴스 범위, 마지막 시장 모드, 터미널 모드
   useEffect(() => {
     if (mode !== 'diary') lastMarketModeRef.current = mode;
-    savePersisted({ watchlist, names, scope, coins, marketMode: lastMarketModeRef.current, terminal });
-  }, [watchlist, names, scope, coins, mode, terminal]);
+    savePersisted({
+      watchlist,
+      names,
+      scope,
+      coins,
+      selectedSymbol: selected,
+      selectedCoin,
+      combinedSplit,
+      marketMode: lastMarketModeRef.current,
+      terminal,
+      officeMode: office,
+    });
+  }, [watchlist, names, scope, coins, selected, selectedCoin, combinedSplit, mode, terminal, office]);
 
   // 채널톡 · 후원 위젯 — 앱 마운트 시 1회 boot
   useEffect(() => {
@@ -89,15 +121,20 @@ export function App() {
     bootDonate();
   }, []);
 
-  // 단색 모드 — 앱 전체를 흑백으로 바꾸고 등락 색도 텍스트색으로 통일한다.
+  // 업무 화면 — 등락 강조를 낮추고 개인용 위젯을 감춘다. 선택값은 localStorage 로 복원된다.
   useEffect(() => {
-    document.documentElement.toggleAttribute('data-mono', mono);
-  }, [mono]);
+    document.documentElement.toggleAttribute('data-office', office);
+  }, [office]);
+
+  // 엑셀 위장과 업무 화면에서는 채널톡과 후원 버튼도 감춰 화면 목적을 일관되게 유지한다.
+  useEffect(() => {
+    document.documentElement.toggleAttribute('data-stealth', office || excel || welcomeOpen);
+  }, [office, excel, welcomeOpen]);
 
   // 엑셀 위장 모드 — 탭 제목까지 스프레드시트로 바꿔 작업표시줄/탭에서도 티 안 나게.
   // 진입 시 매뉴얼 모달은 닫는다(위장 화면 위에 떠 있으면 안 됨).
   useEffect(() => {
-    document.title = excel ? 'watchlist.xlsx - Excel' : 'fin-term · web';
+    document.title = excel ? 'market-report.xlsx - Excel' : 'fin-term web';
     if (excel) setManualOpen(false);
   }, [excel]);
 
@@ -137,12 +174,20 @@ export function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [mode, selected, watchlist]);
 
-  const addCoin = (c: CoinMeta) => setCoins((cs) => (cs.some((x) => x.id === c.id) ? cs : [...cs, c]));
+  const addCoin = (c: CoinMeta) => {
+    setCoins((cs) => (cs.some((x) => x.id === c.id) ? cs : [...cs, c]));
+    setSelectedCoin(c.symbol);
+  };
   const removeCoin = (id: string) => setCoins((cs) => cs.filter((c) => c.id !== id));
 
   // 라벨 + AI 키(서버 env 보유 여부) 1회 로드 + 방문 기록
   useEffect(() => {
-    api.markets().then((m) => setLabels(m.labels)).catch(() => {});
+    api.markets()
+      .then((marketResult) => {
+        setLabels(marketResult.labels);
+        setStockConnection((current) => ({ ...current, issue: null }));
+      })
+      .catch(() => setStockConnection((current) => ({ ...current, issue: '시장 지표 갱신 실패' })));
     api.aiStatus().then((s) => setHasServerKey(s.serverKey)).catch(() => {});
     api.visit().catch(() => {});
   }, []);
@@ -152,10 +197,18 @@ export function App() {
 
   // SSE 시세 스트림 — watchlist 바뀌면 재연결
   useEffect(() => {
-    if (!watchlist.length) return;
+    if (!watchlist.length) {
+      setStockConnection({ state: 'idle', lastUpdated: null, issue: null });
+      return;
+    }
+    setStockConnection((current) => ({ ...current, state: 'connecting' }));
     const es = new EventSource(`/api/stream/quotes?symbols=${encodeURIComponent(watchlist.join(','))}`);
+    es.addEventListener('open', () => setStockConnection((current) => ({ ...current, state: 'live' })));
     es.addEventListener('quotes', (e) => {
       const { quotes } = JSON.parse((e as MessageEvent).data) as { quotes: Quote[] };
+      const receivedAt = Date.now();
+      lastStockEventRef.current = receivedAt;
+      setStockConnection((current) => ({ ...current, state: 'live', lastUpdated: receivedAt }));
       setQuotes((prev) => {
         const next = { ...prev };
         for (const q of quotes) next[q.symbol] = q;
@@ -171,10 +224,23 @@ export function App() {
     });
     es.addEventListener('markets', (e) => {
       const { indices, markets } = JSON.parse((e as MessageEvent).data) as { indices: Quote[]; markets: Quote[] };
+      const receivedAt = Date.now();
+      lastStockEventRef.current = receivedAt;
+      setStockConnection((current) => ({ ...current, state: 'live', lastUpdated: receivedAt }));
       if (indices?.length) setIndices(indices);
       if (markets?.length) setMarkets(markets);
     });
-    return () => es.close();
+    es.addEventListener('error', () => setStockConnection((current) => ({ ...current, state: 'reconnecting' })));
+    const staleTimer = setInterval(() => {
+      const lastEvent = lastStockEventRef.current;
+      if (lastEvent && Date.now() - lastEvent > 90_000) {
+        setStockConnection((current) => ({ ...current, state: 'stale' }));
+      }
+    }, 15_000);
+    return () => {
+      clearInterval(staleTimer);
+      es.close();
+    };
     // onPrice 는 usePriceAlerts 에서 useCallback 으로 안정적 — watchlist 만 재연결 트리거
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchlist]);
@@ -206,9 +272,10 @@ export function App() {
         .then((r) => {
           if (!alive) return;
           setNews(r.news);
+          setStockConnection((current) => ({ ...current, issue: null }));
           checkBreakingNews(r.news);
         })
-        .catch(() => {});
+        .catch(() => setStockConnection((current) => ({ ...current, issue: '뉴스 갱신 실패' })));
     load();
     const t = setInterval(load, NEWS_INTERVAL);
     return () => {
@@ -254,6 +321,14 @@ export function App() {
   useEffect(() => {
     if (selected && !watchlist.includes(selected)) setSelected(watchlist[0] ?? null);
   }, [watchlist, selected]);
+
+  useEffect(() => {
+    if (selectedCoin && !coins.some((coin) => coin.symbol === selectedCoin)) {
+      setSelectedCoin(coins[0]?.symbol ?? null);
+    } else if (!selectedCoin && coins.length) {
+      setSelectedCoin(coins[0].symbol);
+    }
+  }, [coins, selectedCoin]);
 
   const addSymbol = (sym: string, name: string) => {
     const up = sym.toUpperCase();
@@ -315,35 +390,58 @@ export function App() {
     }
   };
 
+  const visibleMarketMode = mode === 'diary' ? lastMarketModeRef.current : mode;
+  const navConnectionState = visibleMarketMode === 'combined'
+    ? stockConnection.state === 'idle' && cryptoLive.connection.state === 'idle'
+      ? 'idle'
+      : stockConnection.state === 'live' && cryptoLive.connection.state === 'live'
+      ? 'live'
+      : stockConnection.state === 'stale' || cryptoLive.connection.state === 'stale'
+        ? 'stale'
+        : stockConnection.state === 'reconnecting' || cryptoLive.connection.state === 'reconnecting'
+          ? 'reconnecting'
+          : 'connecting'
+    : visibleMarketMode === 'stock'
+      ? stockConnection.state
+      : cryptoLive.connection.state;
+  const navConnectionLabel = navConnectionState === 'live'
+    ? 'live'
+    : navConnectionState === 'idle'
+      ? '대기'
+    : navConnectionState === 'stale'
+      ? '지연'
+      : navConnectionState === 'reconnecting'
+        ? '재연결'
+        : '연결 중';
+
+  const closeWelcome = () => {
+    try {
+      localStorage.setItem(WELCOME_KEY, '1');
+    } catch {
+      // 저장 불가 환경에서도 현재 세션은 계속 진행한다.
+    }
+    setWelcomeOpen(false);
+  };
+
   return (
     <div className="app-shell">
       {!excel && (
       <div className="topbar">
-        <div className="brand">
-          fin-term <span className="ver">v0.9.12 · web</span>
+        <div className="brand-wrap">
+          <button className="brand" onClick={() => setWelcomeOpen(true)} title="시작 화면 열기">
+            <img className="brand-logo" src="/favicon.svg" alt="" />
+            <span className="brand-copy">
+              <strong>fin-term</strong>
+              <small>stock + crypto</small>
+            </span>
+          </button>
           <button className="manual-btn" onClick={() => setManualOpen(true)} title="사용 안내">
             ?
           </button>
         </div>
         <nav className="modes" aria-label="주요 화면">
-          {/* 표시 모드 */}
-          <button
-            className={`mode-btn${terminal ? ' active' : ''}`}
-            onClick={() => setTerminal((t) => !t)}
-            title="터미널 모드 — 명령 콘솔"
-            aria-current={terminal ? 'page' : undefined}
-          >
-            term
-          </button>
-          <button
-            className={`mode-btn${excel ? ' active' : ''}`}
-            onClick={() => setExcel((x) => !x)}
-            title="엑셀 모드 — ` 키로도 전환"
-          >
-            xlsx
-          </button>
-          <span className="nav-sep">│</span>
           {/* 시장 모드 */}
+          <div className="nav-button-group market-tools" aria-label="시장 화면">
           <button
             className={`mode-btn${!terminal && mode === 'combined' ? ' active' : ''}`}
             onClick={() => {
@@ -352,7 +450,7 @@ export function App() {
             }}
             aria-current={!terminal && mode === 'combined' ? 'page' : undefined}
           >
-            혼합
+            종합
           </button>
           <button
             className={`mode-btn${!terminal && mode === 'stock' ? ' active' : ''}`}
@@ -385,43 +483,60 @@ export function App() {
           >
             diary
           </button>
-          <span className="nav-sep">│</span>
-          {/* 설정 */}
-          <button
-            className={`mode-btn${mono ? ' active' : ''}`}
-            onClick={() => setMono((m) => !m)}
-            title="단색 모드 — 전체 화면 흑백 전환"
-          >
-            mono
-          </button>
-          {(mode === 'stock' || mode === 'combined') && (
-            <AlertButton
-              settings={stockAlerts.settings}
-              bases={stockAlerts.bases}
-              overrides={stockAlerts.overrides}
-              rows={watchlist.map((sym) => ({ key: sym, label: sym, price: quotes[sym]?.price ?? null }))}
-              fmt={fmtPrice}
-              onToggle={stockAlerts.toggle}
-              onApply={stockAlerts.applyBatch}
-              history={stockAlerts.history}
-              onClearHistory={stockAlerts.clearHistory}
-              triggerLabel={mode === 'combined' ? '주식 alert' : undefined}
-            />
-          )}
-          {(mode === 'crypto' || mode === 'combined') && (
-            <div className="alert-btn-wrap" style={{ position: 'relative' }}>
-              <AlertTriggerButton
-                enabled={cryptoAlerts.settings.enabled}
-                onClick={() => setCryptoAlertOpen(true)}
-                label={mode === 'combined' ? '코인 alert' : undefined}
-                title="코인 변동 알림 설정"
-              />
+          </div>
+          <div className="nav-button-group display-tools" aria-label="보기 도구">
+            <button
+              className={`mode-btn tool-btn${terminal ? ' active' : ''}`}
+              onClick={() => setTerminal((value) => !value)}
+              title="명령형 Terminal 화면"
+              aria-label="Terminal"
+              aria-pressed={terminal}
+            >
+              <span className="tool-glyph">›_</span> Terminal
+            </button>
+            <button className="mode-btn tool-btn" onClick={() => setExcel(true)} title="Excel 위장 화면 (` 키)" aria-label="Excel">
+              <span className="tool-glyph">▦</span> Excel
+            </button>
+            <button
+              className={`mode-btn tool-btn${office ? ' active' : ''}`}
+              onClick={() => setOffice((value) => !value)}
+              title="등락 색상을 낮추고 개인 위젯 숨김"
+              aria-label="업무 화면"
+              aria-pressed={office}
+            >
+              <span className="tool-glyph">◐</span> 업무
+            </button>
+          </div>
+          <details className="nav-menu">
+            <summary className={`mode-btn alert-trigger${stockAlerts.settings.enabled || cryptoAlerts.settings.enabled ? ' on' : ''}`}>
+              alert{stockAlerts.settings.enabled || cryptoAlerts.settings.enabled ? ' ●' : ''}
+            </summary>
+            <div className="nav-menu-pop nav-alert-menu">
+              <button
+                className={`nav-menu-item${stockAlerts.settings.enabled ? ' active' : ''}`}
+                onClick={(event) => {
+                  const details = event.currentTarget.closest('details');
+                  if (details) details.open = false;
+                  setStockAlertOpen(true);
+                }}
+              >
+                주식 알림 <span>{stockAlerts.settings.enabled ? 'ON' : 'OFF'}</span>
+              </button>
+              <button
+                className={`nav-menu-item${cryptoAlerts.settings.enabled ? ' active' : ''}`}
+                onClick={(event) => {
+                  const details = event.currentTarget.closest('details');
+                  if (details) details.open = false;
+                  setCryptoAlertOpen(true);
+                }}
+              >
+                코인 알림 <span>{cryptoAlerts.settings.enabled ? 'ON' : 'OFF'}</span>
+              </button>
             </div>
-          )}
+          </details>
           <AiKeyManager onChange={onAiKeyChange} />
           <InstallButton />
-          <span className="nav-sep">│</span>
-          <span className="nav-live">● live</span>
+          <span className={`nav-live state-${navConnectionState}`}>● {navConnectionLabel}</span>
         </nav>
       </div>
       )}
@@ -436,6 +551,14 @@ export function App() {
           labels={labels}
           news={news}
           hot={hot}
+          coins={coins}
+          coinQuotes={cryptoLive.quotes}
+          coinLive={cryptoLive.live}
+          coinNews={cryptoLive.news}
+          stockConnection={stockConnection}
+          coinConnection={cryptoLive.connection}
+          onAddSymbol={addSymbol}
+          onAddCoin={addCoin}
           onExit={() => setExcel(false)}
         />
       ) : terminal ? (
@@ -478,6 +601,10 @@ export function App() {
           coinQuotes={cryptoLive.quotes}
           coinLive={cryptoLive.live}
           coinNews={cryptoLive.news}
+          selectedCoin={selectedCoin}
+          stockConnection={stockConnection}
+          coinConnection={cryptoLive.connection}
+          combinedSplit={combinedSplit}
           onAddSymbol={addSymbol}
           onRemoveSymbol={removeSymbol}
           onSelectSymbol={setSelected}
@@ -486,6 +613,8 @@ export function App() {
           onScopeChange={setScope}
           onAddCoin={addCoin}
           onRemoveCoin={removeCoin}
+          onSelectCoin={setSelectedCoin}
+          onCombinedSplitChange={setCombinedSplit}
         />
       ) : mode === 'stock' ? (
         <>
@@ -535,6 +664,8 @@ export function App() {
           quotes={cryptoLive.quotes}
           live={cryptoLive.live}
           news={cryptoLive.news}
+          selected={selectedCoin}
+          onSelect={setSelectedCoin}
           briefSlot={<BriefPanel text={brief.text} loading={brief.loading} err={brief.err} usable={briefUsable} onRun={() => void runBrief()} />}
         />
       ) : (
@@ -571,6 +702,20 @@ export function App() {
           🔔 {cryptoAlerts.toast}
         </div>
       )}
+      {stockAlertOpen && (
+        <AlertSettingsModal
+          settings={stockAlerts.settings}
+          bases={stockAlerts.bases}
+          overrides={stockAlerts.overrides}
+          rows={watchlist.map((symbol) => ({ key: symbol, label: symbol, price: quotes[symbol]?.price ?? null }))}
+          fmt={fmtPrice}
+          onClose={() => setStockAlertOpen(false)}
+          onToggle={stockAlerts.toggle}
+          onApply={stockAlerts.applyBatch}
+          history={stockAlerts.history}
+          onClearHistory={stockAlerts.clearHistory}
+        />
+      )}
       {cryptoAlertOpen && (
         <AlertSettingsModal
           settings={cryptoAlerts.settings}
@@ -586,6 +731,25 @@ export function App() {
         />
       )}
       {manualOpen && <ManualModal onClose={() => setManualOpen(false)} />}
+      {welcomeOpen && (
+        <WelcomeLanding
+          onStart={() => {
+            setMode('combined');
+            setTerminal(false);
+            closeWelcome();
+          }}
+          onOffice={() => {
+            setOffice(true);
+            setMode('combined');
+            setTerminal(false);
+            closeWelcome();
+          }}
+          onExcel={() => {
+            setExcel(true);
+            closeWelcome();
+          }}
+        />
+      )}
     </div>
   );
 }
