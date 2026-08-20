@@ -8,7 +8,7 @@ interface Props {
 const SHORTCUTS: { key: string; desc: string }[] = [
   { key: '/', desc: '종목 검색창 포커스' },
   { key: 'j / k', desc: '관심종목 아래 / 위 이동' },
-  { key: 'm', desc: '주식 ↔ 코인 모드 전환' },
+  { key: 'm', desc: '혼합 → 주식 → 코인 시장 모드 순환' },
   { key: '`', desc: '엑셀 모드 켜기 / 끄기' },
   { key: 'Esc', desc: '뉴스 필터 해제' },
 ];
@@ -35,7 +35,8 @@ export function ManualModal({ onClose }: Props) {
         <div className="manual-section">
           <h4>모드</h4>
           <ul>
-            <li><b>주식 / 코인</b> — 상단 버튼 또는 <code>m</code> 키로 전환</li>
+            <li><b>혼합 / 주식 / 코인</b> — 혼합은 두 시장을 함께 표시하고, 상단 버튼 또는 <code>m</code> 키로 전환</li>
+            <li><b>Terminal</b> — 현재 시장 모드에 맞는 실시간 시세와 검색 명령을 콘솔 형태로 표시</li>
             <li><b>Diary</b> — 오늘의 브리핑을 직접 생성하고 내 판단·실행 계획을 함께 기록</li>
             <li><b>단색</b> — 현재 화면 전체를 흑백으로 바꾸고 등락 색도 숨김</li>
             <li><b>엑셀</b> — 화면을 스프레드시트로 위장. <code>`</code> 키 또는 버튼, 엑셀 화면의 <b>닫기</b>로 복귀</li>
@@ -61,6 +62,7 @@ export function ManualModal({ onClose }: Props) {
           <ul>
             <li>관심종목 시세는 실시간(SSE)으로 갱신됩니다</li>
             <li>종목 검색 후 Enter/클릭으로 관심목록에 추가 (한글·영문 모두 지원)</li>
+            <li>코인 모드에서 Terminal을 열면 코인 시세, 검색, 뉴스 명령을 바로 사용</li>
             <li>관심종목의 <b>뉴스</b> 태그로 해당 종목 뉴스만 필터링</li>
             <li>변동 알림은 상단 <b>변동 알림</b>에서 종목별 기준가 설정</li>
             <li>AI 브리핑·용어 풀이는 상단 <b>AI 키</b> 입력 시 활성화</li>
