@@ -1,0 +1,8 @@
+
+/* 모바일 — 상단바 버튼이 좁은 폭에서 짓눌리지 않고 다음 줄로 흐르도록 */
+@media (max-width: 640px) {
+  .topbar { flex-wrap: wrap; gap: 8px; }
+  .modes { width: 100%; min-width: 0; flex-wrap: wrap; justify-content: flex-start; row-gap: 6px; }
+  .modes > * { flex: 0 0 auto; } /* 버튼·래퍼가 줄어들지 않고 원래 크기 유지 */
+  .nav-button-group { max-width: 100%; overflow-x: auto; }
+}

@@ -1,0 +1,61 @@
+
+/* 패널 공통 */
+.panel {
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--panel); padding: 8px 12px; overflow: auto;
+}
+.panel.focused { border-color: var(--border-foc); }
+.ptitle { font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+.ptitle .sub { color: var(--dim); font-weight: 400; font-size: 12px; }
+.ptitle .dot { color: var(--cyan); }
+.t-yellow { color: var(--yellow); }
+.t-blue { color: var(--blue); }
+.t-magenta { color: var(--magenta); }
+.t-red { color: var(--red); }
+.dim { color: var(--dim); }
+.up { color: var(--up); }
+.down { color: var(--down); }
+
+/* 행 — 심볼·가격은 잘리지 않고(flex-shrink:0), 회사명만 줄어든다(ellipsis) */
+.row { display: flex; align-items: center; gap: 8px; padding: 1px 0; cursor: pointer; }
+.row .sym { color: var(--txt); font-weight: 600; white-space: nowrap; flex-shrink: 0; }
+.row .name { color: var(--dim); flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.panel .row .val {
+  width: 20ch; flex: 0 0 20ch; margin-left: auto; overflow: hidden;
+  white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+.row:hover { background: var(--accent-bg); border-radius: 4px; }
+
+/* 급변동 실시간 피드 — 한 줄씩 위로 쌓이는 로그 */
+.surge-row { display: flex; align-items: baseline; gap: 7px; padding: 2px 0; font-size: 12.5px; animation: surge-in .25s ease-out; }
+.surge-row .time { color: var(--dim); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.surge-row .sym { color: var(--txt); font-weight: 600; flex-shrink: 0; }
+.surge-row .surge-price { color: var(--dim); flex: 1 1 auto; text-align: right; font-variant-numeric: tabular-nums; }
+.surge-row .val { flex-shrink: 0; white-space: nowrap; font-variant-numeric: tabular-nums; }
+@keyframes surge-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+.row.sel { background: var(--accent-bg-strong); border-radius: 4px; }
+.row.sel .sym { color: var(--cyan); }
+.caret { width: 10px; display: inline-block; color: var(--cyan); flex-shrink: 0; }
+
+/* 2줄 리스트 행 — 긴 심볼/회사명에도 안 깨지게. 1행: 심볼+가격, 2행: 회사명 */
+.listrow { padding: 4px 4px; border-radius: 4px; cursor: pointer; border-left: 2px solid transparent; }
+.listrow:hover { background: var(--accent-bg); border-left-color: var(--cyan); }
+.listrow.sel { background: var(--accent-bg-strong); border-left-color: var(--cyan); }
+.listrow.sel .sym { color: var(--cyan); }
+.listrow-top { display: flex; align-items: baseline; gap: 6px; }
+.listrow-top .sym { color: var(--txt); font-weight: 700; white-space: nowrap; flex-shrink: 0; }
+.listrow-top .val {
+  width: 21ch; flex: 0 0 21ch; margin-left: auto; overflow: hidden;
+  white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+.list-remove-btn {
+  width: 18px; height: 18px; flex: none; cursor: pointer; opacity: 0;
+  border: 1px solid transparent; border-radius: 4px; padding: 0;
+  background: transparent; color: var(--dim); font: 14px/16px var(--mono);
+}
+.listrow:hover .list-remove-btn, .list-remove-btn:focus-visible { opacity: 1; }
+.list-remove-btn:hover { border-color: var(--red); color: var(--red); }
+.listrow-sub { color: var(--dim); font-size: 11px; padding-left: 16px; overflow: hidden;
+  white-space: nowrap; text-overflow: ellipsis; }

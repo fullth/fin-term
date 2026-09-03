@@ -1,0 +1,10 @@
+
+@media (max-width: 1180px) {
+  .combined-main { overflow: auto; }
+  .cross-market-summary { grid-template-columns: 1fr; }
+  .cross-market-metrics { grid-template-columns: repeat(5, minmax(110px, 1fr)); overflow-x: auto; }
+  .combined-market-grid { flex: none; grid-template-columns: minmax(0, 1fr); }
+  .combined-lane { min-height: 720px; overflow: hidden; }
+  .combined-overview { height: 330px; }
+  .combined-lane > .area-news { height: auto; max-height: none; }
+}
