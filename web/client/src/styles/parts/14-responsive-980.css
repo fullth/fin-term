@@ -1,0 +1,24 @@
+
+@media (max-width: 980px) {
+  .inforow { grid-template-columns: 1fr 1fr; }
+  .mid-info { grid-template-columns: 1fr 1fr; }
+  .topbars { flex-direction: column; }
+  .explain-compact .aikey-input { width: 100%; flex: 1; }
+
+  /* 모바일: 세로 1열로 쌓고 페이지 전체가 스크롤되게 — 패널을 viewport 높이에 가두지 않는다.
+     데스크탑은 app-shell(100vh) 안에서 패널별 내부 스크롤이지만, 모바일은 컬럼이 위아래로
+     쌓이므로 각 패널이 콘텐츠 높이를 갖고 본문 전체가 스크롤되어야 목록이 잘리지 않는다. */
+  .app-shell { height: auto; min-height: 100vh; overflow: visible; }
+  .app-shell > .layout3 { flex: none; }
+  .layout3 {
+    grid-template-columns: 1fr; height: auto; min-height: 0;
+  }
+  .col-left, .col-mid, .col-right { overflow: visible; }
+  /* flex:1 로 viewport 잔여 높이를 채우던 패널들 — 모바일에선 콘텐츠 높이로 풀고 최소 높이만 보장 */
+  .col-left > .area-watch,
+  .col-right > .panel { flex: none; overflow: visible; min-height: 320px; }
+
+  /* 모바일 뉴스 패널 — 헤드라인이 수백 개라 전부 펼치면 페이지가 끝없이 길어진다.
+     패널 높이를 화면 일부로 고정하고 그 안에서만 스크롤(약 50개 노출, 나머지는 내부 스크롤). */
+  .area-news { flex: none; height: 70vh; max-height: 70vh; min-height: 320px; overflow: auto; }
+}

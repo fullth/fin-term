@@ -1,0 +1,42 @@
+
+/* ===== 업무 화면 — 방향은 화살표로 남기고 금융 화면 특유의 강한 빨강/파랑은 낮춘다. ===== */
+:root[data-office] {
+  --bg: #0d1013;
+  --panel: #12161a;
+  --border: #303740;
+  --btn-border: #515b66;
+  --border-foc: #8c98a4;
+  --txt: #c7cdd4;
+  --dim: #7f8994;
+  --news-summary: #9aa4af;
+  --yellow: #a7b0ba;
+  --cyan: #aab4be;
+  --blue: #8f9aa6;
+  --magenta: #939da8;
+  --red: #89949f;
+  --green: #9ba6b1;
+  --up: #aab3bc;
+  --down: #7f8a95;
+  --input-bg: #151a1f;
+  --accent-bg: rgba(151, 163, 175, .08);
+  --accent-bg-strong: rgba(151, 163, 175, .14);
+}
+:root[data-office] .mode-btn.active,
+:root[data-office] .nav-menu-item.active,
+:root[data-office] .nav-live,
+:root[data-office] .connection-badge { color: #aab4be; }
+:root[data-office] .connection-badge i {
+  background: #8f9aa6;
+  box-shadow: none;
+}
+:root[data-office] .spark polyline { opacity: .62; }
+:root[data-office] .combined-lane,
+:root[data-office] .combined-lane.crypto-lane,
+:root[data-office] .combined-search-group,
+:root[data-office] .cross-market-summary > *,
+:root[data-office] .cross-market-metrics > div,
+:root[data-office] .nav-button-group { background: #11151a; }
+
+/* 엑셀 위장과 업무 화면에서는 개인용 외부 위젯까지 함께 감춘다. */
+:root[data-stealth] #smtc-root,
+:root[data-stealth] #ch-plugin { display: none !important; }
