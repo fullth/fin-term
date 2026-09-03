@@ -1,0 +1,57 @@
+
+/* 첫 방문 시작 화면 — 기존 파비콘을 브랜드 마크로 재사용한다. */
+.welcome-landing {
+  position: fixed; inset: 0; z-index: 1200; display: grid; place-items: center; padding: 24px;
+  background:
+    radial-gradient(circle at 18% 18%, rgba(34, 211, 238, .11), transparent 31%),
+    radial-gradient(circle at 82% 78%, rgba(234, 179, 8, .08), transparent 28%),
+    #05070a;
+}
+.welcome-landing::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .22;
+  background-image: linear-gradient(rgba(255,255,255,.045) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.045) 1px, transparent 1px);
+  background-size: 42px 42px;
+}
+.welcome-card {
+  position: relative; width: min(720px, 100%); overflow: hidden;
+  border: 1px solid #34404c; border-radius: 18px; padding: 34px;
+  background: linear-gradient(145deg, rgba(15, 20, 26, .97), rgba(5, 8, 12, .98));
+  box-shadow: 0 28px 90px rgba(0,0,0,.62);
+}
+.welcome-card::after {
+  content: ""; position: absolute; top: 0; right: 0; width: 170px; height: 3px;
+  background: linear-gradient(90deg, transparent, var(--cyan));
+}
+.welcome-brand { display: flex; align-items: center; gap: 17px; }
+.welcome-brand img { width: 68px; height: 68px; border-radius: 14px; box-shadow: 0 0 30px rgba(34, 211, 238, .13); }
+.welcome-brand span { color: var(--cyan); font-size: 9px; letter-spacing: .22em; }
+.welcome-brand h1 { margin: 5px 0 0; color: var(--yellow); font-size: clamp(30px, 6vw, 48px); line-height: 1; letter-spacing: -.04em; }
+.welcome-copy { max-width: 570px; margin: 26px 0 22px; color: var(--txt); font-size: 16px; line-height: 1.75; }
+.welcome-features {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px;
+  border: 1px solid var(--border); border-radius: 9px; overflow: hidden; background: var(--border);
+}
+.welcome-features span { min-width: 0; padding: 13px 12px; background: #0a0d11; color: var(--dim); font-size: 11px; }
+.welcome-features b { display: block; margin-bottom: 4px; color: var(--cyan); font-size: 9px; }
+.welcome-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+.welcome-actions button {
+  min-height: 38px; border: 1px solid var(--btn-border); border-radius: 7px; padding: 7px 13px;
+  background: #0d1117; color: var(--txt); font-family: var(--mono); cursor: pointer;
+}
+.welcome-actions button:hover { border-color: var(--cyan); color: var(--cyan); background: var(--accent-bg); }
+.welcome-actions .welcome-primary {
+  min-width: 190px; justify-content: space-between; display: inline-flex; align-items: center;
+  border-color: var(--cyan); background: rgba(34, 211, 238, .11); color: var(--cyan); font-weight: 750;
+}
+.welcome-actions .welcome-primary span { font-size: 18px; }
+.welcome-card > small { display: block; margin-top: 18px; color: var(--dim); font-size: 10px; }
+
+@media (max-width: 620px) {
+  .welcome-landing { padding: 12px; }
+  .welcome-card { padding: 24px 20px; border-radius: 13px; }
+  .welcome-brand img { width: 54px; height: 54px; }
+  .welcome-copy { margin: 20px 0; font-size: 14px; }
+  .welcome-features { grid-template-columns: 1fr; }
+  .welcome-actions { display: grid; }
+  .welcome-actions button, .welcome-actions .welcome-primary { width: 100%; }
+}

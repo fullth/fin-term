@@ -1,0 +1,110 @@
+
+/* ===== 엑셀 위장 모드 — 스프레드시트 골격. 테마와 무관하게 항상 고정 라이트 룩. ===== */
+.excel {
+  flex: 1; min-height: 0; display: flex; flex-direction: column;
+  background: #f3f2f1; color: #323130;
+  font-family: "Segoe UI", "Malgun Gothic", -apple-system, sans-serif; font-size: 13px;
+}
+.excel .excel-ribbon-tabs {
+  background: #217346; color: #fff; display: flex; flex-wrap: wrap; gap: 2px; padding: 0 8px;
+  font-size: 12.5px; align-items: flex-end; flex: none;
+}
+.excel .excel-ribbon-tabs .tab { padding: 6px 12px; cursor: default; line-height: 1; white-space: nowrap; }
+.excel .excel-ribbon-tabs .tab.active { background: #f3f2f1; color: #217346; border-radius: 4px 4px 0 0; font-weight: 600; }
+.excel .excel-ribbon {
+  background: #f3f2f1; border-bottom: 1px solid #d2d0ce; min-height: 56px; flex: none;
+  display: flex; align-items: stretch; gap: 16px; padding: 8px 14px; flex-wrap: wrap;
+}
+.excel .rg { display: flex; flex-direction: column; align-items: center; gap: 4px; justify-content: center; flex: none; }
+.excel .rrow { display: flex; gap: 4px; }
+.excel .rlabel { font-size: 11px; color: #888; }
+.excel .rib-btn { background: #fff; border: 1px solid #d2d0ce; border-radius: 3px; padding: 4px 8px; font-size: 12px; color: #444; }
+.excel .rsep { width: 1px; align-self: center; height: 40px; background: #d2d0ce; flex: none; }
+.excel .excel-search-group { flex: 1; min-width: 330px; max-width: 620px; align-items: stretch; }
+.excel .excel-search {
+  position: relative; display: flex; align-items: center; min-height: 30px;
+  border: 1px solid #a19f9d; border-radius: 3px; background: #fff;
+}
+.excel .excel-search:focus-within { border-color: #217346; box-shadow: 0 0 0 1px #217346; }
+.excel .excel-search-icon { padding: 0 7px; color: #605e5c; font-size: 17px; line-height: 1; }
+.excel .excel-search input {
+  min-width: 0; width: 100%; border: 0; outline: 0; padding: 5px 8px 5px 0;
+  background: transparent; color: #323130; font: 12px "Segoe UI", "Malgun Gothic", sans-serif;
+}
+.excel .excel-search-results {
+  position: absolute; top: calc(100% + 4px); left: -1px; right: -1px; z-index: 30;
+  max-height: 300px; overflow: auto; border: 1px solid #a19f9d; border-radius: 3px;
+  background: #fff; box-shadow: 0 5px 16px rgba(0,0,0,.2);
+}
+.excel .excel-search-results button {
+  width: 100%; display: grid; grid-template-columns: 38px 70px minmax(90px, 1fr) auto;
+  align-items: center; gap: 8px; border: 0; border-bottom: 1px solid #edebe9;
+  padding: 7px 9px; background: #fff; color: #323130; text-align: left; cursor: pointer;
+  font: 12px "Segoe UI", "Malgun Gothic", sans-serif;
+}
+.excel .excel-search-results button:last-child { border-bottom: 0; }
+.excel .excel-search-results button:hover,
+.excel .excel-search-results button:focus-visible { background: #edf6f1; outline: none; }
+.excel .excel-search-results .asset-kind {
+  border-radius: 2px; padding: 1px 4px; color: #fff; background: #4472c4; font-size: 10px; text-align: center;
+}
+.excel .excel-search-results .asset-kind.coin { background: #a66b16; }
+.excel .excel-search-results strong { color: #217346; }
+.excel .excel-search-results .asset-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.excel .excel-search-results small { color: #777; white-space: nowrap; }
+.excel .excel-search-empty { padding: 12px; color: #777; text-align: center; }
+.excel .excel-formula-bar {
+  background: #fff; border-bottom: 1px solid #d2d0ce; height: 24px; display: flex; align-items: center; font-size: 12px;
+}
+.excel .name-box { width: 90px; border-right: 1px solid #d2d0ce; padding: 0 8px; color: #555; height: 100%; display: flex; align-items: center; }
+.excel .fx { padding: 0 8px; color: #888; border-right: 1px solid #d2d0ce; height: 100%; display: flex; align-items: center; font-style: italic; }
+.excel .formula-input { padding: 0 8px; color: #323130; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.excel .excel-grid-wrap { flex: 1; overflow: auto; background: #fff; }
+.excel table.excel-sheet { border-collapse: collapse; table-layout: fixed; font-size: 12.5px; width: 100%; }
+.excel table.excel-sheet th,
+.excel table.excel-sheet td {
+  border: 1px solid #e1dfdd; height: 21px; padding: 0 8px; overflow: hidden;
+  white-space: nowrap; text-overflow: ellipsis; text-align: right; color: #323130;
+}
+.excel table.excel-sheet th { background: #f3f2f1; color: #605e5c; text-align: center; font-weight: 500; position: sticky; top: 0; z-index: 1; }
+.excel table.excel-sheet th.row-h,
+.excel table.excel-sheet td.row-h { min-width: 34px; width: 34px; background: #f3f2f1; color: #605e5c; text-align: center; }
+.excel table.excel-sheet td.left { text-align: left; }
+.excel table.excel-sheet td.head { font-weight: 600; background: #fafafa; }
+.excel table.excel-sheet td.section { font-weight: 700; background: #eef5f1; color: #217346; text-align: left; }
+/* 등락 색 — 엑셀 룩에 맞춘 고정 색(테마 변수 미사용: 골격이 항상 라이트라서). */
+.excel table.excel-sheet td.up { color: #0a7d33; }
+.excel table.excel-sheet td.down { color: #c0392b; }
+.excel table.excel-sheet tr:hover td:not(.row-h):not(.section) { background: #f5f9f7; }
+.excel .excel-sheet-tabs {
+  background: #f3f2f1; border-top: 1px solid #d2d0ce; height: 28px; display: flex; align-items: center;
+  padding: 0 8px; gap: 2px; font-size: 12px;
+}
+.excel .sheet-tab { padding: 4px 12px; color: #605e5c; border-right: 1px solid #e1dfdd; cursor: pointer; }
+.excel .sheet-tab.active { background: #fff; color: #217346; font-weight: 600; border-top: 2px solid #217346; }
+.excel .excel-statusbar {
+  background: #217346; color: #fff; height: 22px; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 12px; font-size: 11.5px;
+}
+.excel .excel-statusbar .right { display: flex; gap: 18px; }
+
+/* 리본 탭 줄 "닫기" 버튼 — "보기" 옆, 우측 정렬로 밀어냄 */
+.excel .excel-exit {
+  margin-left: auto; align-self: center; background: rgba(255,255,255,.14); color: #fff;
+  border: 1px solid rgba(255,255,255,.35); border-radius: 4px; padding: 3px 10px;
+  font-size: 12px; cursor: pointer; white-space: nowrap;
+}
+.excel .excel-exit:hover { background: rgba(255,255,255,.26); }
+
+/* 엑셀 시트 안 링크 버튼 (뉴스 F열 등) */
+.excel .excel-link {
+  color: #0563c1; text-decoration: underline; cursor: pointer; font-size: 12px;
+}
+.excel .excel-link:hover { color: #073d80; }
+
+@media (max-width: 700px) {
+  .excel .excel-ribbon { gap: 8px; padding: 7px 8px; }
+  .excel .excel-search-group { order: 2; flex-basis: 100%; min-width: 0; max-width: none; }
+  .excel .excel-search-results button { grid-template-columns: 38px 58px minmax(70px, 1fr); }
+  .excel .excel-search-results small { display: none; }
+}

@@ -1,0 +1,16 @@
+
+/* QUOTE */
+.quote-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.quote-head .qsym { font-size: 18px; font-weight: 700; }
+.quote-head .qname { color: var(--dim); }
+.quote-head .qprice {
+  min-width: 0; white-space: nowrap; font-size: 18px; font-weight: 700;
+  font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1;
+}
+.fields { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 8px; }
+.fields, .cross-market-metrics, .excel-sheet { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }
+.field .l { color: var(--dim); margin-right: 5px; }
+.meta { color: var(--dim); font-size: 12px; margin-bottom: 8px; }
+.meta b { color: var(--txt); font-weight: 600; }
+.spark { height: 48px; margin: 6px 0; display: block; }
+.updated { color: var(--dim); font-size: 11px; }

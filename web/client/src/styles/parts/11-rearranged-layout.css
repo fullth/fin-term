@@ -1,0 +1,61 @@
+
+/* 재배치 레이아웃: 검색줄 + 정보띠 + 메인 */
+.topbars { display: flex; gap: 10px; padding: 6px 14px; border-bottom: 1px solid var(--border); background: var(--panel); }
+.topbars .searchbar { flex: 1; border: none; padding: 0; background: transparent; }
+.explain-compact { display: flex; gap: 6px; align-items: center; }
+.explain-compact .aikey-input { width: 220px; }
+.explain-pop { position: absolute; top: 36px; right: 0; z-index: 40; min-width: 320px; max-width: 420px;
+  background: var(--panel); border: 1px solid var(--magenta); border-radius: 8px; padding: 10px 12px;
+  font-size: 12px; line-height: 1.6; cursor: pointer; box-shadow: 0 4px 16px rgba(0,0,0,.4); }
+
+/* 브리핑 전체보기 모달 */
+.brief-modal-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,.55);
+  display: flex; align-items: center; justify-content: center; padding: 24px; }
+.brief-modal { width: min(720px, 92vw); max-height: 80vh; display: flex; flex-direction: column;
+  background: var(--panel); border: 1px solid var(--magenta); border-radius: 10px; padding: 14px 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.5); }
+.brief-modal-body { margin-top: 8px; overflow: auto; font-size: 14px; line-height: 1.75; white-space: pre-wrap; color: var(--txt); }
+
+/* 가격 알림 설정 모달 */
+.alert-modal { width: min(560px, 94vw); max-height: 84vh; display: flex; flex-direction: column;
+  background: var(--panel); border: 1px solid var(--red); border-radius: 10px; padding: 14px 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.5); }
+.alert-modal-common { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  flex-wrap: wrap; margin: 10px 0; padding-bottom: 10px; border-bottom: 1px solid var(--border); font-size: 12px; }
+.alert-modal-list { overflow: auto; display: flex; flex-direction: column; gap: 5px; }
+.alert-modal-head { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--dim);
+  padding: 0 2px 4px; }
+.alert-modal-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.alert-modal-row .sym { color: var(--txt); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.alert-modal-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+.alert-modal-footer .newsbtn { padding: 5px 14px; font-size: 12px; }
+/* 알림 모달 탭 */
+.alert-modal-tabs { display: flex; gap: 6px; margin: 10px 0; }
+.alert-modal-tabs .newsbtn { padding: 4px 12px; font-size: 12px; }
+/* 알림 이력 행 */
+.alert-hist-row { display: flex; align-items: baseline; gap: 10px; font-size: 12px; padding: 4px 2px;
+  border-bottom: 1px solid var(--border); }
+.alert-hist-time { flex: 0 0 64px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.alert-hist-label { flex: 1; color: var(--txt); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.alert-hist-pct { flex: 0 0 84px; text-align: right; font-weight: 600; }
+.alert-hist-price { flex: 0 0 96px; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* 정보 띠: 브리핑 · 지수 · 환율 · 급상승 (가로 4분할) */
+.inforow { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 10px; padding: 10px 10px 0; align-items: start; }
+.inforow .panel { max-height: 230px; }
+
+/* 3열: 좌(브리핑+WATCHLIST) · 중앙(지수·환율+QUOTE+NEWS) · 우(급상승) */
+.layout3 {
+  display: grid;
+  grid-template-columns: minmax(300px, 1fr) 2.4fr minmax(220px, 0.9fr);
+  gap: 10px; padding: 10px; height: 100%; min-height: 0;
+}
+.col-left { display: flex; flex-direction: column; gap: 10px; min-width: 0; min-height: 0; overflow: hidden; }
+.col-left > .brief-panel { flex: none; height: var(--info-h, 190px); overflow: hidden; display: flex; flex-direction: column; }
+.brief-panel > .ptitle { flex: none; }
+.brief-panel > .brief-body { flex: 1; min-height: 0; overflow: auto; }
+.col-left > .area-watch { flex: 1; min-height: 0; overflow: auto; }
+.col-mid { display: flex; flex-direction: column; gap: 10px; min-width: 0; min-height: 0; overflow: hidden; }
+.col-right { display: flex; flex-direction: column; gap: 10px; min-width: 0; min-height: 0; overflow: hidden; }
+.col-right > .panel { flex: 1; min-height: 0; overflow: auto; }
