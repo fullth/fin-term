@@ -1,0 +1,32 @@
+{
+  "projectId": "0c1696e3-626a-449e-aff4-3cbdde4bed3b",
+  "shape": "package",
+  "pkg": "fin-term-client",
+  "globalName": "FinTerm",
+  "entry": "web/client/.ds-entry.tsx",
+  "cssEntry": "src/styles/app.css",
+  "tsconfig": "tsconfig.json",
+  "readmeHeader": ".design-sync/conventions.md",
+  "componentSrcMap": {
+    "Sparkline": "src/components/Sparkline.tsx",
+    "QuotePanel": "src/components/QuotePanel.tsx",
+    "Watchlist": "src/components/Watchlist.tsx",
+    "NewsStream": "src/components/NewsStream.tsx",
+    "IndicesPanel": "src/components/SidePanels.tsx",
+    "MarketsPanel": "src/components/SidePanels.tsx",
+    "HotPanel": "src/components/SidePanels.tsx",
+    "BriefPanel": "src/components/SidePanels.tsx",
+    "AlertTriggerButton": "src/components/AlertTriggerButton.tsx"
+  },
+  "dtsPropsFor": {
+    "Sparkline": "/** intraday close values; needs >= 2 points to draw */\n  values: number[];\n  /** true = up (var(--up)) stroke, false = down (var(--down)) */\n  positive: boolean;\n  /** viewBox width, default 400 */\n  width?: number;\n  /** pixel height, default 48 */\n  height?: number;",
+    "QuotePanel": "/** selected symbol's live quote; undefined shows an empty prompt */\n  quote?: {\n    symbol: string;\n    price: number | null;\n    change: number | null;\n    change_pct: number | null;\n    open: number | null;\n    high: number | null;\n    low: number | null;\n    prev_close: number | null;\n    spark: number[];\n    updated_at: number;\n    halted?: boolean;\n    error?: string;\n  };\n  /** fundamentals for the same symbol; null shows \"loading\" */\n  detail: {\n    symbol: string;\n    name?: string;\n    week52_high?: number | null;\n    week52_low?: number | null;\n    volume?: number | null;\n    pe?: number | null;\n    market_cap?: number | null;\n    industry?: string;\n    exchange?: string;\n  } | null;",
+    "Watchlist": "watchlist: string[];\n  /** symbol -> display name */\n  names: Record<string, string>;\n  /** symbol -> live quote */\n  quotes: Record<string, {\n    symbol: string;\n    price: number | null;\n    change_pct: number | null;\n    halted?: boolean;\n    error?: string;\n  }>;\n  selected: string | null;\n  /** symbol currently used as the news filter, or null */\n  newsFilter: string | null;\n  onSelect: (sym: string) => void;\n  onRemove: (sym: string) => void;\n  onFilterNews: (sym: string) => void;",
+    "NewsStream": "news: Array<{\n    id: string;\n    title: string;\n    url: string;\n    source: string;\n    published_at: number;\n    tickers: string[];\n  }>;\n  /** 'all' | 'domestic' | 'foreign' */\n  scope: 'domestic' | 'foreign' | 'all';\n  onScopeChange: (s: 'domestic' | 'foreign' | 'all') => void;\n  /** ticker to filter headlines by, or null */\n  filter: string | null;\n  onClearFilter: () => void;",
+    "IndicesPanel": "quotes: Array<{ symbol: string; price: number | null; change_pct: number | null; error?: string }>;\n  /** symbol -> short label shown instead of the raw symbol */\n  labels: Array<{ symbol: string; label: string }>;",
+    "MarketsPanel": "quotes: Array<{ symbol: string; price: number | null; change_pct: number | null; error?: string }>;\n  /** symbol -> short label shown instead of the raw symbol */\n  labels: Array<{ symbol: string; label: string }>;",
+    "HotPanel": "items: Array<{\n    symbol: string;\n    name: string;\n    price: number | null;\n    change_pct: number | null;\n    market: 'KR' | 'US';\n    sector: string | null;\n    volume: number | null;\n    news: Array<{ title: string; source: string; url: string }>;\n  }>;\n  /** first response arrived — distinguishes loading from an empty (market-closed) result */\n  loaded: boolean;\n  onSelect: (sym: string) => void;",
+    "BriefPanel": "/** generated briefing text; null shows the disabled hint */\n  text: string | null;\n  loading: boolean;",
+    "AlertTriggerButton": "/** alerts are on — shows a red dot */\n  enabled: boolean;\n  onClick: () => void;"
+  }
+}
