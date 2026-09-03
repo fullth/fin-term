@@ -1,0 +1,19 @@
+
+/* NEWS */
+.news-row { display: flex; gap: 7px; padding: 2px 6px 2px 0; align-items: baseline; cursor: pointer;
+  border-left: 2px solid transparent; border-radius: 4px; }
+.news-row:hover { background: var(--accent-bg); border-left-color: var(--cyan); }
+.news-row:hover .title { color: var(--cyan); }
+.news-row:hover .num { color: var(--cyan); }
+.news-row.sel { background: var(--accent-bg-strong); border-left-color: var(--cyan); }
+.news-row .num { color: var(--dim); min-width: 26px; text-align: right; }
+.news-row .time { color: var(--dim); }
+.tag { font-weight: 600; }
+.tag.tkr { color: var(--green); }
+.tag.mkt { color: var(--dim); }
+.news-row .title { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--txt); }
+.news-row.sel .title { color: var(--cyan); }
+.news-row .src { color: var(--dim); white-space: nowrap; }
+.news-panel-head { justify-content: space-between; gap: 10px; }
+.news-filter-tools, .news-view-tabs { display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; flex-wrap: wrap; }
+.news-filter-tools .mode-btn, .news-view-tabs .mode-btn { padding: 1px 6px; font-size: 10px; }

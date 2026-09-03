@@ -1,0 +1,39 @@
+/* 블룸버그 룩 디자인 토큰 — docs/web-mockup.html 에서 이식 */
+:root {
+  --bg: #000000;
+  --panel: #050608;
+  --border: #2a2f37;
+  --btn-border: #4b5563; /* 상단바 버튼 테두리 — 검은 배경 위에서도 구분되게 더 밝게 */
+  --border-foc: #22d3ee;
+  --txt: #d7dbe0;
+  --dim: #6b7280;
+  --news-summary: #9aa4b2;
+  --yellow: #eab308;
+  --cyan: #22d3ee;
+  --blue: #3b82f6;
+  --magenta: #c026d3;
+  --red: #ef4444;
+  --green: #22c55e;
+  /* 한국식: 상승=빨강, 하락=파랑 */
+  --up: #f43f5e;
+  --down: #3b82f6;
+  --input-bg: #0b0d10;
+  --accent-bg: rgba(34, 211, 238, .08);
+  --accent-bg-strong: rgba(34, 211, 238, .14);
+  --mono: "SF Mono", "JetBrains Mono", "Menlo", "Consolas", monospace;
+}
+* {
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: #29313b transparent;
+}
+*::-webkit-scrollbar { width: 9px; height: 9px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  min-height: 32px; border: 2px solid transparent; border-radius: 999px;
+  background: #29313b; background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover { background-color: #46515f; }
+*::-webkit-scrollbar-corner { background: transparent; }
+html, body, #root { margin: 0; height: 100%; }
+html { scrollbar-gutter: stable; }
