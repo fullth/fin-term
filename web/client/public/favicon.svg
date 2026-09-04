@@ -1,15 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <!-- fin-term: 블룸버그 터미널 룩. 검정 배경 + 노랑 프롬프트 + 시안 상승 라인 -->
-  <rect width="64" height="64" rx="12" fill="#000000"/>
-  <rect x="3.5" y="3.5" width="57" height="57" rx="10" fill="none" stroke="#2a2f37" stroke-width="2"/>
+  <!-- fin-term: 블룸버그 터미널 룩. 검정 타일 + 시안 상승 라인 + 노랑 캐럿 -->
+  <rect width="64" height="64" rx="14" fill="#0a0b0d"/>
+  <rect x="2.5" y="2.5" width="59" height="59" rx="12" fill="none" stroke="#2a2f37" stroke-width="1.5"/>
+  <!-- 터미널 캐럿 '>' (yellow) — 좌하단 앵커 -->
+  <path d="M14 24 L22 32 L14 40" fill="none" stroke="#eab308" stroke-width="4"
+        stroke-linecap="round" stroke-linejoin="round"/>
   <!-- 상승 시세 라인 (cyan) -->
-  <polyline points="10,42 20,38 28,44 36,30 44,34 54,18"
-            fill="none" stroke="#22d3ee" stroke-width="3"
+  <polyline points="28,42 37,33 44,38 54,22" fill="none" stroke="#22d3ee" stroke-width="4"
             stroke-linecap="round" stroke-linejoin="round"/>
   <!-- 끝점 강조 -->
-  <circle cx="54" cy="18" r="3.2" fill="#22c55e"/>
-  <!-- 터미널 프롬프트 ">_" (yellow) -->
-  <path d="M11 52 l5 4 -5 4" fill="none" stroke="#eab308" stroke-width="2.6"
-        stroke-linecap="round" stroke-linejoin="round"/>
-  <rect x="20" y="54" width="9" height="2.6" rx="1.3" fill="#eab308"/>
+  <circle cx="54" cy="22" r="3.4" fill="#22c55e"/>
 </svg>

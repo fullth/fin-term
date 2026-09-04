@@ -1,4 +1,3 @@
-import type { CSSProperties } from 'react';
 import type { CoinMeta, CoinNewsItem, CoinQuote, Detail, LabelEntry, NewsItem, NewsScope, Quote, UpbitTick } from '../lib/types';
 import { arrow, changeClass, fmtPct, fmtPriceCompact, fmtTime } from '../lib/format';
 import type { ConnectionInfo, ConnectionState } from '../lib/connection';
@@ -30,7 +29,6 @@ interface Props {
   selectedCoin: string | null;
   stockConnection: ConnectionInfo;
   coinConnection: ConnectionInfo;
-  combinedSplit: number;
   onAddSymbol: (symbol: string, name: string) => void;
   onRemoveSymbol: (symbol: string) => void;
   onSelectSymbol: (symbol: string) => void;
@@ -40,7 +38,6 @@ interface Props {
   onAddCoin: (coin: CoinMeta) => void;
   onRemoveCoin: (id: string) => void;
   onSelectCoin: (symbol: string) => void;
-  onCombinedSplitChange: (value: number) => void;
 }
 
 function fmtKrw(value: number | null): string {
@@ -178,14 +175,10 @@ function CrossMarketSummary({
   indices,
   markets,
   coinQuotes,
-  split,
-  onSplitChange,
 }: {
   indices: Quote[];
   markets: Quote[];
   coinQuotes: CoinQuote[];
-  split: number;
-  onSplitChange: (value: number) => void;
 }) {
   const quoteOf = (symbol: string) => [...indices, ...markets].find((quote) => quote.symbol === symbol);
   const sp = quoteOf('^GSPC');
@@ -226,17 +219,6 @@ function CrossMarketSummary({
           </div>
         ))}
       </div>
-      <label className="combined-split-control">
-        <span>화면 비율</span>
-        <input
-          type="range"
-          min="35"
-          max="65"
-          value={split}
-          onChange={(event) => onSplitChange(Number(event.target.value))}
-        />
-        <output>주식 {split} / 코인 {100 - split}</output>
-      </label>
     </section>
   );
 }
@@ -261,7 +243,6 @@ export function CombinedView(props: Props) {
     selectedCoin,
     stockConnection,
     coinConnection,
-    combinedSplit,
     onAddSymbol,
     onRemoveSymbol,
     onSelectSymbol,
@@ -271,7 +252,6 @@ export function CombinedView(props: Props) {
     onAddCoin,
     onRemoveCoin,
     onSelectCoin,
-    onCombinedSplitChange,
   } = props;
 
   const selectedCoinMeta = coins.find((coin) => coin.symbol === selectedCoin) ?? null;
@@ -291,18 +271,9 @@ export function CombinedView(props: Props) {
         </div>
       </div>
 
-      <CrossMarketSummary
-        indices={indices}
-        markets={markets}
-        coinQuotes={coinQuotes}
-        split={combinedSplit}
-        onSplitChange={onCombinedSplitChange}
-      />
+      <CrossMarketSummary indices={indices} markets={markets} coinQuotes={coinQuotes} />
 
-      <div
-        className="combined-market-grid"
-        style={{ '--stock-share': `${combinedSplit}fr`, '--coin-share': `${100 - combinedSplit}fr` } as CSSProperties}
-      >
+      <div className="combined-market-grid">
         <section className="combined-lane stock-lane" aria-labelledby="combined-stock-title">
           <header className="combined-lane-head">
             <div>

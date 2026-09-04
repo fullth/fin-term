@@ -55,7 +55,6 @@ export function App() {
       ? persisted.selectedCoin
       : persisted.coins[0]?.symbol ?? null,
   );
-  const [combinedSplit, setCombinedSplit] = useState(persisted.combinedSplit);
   const [newsFilter, setNewsFilter] = useState<string | null>(null);
   const [hasServerKey, setHasServerKey] = useState(false);
   const [, setAiKeyVersion] = useState(0); // 키 변경 시 AI 패널 리렌더 트리거
@@ -130,12 +129,11 @@ export function App() {
       coins,
       selectedSymbol: selected,
       selectedCoin,
-      combinedSplit,
       marketMode: lastMarketModeRef.current,
       terminal,
       officeMode: office,
     });
-  }, [watchlist, names, scope, coins, selected, selectedCoin, combinedSplit, mode, terminal, office]);
+  }, [watchlist, names, scope, coins, selected, selectedCoin, mode, terminal, office]);
 
   // 채널톡 · 후원 위젯 — 앱 마운트 시 1회 boot
   useEffect(() => {
@@ -617,7 +615,6 @@ export function App() {
           selectedCoin={selectedCoin}
           stockConnection={stockConnection}
           coinConnection={cryptoLive.connection}
-          combinedSplit={combinedSplit}
           onAddSymbol={addSymbol}
           onRemoveSymbol={removeSymbol}
           onSelectSymbol={setSelected}
@@ -627,7 +624,6 @@ export function App() {
           onAddCoin={addCoin}
           onRemoveCoin={removeCoin}
           onSelectCoin={setSelectedCoin}
-          onCombinedSplitChange={setCombinedSplit}
         />
       ) : mode === 'stock' ? (
         <>
