@@ -10,7 +10,6 @@ import { NewsStream } from './components/NewsStream';
 import { IndicesPanel, MarketsPanel, HotPanel } from './components/SidePanels';
 import { BriefPanel, ExplainPanel } from './components/AiPanels';
 import { AlertSettingsModal } from './components/AlertSettingsModal';
-import { AlertCenter } from './components/AlertCenter';
 import { InstallButton } from './components/InstallButton';
 import { usePriceAlerts, fireAlert } from './lib/alerts';
 import { fmtPrice } from './lib/format';
@@ -74,27 +73,7 @@ export function App() {
   const cryptoAlerts = usePriceAlerts('crypto');
   const [stockAlertOpen, setStockAlertOpen] = useState(false);
   const [cryptoAlertOpen, setCryptoAlertOpen] = useState(false);
-  const [alertCenterOpen, setAlertCenterOpen] = useState(false);
-  // 알림 센터에서 마지막으로 확인한 알림 개수 — 새로 쌓인 만큼 배지로 표시.
-  const [alertsSeen, setAlertsSeen] = useState(() => {
-    try {
-      return Number(localStorage.getItem('fin-term:alerts:seen') ?? '0') || 0;
-    } catch {
-      return 0;
-    }
-  });
-  const alertTotal = stockAlerts.history.length + cryptoAlerts.history.length;
-  const alertUnseen = Math.max(0, alertTotal - alertsSeen);
   const alertsOn = stockAlerts.settings.enabled || cryptoAlerts.settings.enabled;
-  const openAlertCenter = () => {
-    setAlertCenterOpen(true);
-    setAlertsSeen(alertTotal);
-    try {
-      localStorage.setItem('fin-term:alerts:seen', String(alertTotal));
-    } catch {
-      /* 무시 */
-    }
-  };
   // 데일리 브리핑 — 주식/코인 공용, 모드 전환·새로고침에도 유지. 생성 버튼 누를 때만 갱신.
   // 마지막 생성 결과를 localStorage 에 보관해 새로고침 후에도 복원한다.
   const [brief, setBrief] = useState<{ text: string | null; loading: boolean; err: string | null }>(() => ({
@@ -460,91 +439,100 @@ export function App() {
           </button>
         </div>
         <nav className="modes" aria-label="주요 화면">
-          {/* 화면 전환 영역 — 시장 화면 + 보기 도구를 한 묶음으로 라벨링 */}
-          <div className="nav-switcher" role="group" aria-label="화면 전환">
-            <span className="nav-switcher-label" aria-hidden="true">화면</span>
-            <div className="nav-button-group market-tools" role="group" aria-label="시장 화면">
-              <button
-                className={`mode-btn${!terminal && mode === 'combined' ? ' active' : ''}`}
-                onClick={() => {
-                  setMode('combined');
-                  setTerminal(false);
-                }}
-                aria-current={!terminal && mode === 'combined' ? 'page' : undefined}
-                title="주식과 코인을 한 화면에서"
-              >
-                주식+코인
-              </button>
-              <button
-                className={`mode-btn${!terminal && mode === 'stock' ? ' active' : ''}`}
-                onClick={() => {
-                  setMode('stock');
-                  setTerminal(false);
-                }}
-                aria-current={!terminal && mode === 'stock' ? 'page' : undefined}
-              >
-                주식
-              </button>
-              <button
-                className={`mode-btn${!terminal && mode === 'crypto' ? ' active' : ''}`}
-                onClick={() => {
-                  setMode('crypto');
-                  setTerminal(false);
-                }}
-                aria-current={!terminal && mode === 'crypto' ? 'page' : undefined}
-              >
-                코인
-              </button>
-              <button
-                className={`mode-btn${!terminal && mode === 'diary' ? ' active' : ''}`}
-                onClick={() => {
-                  setMode('diary');
-                  setTerminal(false);
-                }}
-                aria-current={!terminal && mode === 'diary' ? 'page' : undefined}
-                title="브리핑 이력과 투자 일지"
-              >
-                투자일지
-              </button>
-            </div>
-            <div className="nav-button-group display-tools" role="group" aria-label="보기 도구">
-              <button
-                className={`mode-btn tool-btn${terminal ? ' active' : ''}`}
-                onClick={() => setTerminal((value) => !value)}
-                title="명령형 Terminal 화면"
-                aria-label="Terminal"
-                aria-pressed={terminal}
-              >
-                <span className="tool-glyph">›_</span> Terminal
-              </button>
-              <button className="mode-btn tool-btn" onClick={() => setExcel(true)} title="Excel 위장 화면 (` 키)" aria-label="Excel">
-                <span className="tool-glyph">▦</span> Excel
-              </button>
-              <button
-                className={`mode-btn tool-btn${office ? ' active' : ''}`}
-                onClick={() => setOffice((value) => !value)}
-                title="등락 색상을 낮추고 개인 위젯 숨김"
-                aria-label="업무 화면"
-                aria-pressed={office}
-              >
-                <span className="tool-glyph">◐</span> 업무
-              </button>
-            </div>
-          </div>
+          {/* 시장 모드 */}
+          <div className="nav-button-group market-tools" aria-label="시장 화면">
           <button
-            type="button"
-            className={`mode-btn alert-trigger${alertsOn ? ' on' : ''}`}
-            onClick={openAlertCenter}
-            title="주식·코인 가격 알림과 최근 알림 이력"
+            className={`mode-btn${!terminal && mode === 'combined' ? ' active' : ''}`}
+            onClick={() => {
+              setMode('combined');
+              setTerminal(false);
+            }}
+            aria-current={!terminal && mode === 'combined' ? 'page' : undefined}
           >
-            <span className="tool-glyph">🔔</span> 알림
-            {alertsOn && <span className="alert-trigger-state" aria-label="알림 켜짐">ON</span>}
-            {alertUnseen > 0 && (
-              <span className="alert-trigger-badge" aria-label={`새 알림 ${alertUnseen}건`}>
-                {alertUnseen > 9 ? '9+' : alertUnseen}
-              </span>
-            )}
+            주식+코인
           </button>
+          <button
+            className={`mode-btn${!terminal && mode === 'stock' ? ' active' : ''}`}
+            onClick={() => {
+              setMode('stock');
+              setTerminal(false);
+            }}
+            aria-current={!terminal && mode === 'stock' ? 'page' : undefined}
+          >
+            주식
+          </button>
+          <button
+            className={`mode-btn${!terminal && mode === 'crypto' ? ' active' : ''}`}
+            onClick={() => {
+              setMode('crypto');
+              setTerminal(false);
+            }}
+            aria-current={!terminal && mode === 'crypto' ? 'page' : undefined}
+          >
+            코인
+          </button>
+          <button
+            className={`mode-btn${!terminal && mode === 'diary' ? ' active' : ''}`}
+            onClick={() => {
+              setMode('diary');
+              setTerminal(false);
+            }}
+            aria-current={!terminal && mode === 'diary' ? 'page' : undefined}
+            title="브리핑 이력과 투자 일지"
+          >
+            투자일지
+          </button>
+          </div>
+          <div className="nav-button-group display-tools" aria-label="보기 도구">
+            <button
+              className={`mode-btn tool-btn${terminal ? ' active' : ''}`}
+              onClick={() => setTerminal((value) => !value)}
+              title="명령형 Terminal 화면"
+              aria-label="Terminal"
+              aria-pressed={terminal}
+            >
+              <span className="tool-glyph">›_</span> Terminal
+            </button>
+            <button className="mode-btn tool-btn" onClick={() => setExcel(true)} title="Excel 위장 화면 (` 키)" aria-label="Excel">
+              <span className="tool-glyph">▦</span> Excel
+            </button>
+            <button
+              className={`mode-btn tool-btn${office ? ' active' : ''}`}
+              onClick={() => setOffice((value) => !value)}
+              title="등락 색상을 낮추고 개인 위젯 숨김"
+              aria-label="업무 화면"
+              aria-pressed={office}
+            >
+              <span className="tool-glyph">◐</span> 업무
+            </button>
+          </div>
+          <details className="nav-menu">
+            <summary className={`mode-btn alert-trigger${alertsOn ? ' on' : ''}`}>
+              alert{alertsOn ? ' ●' : ''}
+            </summary>
+            <div className="nav-menu-pop nav-alert-menu">
+              <button
+                className={`nav-menu-item${stockAlerts.settings.enabled ? ' active' : ''}`}
+                onClick={(event) => {
+                  const details = event.currentTarget.closest('details');
+                  if (details) details.open = false;
+                  setStockAlertOpen(true);
+                }}
+              >
+                주식 알림 <span>{stockAlerts.settings.enabled ? 'ON' : 'OFF'}</span>
+              </button>
+              <button
+                className={`nav-menu-item${cryptoAlerts.settings.enabled ? ' active' : ''}`}
+                onClick={(event) => {
+                  const details = event.currentTarget.closest('details');
+                  if (details) details.open = false;
+                  setCryptoAlertOpen(true);
+                }}
+              >
+                코인 알림 <span>{cryptoAlerts.settings.enabled ? 'ON' : 'OFF'}</span>
+              </button>
+            </div>
+          </details>
           <AiKeyManager onChange={onAiKeyChange} />
           <InstallButton />
           <span className={`nav-live state-${navConnectionState}`}>● {navConnectionLabel}</span>
@@ -710,43 +698,6 @@ export function App() {
         >
           🔔 {cryptoAlerts.toast}
         </div>
-      )}
-      {alertCenterOpen && (
-        <AlertCenter
-          onClose={() => setAlertCenterOpen(false)}
-          scopes={[
-            {
-              key: 'stock',
-              label: '주식',
-              enabled: stockAlerts.settings.enabled,
-              threshold: stockAlerts.settings.threshold,
-              watchCount: watchlist.length,
-              history: stockAlerts.history,
-              onToggle: stockAlerts.toggle,
-              onThreshold: stockAlerts.setThreshold,
-              onOpenDetail: () => {
-                setAlertCenterOpen(false);
-                setStockAlertOpen(true);
-              },
-              onClearHistory: stockAlerts.clearHistory,
-            },
-            {
-              key: 'crypto',
-              label: '코인',
-              enabled: cryptoAlerts.settings.enabled,
-              threshold: cryptoAlerts.settings.threshold,
-              watchCount: coins.length,
-              history: cryptoAlerts.history,
-              onToggle: cryptoAlerts.toggle,
-              onThreshold: cryptoAlerts.setThreshold,
-              onOpenDetail: () => {
-                setAlertCenterOpen(false);
-                setCryptoAlertOpen(true);
-              },
-              onClearHistory: cryptoAlerts.clearHistory,
-            },
-          ]}
-        />
       )}
       {stockAlertOpen && (
         <AlertSettingsModal
