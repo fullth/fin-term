@@ -89,6 +89,18 @@ body {
 .nav-button-group .mode-btn:hover { border-color: var(--btn-border); }
 .nav-button-group .mode-btn.active { border-color: currentColor; }
 .display-tools { background: linear-gradient(180deg, rgba(34, 211, 238, .04), transparent), #080a0d; }
+/* 화면 전환 영역 — 시장 화면 + 보기 도구를 하나의 라벨 박스로 묶어 "여기서 화면을 바꾼다"를 명시 */
+.nav-switcher {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 6px 3px 8px; border: 1px solid var(--border-foc);
+  border-radius: 10px; background: rgba(34, 211, 238, .04);
+}
+.nav-switcher-label {
+  color: var(--border-foc); font-family: var(--mono); font-size: 9px; font-weight: 700;
+  letter-spacing: .14em; text-transform: uppercase; padding-right: 2px;
+  border-right: 1px solid var(--border); margin-right: 2px; align-self: stretch;
+  display: inline-flex; align-items: center;
+}
 .tool-btn { gap: 5px; }
 .tool-glyph { min-width: 14px; color: var(--dim); font-size: 11px; text-align: center; }
 .tool-btn:hover .tool-glyph, .tool-btn.active .tool-glyph { color: currentColor; }
@@ -110,30 +122,67 @@ body {
 .nav-live.state-connecting, .nav-live.state-reconnecting { color: var(--yellow); }
 .nav-live.state-stale { color: var(--red); }
 .nav-live.state-idle { color: var(--dim); }
-.nav-menu { position: relative; }
-.nav-menu > summary { list-style: none; }
-.nav-menu > summary::-webkit-details-marker { display: none; }
-.nav-menu[open] > summary { color: var(--cyan); border-color: var(--cyan); }
-.nav-menu-pop {
-  position: absolute; top: 31px; right: 0; z-index: 80; width: 190px;
-  display: grid; gap: 5px; border: 1px solid var(--border); border-radius: 7px;
-  padding: 7px; background: #07090c; box-shadow: 0 10px 28px rgba(0,0,0,.55);
-}
-.nav-menu-item {
-  min-height: 30px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  cursor: pointer; border: 1px solid transparent; border-radius: 5px; padding: 4px 7px;
-  background: transparent; color: var(--txt); font-family: var(--mono); text-align: left;
-}
-.nav-menu-item:hover { border-color: var(--border); background: var(--accent-bg); color: var(--cyan); }
-.nav-menu-item.active { color: #3fb950; }
-.nav-menu-item span { color: var(--dim); font-size: 10px; }
-.nav-menu-pop > .mode-btn, .nav-menu-pop > .alert-btn-wrap > .mode-btn { width: 100%; min-height: 30px; justify-content: space-between; }
-/* 변동 알림 버튼 — 꺼짐도 살짝 강조, 켜짐이면 빨강으로 확실히 */
-.alert-trigger { border-color: var(--red); color: var(--red); font-weight: 600; }
+/* 알림 센터 진입 버튼 — 꺼짐도 살짝 강조, 켜짐이면 빨강으로 확실히 */
+.alert-trigger { position: relative; gap: 5px; border-color: var(--red); color: var(--red); font-weight: 600; }
 .alert-trigger:hover { border-color: var(--red); background: rgba(244, 63, 94, .10); }
 .alert-trigger.on {
   color: var(--red); background: transparent; border-color: var(--red); font-weight: 700;
   box-shadow: 0 0 0 1px var(--red);
+}
+.alert-trigger .tool-glyph { font-size: 12px; }
+.alert-trigger-state {
+  font-size: 8px; font-weight: 800; letter-spacing: .1em;
+  padding: 1px 4px; border-radius: 4px; background: var(--red); color: #fff;
+}
+.alert-trigger-badge {
+  position: absolute; top: -6px; right: -6px; min-width: 15px; height: 15px; padding: 0 3px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 999px; background: var(--red); color: #fff;
+  font-family: var(--mono); font-size: 9px; font-weight: 800; line-height: 1;
+}
+
+/* ===== 알림 센터 모달 ===== */
+.alert-center {
+  width: min(560px, 94vw); max-height: 86vh; display: flex; flex-direction: column;
+  background: var(--panel); border: 1px solid var(--red); border-radius: 10px; padding: 14px 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.5);
+}
+.alert-center-lead { margin: 8px 0 12px; font-size: 12px; line-height: 1.6; }
+.alert-center-scopes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.alert-scope-card {
+  border: 1px solid var(--border); border-radius: 8px; padding: 10px; background: #07090c;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.alert-scope-card.on { border-color: var(--red); }
+.alert-scope-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.alert-scope-top strong { font-size: 13px; color: var(--txt); }
+.alert-scope-body { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12px; }
+.alert-scope-th { display: inline-flex; align-items: center; gap: 4px; }
+.alert-scope-watch { flex: 1; min-width: 0; }
+.alert-center-feed-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin: 14px 0 6px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 11px;
+}
+.alert-center-feed { overflow: auto; display: flex; flex-direction: column; }
+.alert-feed-row {
+  display: flex; align-items: baseline; gap: 8px; font-size: 12px; padding: 5px 2px;
+  border-bottom: 1px solid var(--border);
+}
+.alert-feed-scope {
+  flex: 0 0 auto; font-size: 9px; font-weight: 700; letter-spacing: .06em;
+  padding: 1px 5px; border-radius: 4px; border: 1px solid var(--border); color: var(--dim);
+}
+.alert-feed-time { flex: 0 0 84px; font-variant-numeric: tabular-nums; }
+.alert-feed-label { flex: 1; color: var(--txt); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.alert-feed-pct { flex: 0 0 78px; text-align: right; font-weight: 600; }
+.alert-feed-pct.up { color: var(--up); }
+.alert-feed-pct.down { color: var(--down); }
+.alert-feed-price { flex: 0 0 92px; text-align: right; font-variant-numeric: tabular-nums; }
+.alert-center-foot { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 11px; }
+@media (max-width: 560px) {
+  .alert-center-scopes { grid-template-columns: 1fr; }
+  .alert-feed-time { flex-basis: 72px; }
+  .alert-feed-price { display: none; }
 }
 
 /* 그리드 */
@@ -568,6 +617,9 @@ body {
   .modes { width: 100%; min-width: 0; flex-wrap: wrap; justify-content: flex-start; row-gap: 6px; }
   .modes > * { flex: 0 0 auto; } /* 버튼·래퍼가 줄어들지 않고 원래 크기 유지 */
   .nav-button-group { max-width: 100%; overflow-x: auto; }
+  /* 화면 전환 박스도 폭이 좁으면 두 그룹을 세로로 흐르게 */
+  .nav-switcher { flex-wrap: wrap; width: 100%; }
+  .nav-switcher .nav-button-group { flex: 1 1 auto; }
 }
 
 /* ===== 업무 화면 — 방향은 화살표로 남기고 금융 화면 특유의 강한 빨강/파랑은 낮춘다. ===== */
@@ -593,7 +645,6 @@ body {
   --accent-bg-strong: rgba(151, 163, 175, .14);
 }
 :root[data-office] .mode-btn.active,
-:root[data-office] .nav-menu-item.active,
 :root[data-office] .nav-live,
 :root[data-office] .connection-badge { color: #aab4be; }
 :root[data-office] .connection-badge i {

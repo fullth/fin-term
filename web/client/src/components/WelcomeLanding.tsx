@@ -19,13 +19,13 @@ export function WelcomeLanding({ onStart, onOffice, onExcel }: Props) {
           주식과 코인을 한 화면에서 비교하고, 필요한 방식으로 조용하게 확인하세요.
         </p>
         <div className="welcome-features" aria-label="주요 기능">
-          <span><b>01</b> 종합 시장 모니터</span>
+          <span><b>01</b> 주식+코인 동시 모니터</span>
           <span><b>02</b> 업무용 저채도 화면</span>
           <span><b>03</b> 검색 가능한 Excel 화면</span>
         </div>
         <div className="welcome-actions">
           <button className="welcome-primary" onClick={onStart}>
-            종합 화면 시작 <span>→</span>
+주식+코인 화면 시작 <span>→</span>
           </button>
           <button onClick={onOffice}>업무 화면으로 시작</button>
           <button onClick={onExcel}>Excel로 시작</button>
