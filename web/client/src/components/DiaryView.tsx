@@ -11,9 +11,6 @@ import {
 
 interface Props {
   history: BriefEntry[];
-  briefLoading: boolean;
-  onGenerateBrief: () => Promise<{ text: string | null; err: string | null; entryId?: string }>;
-  onOpenTerminal: () => void;
 }
 
 type SaveStatus = 'idle' | 'dirty' | 'saved' | 'error';
@@ -67,7 +64,7 @@ function statusText(status: SaveStatus, hasNote: boolean, savedAutomatically: bo
   return hasNote ? '✓ 저장된 기록' : '미저장 변경 없음';
 }
 
-export function DiaryView({ history, briefLoading, onGenerateBrief, onOpenTerminal }: Props) {
+export function DiaryView({ history }: Props) {
   const [notes, setNotes] = useState<DiaryEntries>(loadDiaryEntries);
   const notesRef = useRef(notes);
   const entries = useMemo(() => {
@@ -83,8 +80,6 @@ export function DiaryView({ history, briefLoading, onGenerateBrief, onOpenTermin
   const [draft, setDraft] = useState<DiaryDraft>(emptyDiaryDraft);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [savedAutomatically, setSavedAutomatically] = useState(false);
-  const [generateError, setGenerateError] = useState<string | null>(null);
-  const [pendingSelectionId, setPendingSelectionId] = useState<string | null>(null);
   const selectedRef = useRef<BriefEntry | null>(null);
   const draftRef = useRef(draft);
   const dirtyRef = useRef(false);
@@ -137,14 +132,6 @@ export function DiaryView({ history, briefLoading, onGenerateBrief, onOpenTermin
     [flushPending],
   );
 
-  const generateBrief = useCallback(async () => {
-    if (briefLoading) return;
-    setGenerateError(null);
-    const result = await onGenerateBrief();
-    if (result.entryId) setPendingSelectionId(result.entryId);
-    setGenerateError(result.err);
-  }, [briefLoading, onGenerateBrief]);
-
   const updateDraft = useCallback(
     (updater: (current: DiaryDraft) => DiaryDraft) => {
       const next = updater(draftRef.current);
@@ -173,13 +160,8 @@ export function DiaryView({ history, briefLoading, onGenerateBrief, onOpenTermin
       setSelectedId(null);
       return;
     }
-    if (pendingSelectionId && entries.some((entry) => entry.id === pendingSelectionId)) {
-      setPendingSelectionId(null);
-      selectEntry(pendingSelectionId);
-      return;
-    }
     if (!selectedId || !entries.some((entry) => entry.id === selectedId)) setSelectedId(entries[0].id);
-  }, [entries, pendingSelectionId, selectEntry, selectedId]);
+  }, [entries, selectedId]);
 
   useLayoutEffect(() => {
     if (!selected) return;
@@ -258,19 +240,7 @@ export function DiaryView({ history, briefLoading, onGenerateBrief, onOpenTermin
         <div className="diary-empty-box">
           <span className="diary-eyebrow">market log / local only</span>
           <h1>아직 생성된 브리핑이 없습니다</h1>
-          <p>오늘의 시장 브리핑을 생성하면 AI 원문과 나의 판단을 한 화면에 기록할 수 있습니다.</p>
-          <div className="diary-empty-actions">
-            <button
-              type="button"
-              className="diary-primary-btn diary-generate-btn"
-              onClick={() => void generateBrief()}
-              disabled={briefLoading}
-            >
-              {briefLoading ? '브리핑 생성 중…' : '오늘의 데일리 브리핑 생성'}
-            </button>
-            <button type="button" className="diary-ghost-btn" onClick={onOpenTerminal}>터미널에서 brief 실행</button>
-          </div>
-          {generateError && <span className="diary-generate-error" role="alert">{generateError}</span>}
+          <p>매일 오전 7시 공개되는 브리핑을 기다려 주세요.</p>
         </div>
       </main>
     );
@@ -285,15 +255,6 @@ export function DiaryView({ history, briefLoading, onGenerateBrief, onOpenTermin
         </div>
         <div className="diary-hero-actions">
           <span className="diary-local-badge">LOCAL ONLY</span>
-          <button
-            type="button"
-            className="diary-primary-btn diary-generate-btn"
-            onClick={() => void generateBrief()}
-            disabled={briefLoading}
-          >
-            {briefLoading ? '브리핑 생성 중…' : '오늘의 데일리 브리핑 생성'}
-          </button>
-          {generateError && <span className="diary-generate-error" role="alert">{generateError}</span>}
         </div>
       </header>
 
@@ -338,7 +299,6 @@ export function DiaryView({ history, briefLoading, onGenerateBrief, onOpenTermin
               <span className="diary-eyebrow">ai market brief</span>
               <strong>{selected ? formatDate(selected.at, true) : 'BRIEF'}</strong>
             </div>
-            <button type="button" className="diary-ghost-btn" onClick={onOpenTerminal}>터미널 열기</button>
           </div>
           <div className="diary-brief-meta">
             <div><span>CREATED</span><strong>{selected ? formatDate(selected.at, true) : '—'}</strong></div>

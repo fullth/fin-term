@@ -8,6 +8,8 @@ export interface Feed {
 }
 
 export const DEFAULT_FEEDS: Feed[] = [
+  { source: 'Google News', url: 'https://news.google.com/rss/search?q=%EC%A6%9D%EC%8B%9C%20OR%20%EA%B8%88%EB%A6%AC%20OR%20%ED%99%98%EC%9C%A8&hl=ko&gl=KR&ceid=KR:ko', lang: 'ko' },
+  { source: 'Google News', url: 'https://news.google.com/rss/search?q=stock%20market%20OR%20federal%20reserve&hl=en-US&gl=US&ceid=US:en', lang: 'en' },
   // 미국
   { source: 'Yahoo', url: 'https://finance.yahoo.com/news/rssindex', lang: 'en' },
   { source: 'CNBC', url: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114', lang: 'en' },

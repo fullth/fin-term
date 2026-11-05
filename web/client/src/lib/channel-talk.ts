@@ -10,7 +10,7 @@ export function bootChannelTalk(): void {
   if (booted || !PLUGIN_KEY) return;
   booted = true;
   ChannelService.loadScript();
-  ChannelService.boot({ pluginKey: PLUGIN_KEY });
+  ChannelService.boot({ pluginKey: PLUGIN_KEY, hideChannelButtonOnBoot: true });
 
   // 메신저가 열리면 커피 후원 버튼을 숨긴다(특히 모바일: 채널톡이 전체화면으로 뜨는데 커피 버튼이 위에 남는 문제).
   // 닫히면 다시 표시. data-messenger-open 속성으로 상태를 남겨, 다른 코드(donate.ts 복구 루프)가
@@ -35,4 +35,8 @@ export function bootChannelTalk(): void {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') recover();
   });
+}
+
+export function openChannelTalk(): void {
+  ChannelService.showMessenger();
 }

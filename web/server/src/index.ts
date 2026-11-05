@@ -9,16 +9,17 @@ import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { existsSync } from 'node:fs';
-import { recordVisit, recordEvent, getStats } from './db.js';
+import { recordVisit, getStats, claimDailyBrief, saveDailyBrief, listDailyBriefs } from './db.js';
 import { parseUA } from './ua.js';
 import { ADMIN_HTML } from './admin-page.js';
 import { fetchQuotes } from '../../../src/sources/quote.js';
 import { fetchNews } from '../../../src/sources/rss.js';
 import { fetchDetail } from '../../../src/sources/detail.js';
 import { searchSymbols } from '../../../src/sources/search.js';
+import { tagTickers } from '../../../src/core/ticker-tag.js';
 import { fetchHot } from '../../../src/sources/hot.js';
-import { resolveUserKey, explainTermWith, streamBriefWith } from './ai.js';
-import type { Quote, NewsScope } from '../../../src/core/types.js';
+import { generateBriefWith } from './ai.js';
+import type { Quote, NewsScope, NewsItem } from '../../../src/core/types.js';
 import { DEFAULT_FEEDS, INDICES, MARKETS } from './feeds.js';
 import { fetchCoinDashboard, upbitFeed, DEFAULT_COINS, searchCoins, fetchCoinNews, type CoinMeta } from './crypto.js';
 import { isKrSymbol, fetchKrQuotes } from './kr-quote.js';
@@ -153,13 +154,35 @@ app.get('/api/markets', (_req, res) => {
   });
 });
 
-app.get('/api/news', async (req, res) => {
+// 출처별 캐시를 공유해 접속자 수와 관계없이 RSS를 1분마다 수집한다.
+const stockNewsByFeed = new Map<string, NewsItem[]>();
+let stockNewsRefreshing = false;
+async function refreshStockNews(): Promise<void> {
+  if (stockNewsRefreshing) return;
+  stockNewsRefreshing = true;
+  try {
+    await Promise.all(DEFAULT_FEEDS.map(async (feed) => {
+      const items = await fetchNews([feed], [], 'all');
+      if (items.length) stockNewsByFeed.set(feed.url, items);
+    }));
+  } finally {
+    stockNewsRefreshing = false;
+  }
+}
+void refreshStockNews();
+setInterval(() => void refreshStockNews(), 60_000);
+
+app.get('/api/news', (req, res) => {
   const scope = (req.query.scope as NewsScope) ?? 'all';
   const watchlist = String(req.query.watchlist ?? '')
-    .split(',')
-    .map((s) => s.trim().toUpperCase())
-    .filter(Boolean);
-  const news = await fetchNews(DEFAULT_FEEDS, watchlist, scope);
+    .split(',').map((symbol) => symbol.trim().toUpperCase())
+    .filter((symbol) => /^[A-Z0-9.^=-]{1,20}$/.test(symbol)).slice(0, 100);
+  const items = [...stockNewsByFeed.values()].flat();
+  const unique = new Map(items.map((item) => [item.id, item]));
+  const news = [...unique.values()]
+    .filter((item) => scope === 'all' || item.lang === (scope === 'foreign' ? 'en' : 'ko'))
+    .sort((a, b) => b.published_at - a.published_at)
+    .map((item) => ({ ...item, tickers: tagTickers(item.title, watchlist) }));
   res.json({ news });
 });
 
@@ -202,56 +225,37 @@ app.post('/api/visit', (req, res) => {
   res.json({ ok: true });
 });
 
-// AI 기능 사용 가능 여부 — 서버 env 키 보유 여부만 알려줌(클라가 키 없을 때 fallback 판단용).
-app.get('/api/ai-status', (_req, res) => res.json({ serverKey: Boolean(process.env.ANTHROPIC_API_KEY) }));
-
-// AI 데일리 브리핑 — 서버 키 전용. 주식+코인 시장 전반(개인화 없음). 서버가 시장 데이터를 직접 모은다.
+// 매일 서울 시간 7시 이후 첫 실행에서 하루 한 번 생성한다. DB에 날짜를 먼저 기록해 중복 호출을 막는다.
 const labelOf = (defs: { symbol: string; label: string }[], sym: string) => defs.find((d) => d.symbol === sym)?.label ?? sym;
-// SSE 스트리밍 — 델타를 chunk 이벤트로 실시간 push, 완료 시 done, 실패 시 error.
-app.post('/api/brief', async (req, res) => {
-  const key = process.env.ANTHROPIC_API_KEY || null;
-  if (!key) return res.status(401).json({ text: null, error: 'no_server_key' });
+async function generateDailyBrief(): Promise<void> {
+  const now = new Date();
+  const seoul = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  if (seoul.getUTCHours() < 7 || !process.env.ANTHROPIC_API_KEY) return;
+  const day = seoul.toISOString().slice(0, 10);
+  if (!claimDailyBrief(day)) return;
   try {
-    recordEvent('brief', clientIpHash(req), Date.now());
-  } catch {
-    /* 집계 실패 무시 */
-  }
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    Connection: 'keep-alive',
-    'X-Accel-Buffering': 'no',
-  });
-  res.write(': connected\n\n');
-  const [hot, coins, news] = await Promise.all([
-    fetchHot().catch(() => []),
-    fetchCoinDashboard(DEFAULT_COINS).catch(() => [] as Awaited<ReturnType<typeof fetchCoinDashboard>>),
-    fetchNews(DEFAULT_FEEDS, [], 'all').catch(() => []),
-  ]);
-  const ok = await streamBriefWith(
-    key,
-    {
+    await refreshMarkets();
+    const [hot, coins, news] = await Promise.all([
+      fetchHot().catch(() => []),
+      fetchCoinDashboard(DEFAULT_COINS).catch(() => [] as Awaited<ReturnType<typeof fetchCoinDashboard>>),
+      fetchNews(DEFAULT_FEEDS, [], 'all').catch(() => []),
+    ]);
+    const text = await generateBriefWith(process.env.ANTHROPIC_API_KEY, {
       indices: marketCache.indices.map((q) => ({ label: labelOf(INDICES, q.symbol), change_pct: q.change_pct })),
       markets: marketCache.markets.map((q) => ({ label: labelOf(MARKETS, q.symbol), change_pct: q.change_pct })),
       hot: hot.map((h) => ({ name: h.name, change_pct: h.change_pct })),
       coins: coins.map((c) => ({ symbol: c.symbol, change_24h: c.change_24h })),
       news: news.map((n) => ({ title: n.title, source: n.source })),
-    },
-    (delta) => res.write(`event: chunk\ndata: ${JSON.stringify({ delta })}\n\n`),
-  );
-  res.write(ok ? 'event: done\ndata: {}\n\n' : 'event: error\ndata: {}\n\n');
-  res.end();
-});
-
-// 용어 풀이 — 사용자 키 전용. 임의 문자열을 받으므로 서버 키로 열어주면 무제한 프롬프트 악용 위험.
-app.get('/api/explain', async (req, res) => {
-  const key = resolveUserKey(req.header('X-AI-Key') ?? undefined);
-  if (!key) return res.status(401).json({ text: null, error: 'need_key' });
-  const term = String(req.query.term ?? '').trim();
-  if (!term) return res.json({ text: null });
-  const text = await explainTermWith(key, term);
-  res.json({ text });
-});
+    });
+    if (text) saveDailyBrief(day, text, Date.now());
+    else console.error('[daily-brief] generation failed');
+  } catch (error) {
+    console.error('[daily-brief] generation failed', error);
+  }
+}
+app.get('/api/brief', (_req, res) => res.json({ briefs: listDailyBriefs() }));
+void generateDailyBrief();
+setInterval(() => void generateDailyBrief(), 60_000);
 
 // ── SSE: 시세 스트림 (전역 공유 캐시) ────────────────────────────────
 // 다수 사용자 대비: 클라이언트별 폴링이 아니라, 서버가 "구독 중인 모든 심볼의 합집합"을

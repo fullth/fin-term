@@ -11,7 +11,7 @@ let booted = false;
 // --smtc-offset-* 를 host(#smtc-root)에 직접 세팅하므로, 외부 CSS 로는 못 덮는다.
 // → 인라인 스타일(최우선순위)로 CSS 변수를 덮어써 위치를 강제한다.
 // 데스크톱: 채널톡 버튼(우하단) 왼쪽에 나란히. 모바일: 채널톡 버튼 위로 올려 겹침 방지.
-const DESKTOP = { x: 92, y: 24 };
+const DESKTOP = { x: 132, y: 24 };
 const MOBILE = { x: 16, y: 96 }; // 채널톡 런처(약 54px + 하단 여백) 위로 — 세로로 확실히 띄운다
 
 function currentOffset(): { x: number; y: number } {

@@ -453,7 +453,7 @@ body {
 .cross-market-signal span { color: var(--dim); font-size: 9px; letter-spacing: .12em; }
 .cross-market-signal strong { color: var(--cyan); font-size: 14px; }
 .cross-market-signal small { color: var(--dim); font-size: 9px; }
-.cross-market-metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1px; padding: 0; background: var(--border); }
+.cross-market-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; padding: 0; background: var(--border); }
 .cross-market-metrics > div { min-width: 0; display: grid; align-content: center; gap: 2px; padding: 7px 12px; background: #050608; }
 .cross-market-metrics span { color: var(--dim); font-size: 9px; }
 .cross-market-metrics strong { overflow: hidden; color: var(--txt); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
@@ -531,7 +531,7 @@ body {
 @media (max-width: 1180px) {
   .combined-main { overflow: auto; }
   .cross-market-summary { grid-template-columns: 1fr; }
-  .cross-market-metrics { grid-template-columns: repeat(5, minmax(110px, 1fr)); overflow-x: auto; }
+  .cross-market-metrics { grid-template-columns: repeat(4, minmax(110px, 1fr)); overflow-x: auto; }
   .combined-market-grid { flex: none; grid-template-columns: minmax(0, 1fr); }
   .combined-lane { min-height: 720px; overflow: hidden; }
   .combined-overview { height: 330px; }
@@ -543,7 +543,7 @@ body {
   .combined-market-grid { padding: 8px; }
   .combined-lane { min-height: 0; overflow: visible; }
   .combined-lane-head { align-items: flex-start; }
-  .combined-lane-head > div { display: grid; gap: 2px; }
+  .combined-lane-head > div:first-child { display: grid; gap: 2px; }
   .combined-overview { height: auto; min-height: 0; grid-template-columns: minmax(0, 1fr); }
   .combined-overview > .area-watch { min-height: 260px; }
   .combined-detail-stack { overflow: visible; }
@@ -553,7 +553,7 @@ body {
   .combined-lane > .area-news { flex: none; min-height: 320px; height: 65vh; max-height: 65vh; }
   .cross-market-summary { min-height: 0; }
   .cross-market-summary > * { padding: 8px 10px; }
-  .cross-market-metrics { grid-template-columns: repeat(5, minmax(105px, 1fr)); }
+  .cross-market-metrics { grid-template-columns: repeat(4, minmax(105px, 1fr)); }
   .list-remove-btn { opacity: 1; width: 24px; height: 24px; font-size: 17px; line-height: 22px; }
   .news-panel-head { align-items: flex-start; flex-direction: column; }
   .news-filter-tools, .news-view-tabs { justify-content: flex-start; }
@@ -1071,3 +1071,34 @@ body {
 }
 
 /* 커피 후원 위젯 위치는 donate.ts 에서 인라인 스타일로 반응형 제어(Shadow DOM host 값을 외부 CSS 로 못 덮어서). */
+
+/* 종합 화면의 보조 기능과 패널 강조를 정리한다. */
+.tools-menu-pop { display: flex; flex-direction: column; align-items: stretch; gap: 8px; min-width: 210px; padding: 10px; }
+.tools-menu-pop .display-tools { flex-wrap: wrap; }
+.tools-menu-pop .nav-menu { position: relative; }
+.tools-menu-pop .aikey-pop { right: 0; }
+.support-link { text-decoration: none; justify-content: center; }
+.lane-actions { display: flex; align-items: center; gap: 10px; }
+.lane-search { position: relative; }
+.lane-search > summary { list-style: none; }
+.lane-search > .searchbar { position: absolute !important; right: 0; top: calc(100% + 5px); z-index: 30; width: min(350px, 75vw); border: 1px solid var(--border); background: var(--panel); }
+.combined-lane { overflow: visible; }
+.combined-lane .combined-overview .panel, .combined-lane > .area-news { border-color: transparent; background: transparent; }
+.combined-lane .combined-overview .focused { border-color: transparent; }
+.combined-lane .ptitle { color: var(--txt); }
+
+.combined-brief { position: relative; flex: none; padding: 5px 14px; border-bottom: 1px solid var(--border); }
+.combined-brief > summary { cursor: pointer; color: var(--txt); font-size: 12px; }
+.combined-brief[open] > .brief-panel { position: absolute; z-index: 35; top: 100%; left: 10px; width: min(520px, 90vw); max-height: 60vh; overflow: auto; background: var(--panel); box-shadow: 0 8px 24px #000; }
+
+.news-select { color: var(--txt); background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 2px 4px; font: inherit; }
+
+/* 고정된 문의와 후원 버튼 아래에 뉴스의 마지막 항목이 가려지지 않게 한다. */
+.combined-lane > .area-news { padding-bottom: 120px; scroll-padding-bottom: 120px; }
+@media (max-width: 980px) {
+  .combined-main { padding-bottom: 160px; }
+}
+
+.contact-launcher { position: fixed; right: 24px; bottom: 24px; z-index: 1000; min-height: 48px; padding: 0 16px; border: 1px solid #565b63; border-radius: 999px; background: #1a1a1a; color: white; font: 700 14px system-ui, sans-serif; cursor: pointer; }
+:root[data-stealth] .contact-launcher, :root[data-messenger-open] .contact-launcher { display: none; }
+@media (max-width: 640px) { .contact-launcher { right: 16px; bottom: 24px; } }

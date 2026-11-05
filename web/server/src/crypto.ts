@@ -247,8 +247,8 @@ function matchRank(m: UpbitMarket, q: string): number {
   return 0;
 }
 
-// 코인 뉴스 — Google News RSS (코인 키워드). 제목/시간/출처만.
-const cryptoParser = new Parser({ headers: { 'User-Agent': 'Mozilla/5.0 (fin-term)' }, timeout: 8000 });
+// 코인 뉴스는 여러 피드를 각각 수집하고 실패한 피드의 마지막 결과를 유지한다.
+const cryptoParser = new Parser({ headers: { 'User-Agent': 'Mozilla/5.0 (fin-term)' }, timeout: 8000, customFields: { item: ['source'] } });
 export interface CoinNewsItem {
   id: string;
   title: string;
@@ -256,23 +256,36 @@ export interface CoinNewsItem {
   source: string;
   published_at: number;
 }
-let coinNewsCache: CoinNewsItem[] = [];
+const coinNewsFeeds = [
+  { source: 'Google News', url: `https://news.google.com/rss/search?q=${encodeURIComponent('비트코인 OR 이더리움 OR 가상자산 OR 암호화폐')}&hl=ko&gl=KR&ceid=KR:ko` },
+  { source: 'Google News', url: `https://news.google.com/rss/search?q=${encodeURIComponent('bitcoin OR ethereum OR cryptocurrency')}&hl=en-US&gl=US&ceid=US:en` },
+  { source: 'CoinDesk', url: 'https://www.coindesk.com/arc/outboundfeeds/rss/' },
+  { source: 'Cointelegraph', url: 'https://cointelegraph.com/rss' },
+];
+const coinNewsByFeed = new Map<string, CoinNewsItem[]>();
+let coinNewsRefresh: Promise<void> | null = null;
 let coinNewsAt = 0;
 export async function fetchCoinNews(): Promise<CoinNewsItem[]> {
-  if (coinNewsCache.length && Date.now() - coinNewsAt < 60_000) return coinNewsCache;
-  const q = encodeURIComponent('비트코인 OR 이더리움 OR 가상자산 OR 암호화폐 OR 코인');
-  try {
-    const feed = await cryptoParser.parseURL(`https://news.google.com/rss/search?q=${q}&hl=ko&gl=KR&ceid=KR:ko`);
-    coinNewsCache = (feed.items ?? []).slice(0, 30).map((it, i) => ({
-      id: it.guid ?? it.link ?? String(i),
-      title: it.title ?? '',
-      url: it.link ?? '',
-      source: (it as any).source?.['#text'] ?? it.creator ?? 'Google News',
-      published_at: it.isoDate ? new Date(it.isoDate).getTime() : Date.now(),
-    }));
-    coinNewsAt = Date.now();
-  } catch {
-    /* 캐시 유지 */
+  if (Date.now() - coinNewsAt >= 60_000 && !coinNewsRefresh) {
+    coinNewsRefresh = Promise.all(coinNewsFeeds.map(async (source) => {
+      try {
+        const feed = await cryptoParser.parseURL(source.url);
+        const items = (feed.items ?? []).filter((item) => {
+          if (!item.title || !item.link) return false;
+          try { return ['http:', 'https:'].includes(new URL(item.link).protocol); } catch { return false; }
+        }).map((item) => {
+          const date = Date.parse(item.isoDate ?? item.pubDate ?? '');
+          const publisher = typeof item.source === 'string' ? item.source : (item.source as { '#text'?: string } | undefined)?.['#text'];
+          return { id: item.guid ?? item.link!, title: item.title!, url: item.link!,
+            source: publisher || item.creator || source.source, published_at: Number.isFinite(date) ? date : 0 };
+        });
+        if (items.length) coinNewsByFeed.set(source.url, items);
+      } catch {
+        // 다른 출처와 마지막 성공 결과를 유지한다.
+      }
+    })).then(() => { coinNewsAt = Date.now(); }).finally(() => { coinNewsRefresh = null; });
   }
-  return coinNewsCache;
+  if (!coinNewsByFeed.size && coinNewsRefresh) await coinNewsRefresh;
+  const unique = new Map([...coinNewsByFeed.values()].flat().map((item) => [item.id, item]));
+  return [...unique.values()].sort((a, b) => b.published_at - a.published_at).slice(0, 150);
 }

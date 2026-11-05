@@ -11,6 +11,7 @@ import { Watchlist } from './Watchlist';
 import { CoinNewsStream } from './CoinNewsStream';
 
 interface Props {
+  briefSlot: React.ReactNode;
   watchlist: string[];
   names: Record<string, string>;
   quotes: Record<string, Quote>;
@@ -162,10 +163,10 @@ const CONNECTION_LABEL: Record<ConnectionState, string> = {
 
 function ConnectionBadge({ connection, source }: { connection: ConnectionInfo; source: string }) {
   const updated = connection.lastUpdated ? fmtTime(connection.lastUpdated) : null;
+  const label = `${source} ${CONNECTION_LABEL[connection.state]}${updated ? ` ${updated}` : ''}${connection.issue ? ` / ${connection.issue}` : ''}`;
   return (
-    <span className={`connection-badge state-${connection.state}`} title={connection.issue ?? undefined}>
-      <i /> {source} {CONNECTION_LABEL[connection.state]}
-      {updated && <small>{updated}</small>}
+    <span className={`connection-badge state-${connection.state}`} title={label} aria-label={label}>
+      <i /> {connection.state !== 'live' && <>{source} {CONNECTION_LABEL[connection.state]}</>}
       {connection.issue && <b>!</b>}
     </span>
   );
@@ -200,7 +201,6 @@ function CrossMarketSummary({
     { label: 'NASDAQ', value: fmtPriceCompact(nasdaq?.price ?? null), change: nasdaq?.change_pct ?? null },
     { label: '원달러', value: fmtPriceCompact(dollar?.price ?? null), change: dollar?.change_pct ?? null },
     { label: '금', value: fmtPriceCompact(gold?.price ?? null), change: gold?.change_pct ?? null },
-    { label: 'BTC', value: fmtKrw(btc?.price_krw ?? null), change: btc?.change_24h ?? null },
   ];
 
   return (
@@ -225,6 +225,7 @@ function CrossMarketSummary({
 
 export function CombinedView(props: Props) {
   const {
+    briefSlot,
     watchlist,
     names,
     quotes,
@@ -260,18 +261,8 @@ export function CombinedView(props: Props) {
 
   return (
     <main className="combined-main">
-      <div className="combined-searches">
-        <div className="combined-search-group stock">
-          <span className="combined-search-label">STOCK</span>
-          <SearchBar onAdd={onAddSymbol} />
-        </div>
-        <div className="combined-search-group crypto">
-          <span className="combined-search-label">COIN</span>
-          <CoinSearchBar onAdd={onAddCoin} />
-        </div>
-      </div>
-
       <CrossMarketSummary indices={indices} markets={markets} coinQuotes={coinQuotes} />
+      <details className="combined-brief"><summary>오늘의 AI 브리핑</summary>{briefSlot}</details>
 
       <div className="combined-market-grid">
         <section className="combined-lane stock-lane" aria-labelledby="combined-stock-title">
@@ -280,7 +271,7 @@ export function CombinedView(props: Props) {
               <span className="combined-eyebrow">EQUITY MARKET</span>
               <h2 id="combined-stock-title">주식</h2>
             </div>
-            <ConnectionBadge connection={stockConnection} source="SSE" />
+            <div className="lane-actions"><details className="lane-search"><summary className="mode-btn">+ 종목 추가</summary><SearchBar onAdd={onAddSymbol} /></details><ConnectionBadge connection={stockConnection} source="주식" /></div>
           </header>
           <div className="combined-overview">
             <Watchlist
@@ -316,7 +307,7 @@ export function CombinedView(props: Props) {
               <span className="combined-eyebrow">DIGITAL ASSET MARKET</span>
               <h2 id="combined-crypto-title">코인</h2>
             </div>
-            <ConnectionBadge connection={coinConnection} source="업비트" />
+            <div className="lane-actions"><details className="lane-search"><summary className="mode-btn">+ 코인 추가</summary><CoinSearchBar onAdd={onAddCoin} /></details><ConnectionBadge connection={coinConnection} source="업비트" /></div>
           </header>
           <div className="combined-overview">
             <CoinWatchlist
