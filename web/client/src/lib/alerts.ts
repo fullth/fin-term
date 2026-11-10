@@ -12,7 +12,7 @@ export interface AlertOverride {
   threshold?: number;
 }
 
-// 발생한 알림 1건 — 메모리에만 보관(페이지 닫으면 소멸), localStorage 미저장.
+// 발생한 알림 1건 — localStorage 에 보관해 새로고침 후에도 최근 알림을 유지한다.
 export interface AlertEvent {
   id: number;
   at: number; // epoch ms
@@ -22,7 +22,7 @@ export interface AlertEvent {
   up: boolean; // 상승 여부
 }
 
-const HISTORY_MAX = 50; // 메모리 상한
+const HISTORY_MAX = 50; // 보관 상한
 
 const DEFAULT: AlertSettings = { enabled: false, threshold: 5 };
 
@@ -34,6 +34,27 @@ function basesKey(scope: string) {
 }
 function overridesKey(scope: string) {
   return `fin-term:alerts:overrides:${scope}`;
+}
+function historyKey(scope: string) {
+  return `fin-term:alerts:history:${scope}`;
+}
+
+function loadHistory(scope: string): AlertEvent[] {
+  try {
+    const raw = localStorage.getItem(historyKey(scope));
+    if (!raw) return [];
+    const arr = JSON.parse(raw) as AlertEvent[];
+    return Array.isArray(arr) ? arr.slice(0, HISTORY_MAX) : [];
+  } catch {
+    return [];
+  }
+}
+function saveHistory(scope: string, events: AlertEvent[]): void {
+  try {
+    localStorage.setItem(historyKey(scope), JSON.stringify(events.slice(0, HISTORY_MAX)));
+  } catch {
+    /* 무시 */
+  }
 }
 
 export function loadAlertSettings(scope: string): AlertSettings {
@@ -122,8 +143,8 @@ export function usePriceAlerts(scope: string) {
   const [bases, setBases] = useState<Record<string, number>>(() => loadMap<number>(basesKey(scope)));
   const [overrides, setOverrides] = useState<Record<string, AlertOverride>>(() => loadMap<AlertOverride>(overridesKey(scope)));
   const [toast, setToast] = useState<string | null>(null);
-  const [history, setHistory] = useState<AlertEvent[]>([]); // 알림 이력 — 메모리 한정
-  const eventSeq = useRef(0);
+  const [history, setHistory] = useState<AlertEvent[]>(() => loadHistory(scope)); // 알림 이력 — localStorage 유지
+  const eventSeq = useRef(history[0]?.id ?? 0);
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
   const basesRef = useRef(bases);
@@ -134,6 +155,7 @@ export function usePriceAlerts(scope: string) {
   useEffect(() => saveAlertSettings(scope, settings), [scope, settings]);
   useEffect(() => saveMap(basesKey(scope), bases), [scope, bases]);
   useEffect(() => saveMap(overridesKey(scope), overrides), [scope, overrides]);
+  useEffect(() => saveHistory(scope, history), [scope, history]);
 
   // 종목 유효 임계값 — 개별 오버라이드 우선, 없으면 공통값
   const thresholdOf = (key: string) => overridesRef.current[key]?.threshold ?? settingsRef.current.threshold;

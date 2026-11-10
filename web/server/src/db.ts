@@ -18,6 +18,7 @@ const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL'); // 동시 읽기/쓰기 안정성
 
 db.exec(`
+  CREATE TABLE IF NOT EXISTS daily_briefs (day TEXT PRIMARY KEY, text TEXT, generated_at INTEGER);
   CREATE TABLE IF NOT EXISTS visits (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     ip_hash    TEXT    NOT NULL,
@@ -161,3 +162,13 @@ export function getStats(startOfToday: number): VisitStats {
 }
 
 export type { VisitStats, ReturningVisitor, Breakdown, EventStat };
+
+export function claimDailyBrief(day: string): boolean {
+  return db.prepare('INSERT OR IGNORE INTO daily_briefs (day) VALUES (?)').run(day).changes === 1;
+}
+export function saveDailyBrief(day: string, text: string, at: number): void {
+  db.prepare('UPDATE daily_briefs SET text = ?, generated_at = ? WHERE day = ?').run(text, at, day);
+}
+export function listDailyBriefs(): { day: string; text: string; generated_at: number }[] {
+  return db.prepare('SELECT day, text, generated_at FROM daily_briefs WHERE text IS NOT NULL ORDER BY day DESC LIMIT 90').all() as { day: string; text: string; generated_at: number }[];
+}

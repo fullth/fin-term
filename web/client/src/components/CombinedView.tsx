@@ -1,4 +1,3 @@
-import type { CSSProperties } from 'react';
 import type { CoinMeta, CoinNewsItem, CoinQuote, Detail, LabelEntry, NewsItem, NewsScope, Quote, UpbitTick } from '../lib/types';
 import { arrow, changeClass, fmtPct, fmtPriceCompact, fmtTime } from '../lib/format';
 import type { ConnectionInfo, ConnectionState } from '../lib/connection';
@@ -12,6 +11,7 @@ import { Watchlist } from './Watchlist';
 import { CoinNewsStream } from './CoinNewsStream';
 
 interface Props {
+  briefSlot: React.ReactNode;
   watchlist: string[];
   names: Record<string, string>;
   quotes: Record<string, Quote>;
@@ -30,7 +30,6 @@ interface Props {
   selectedCoin: string | null;
   stockConnection: ConnectionInfo;
   coinConnection: ConnectionInfo;
-  combinedSplit: number;
   onAddSymbol: (symbol: string, name: string) => void;
   onRemoveSymbol: (symbol: string) => void;
   onSelectSymbol: (symbol: string) => void;
@@ -40,7 +39,6 @@ interface Props {
   onAddCoin: (coin: CoinMeta) => void;
   onRemoveCoin: (id: string) => void;
   onSelectCoin: (symbol: string) => void;
-  onCombinedSplitChange: (value: number) => void;
 }
 
 function fmtKrw(value: number | null): string {
@@ -165,10 +163,10 @@ const CONNECTION_LABEL: Record<ConnectionState, string> = {
 
 function ConnectionBadge({ connection, source }: { connection: ConnectionInfo; source: string }) {
   const updated = connection.lastUpdated ? fmtTime(connection.lastUpdated) : null;
+  const label = `${source} ${CONNECTION_LABEL[connection.state]}${updated ? ` ${updated}` : ''}${connection.issue ? ` / ${connection.issue}` : ''}`;
   return (
-    <span className={`connection-badge state-${connection.state}`} title={connection.issue ?? undefined}>
-      <i /> {source} {CONNECTION_LABEL[connection.state]}
-      {updated && <small>{updated}</small>}
+    <span className={`connection-badge state-${connection.state}`} title={label} aria-label={label}>
+      <i /> {connection.state !== 'live' && <>{source} {CONNECTION_LABEL[connection.state]}</>}
       {connection.issue && <b>!</b>}
     </span>
   );
@@ -178,14 +176,10 @@ function CrossMarketSummary({
   indices,
   markets,
   coinQuotes,
-  split,
-  onSplitChange,
 }: {
   indices: Quote[];
   markets: Quote[];
   coinQuotes: CoinQuote[];
-  split: number;
-  onSplitChange: (value: number) => void;
 }) {
   const quoteOf = (symbol: string) => [...indices, ...markets].find((quote) => quote.symbol === symbol);
   const sp = quoteOf('^GSPC');
@@ -207,7 +201,6 @@ function CrossMarketSummary({
     { label: 'NASDAQ', value: fmtPriceCompact(nasdaq?.price ?? null), change: nasdaq?.change_pct ?? null },
     { label: '원달러', value: fmtPriceCompact(dollar?.price ?? null), change: dollar?.change_pct ?? null },
     { label: '금', value: fmtPriceCompact(gold?.price ?? null), change: gold?.change_pct ?? null },
-    { label: 'BTC', value: fmtKrw(btc?.price_krw ?? null), change: btc?.change_24h ?? null },
   ];
 
   return (
@@ -226,23 +219,13 @@ function CrossMarketSummary({
           </div>
         ))}
       </div>
-      <label className="combined-split-control">
-        <span>화면 비율</span>
-        <input
-          type="range"
-          min="35"
-          max="65"
-          value={split}
-          onChange={(event) => onSplitChange(Number(event.target.value))}
-        />
-        <output>주식 {split} / 코인 {100 - split}</output>
-      </label>
     </section>
   );
 }
 
 export function CombinedView(props: Props) {
   const {
+    briefSlot,
     watchlist,
     names,
     quotes,
@@ -261,7 +244,6 @@ export function CombinedView(props: Props) {
     selectedCoin,
     stockConnection,
     coinConnection,
-    combinedSplit,
     onAddSymbol,
     onRemoveSymbol,
     onSelectSymbol,
@@ -271,7 +253,6 @@ export function CombinedView(props: Props) {
     onAddCoin,
     onRemoveCoin,
     onSelectCoin,
-    onCombinedSplitChange,
   } = props;
 
   const selectedCoinMeta = coins.find((coin) => coin.symbol === selectedCoin) ?? null;
@@ -280,36 +261,17 @@ export function CombinedView(props: Props) {
 
   return (
     <main className="combined-main">
-      <div className="combined-searches">
-        <div className="combined-search-group stock">
-          <span className="combined-search-label">STOCK</span>
-          <SearchBar onAdd={onAddSymbol} />
-        </div>
-        <div className="combined-search-group crypto">
-          <span className="combined-search-label">COIN</span>
-          <CoinSearchBar onAdd={onAddCoin} />
-        </div>
-      </div>
+      <CrossMarketSummary indices={indices} markets={markets} coinQuotes={coinQuotes} />
+      <details className="combined-brief"><summary>오늘의 AI 브리핑</summary>{briefSlot}</details>
 
-      <CrossMarketSummary
-        indices={indices}
-        markets={markets}
-        coinQuotes={coinQuotes}
-        split={combinedSplit}
-        onSplitChange={onCombinedSplitChange}
-      />
-
-      <div
-        className="combined-market-grid"
-        style={{ '--stock-share': `${combinedSplit}fr`, '--coin-share': `${100 - combinedSplit}fr` } as CSSProperties}
-      >
+      <div className="combined-market-grid">
         <section className="combined-lane stock-lane" aria-labelledby="combined-stock-title">
           <header className="combined-lane-head">
             <div>
               <span className="combined-eyebrow">EQUITY MARKET</span>
               <h2 id="combined-stock-title">주식</h2>
             </div>
-            <ConnectionBadge connection={stockConnection} source="SSE" />
+            <div className="lane-actions"><details className="lane-search"><summary className="mode-btn">+ 종목 추가</summary><SearchBar onAdd={onAddSymbol} /></details><ConnectionBadge connection={stockConnection} source="주식" /></div>
           </header>
           <div className="combined-overview">
             <Watchlist
@@ -345,7 +307,7 @@ export function CombinedView(props: Props) {
               <span className="combined-eyebrow">DIGITAL ASSET MARKET</span>
               <h2 id="combined-crypto-title">코인</h2>
             </div>
-            <ConnectionBadge connection={coinConnection} source="업비트" />
+            <div className="lane-actions"><details className="lane-search"><summary className="mode-btn">+ 코인 추가</summary><CoinSearchBar onAdd={onAddCoin} /></details><ConnectionBadge connection={coinConnection} source="업비트" /></div>
           </header>
           <div className="combined-overview">
             <CoinWatchlist

@@ -8,6 +8,7 @@ import { tagTickers } from '../core/ticker-tag.js';
 const parser = new Parser({
   headers: { 'User-Agent': 'Mozilla/5.0 (fin-term)' },
   timeout: 8000,
+  customFields: { item: ['source'] },
 });
 
 function idOf(url: string, title: string): string {
@@ -17,7 +18,9 @@ function idOf(url: string, title: string): string {
 async function fetchFeed(feed: Feed, watchlist: string[]): Promise<NewsItem[]> {
   try {
     const parsed = await parser.parseURL(feed.url);
-    return (parsed.items ?? []).map((it) => {
+    return (parsed.items ?? []).filter((item) => {
+      try { return ['http:', 'https:'].includes(new URL(item.link ?? '').protocol); } catch { return false; }
+    }).map((it) => {
       const title = (it.title ?? '').trim();
       const link = it.link ?? '';
       // pubDate(isoDate) 우선, 없으면 RSS pubDate 원문 파싱. 둘 다 실패면 0(맨 뒤).
@@ -29,7 +32,7 @@ async function fetchFeed(feed: Feed, watchlist: string[]): Promise<NewsItem[]> {
         title,
         lang: feed.lang,
         url: link,
-        source: feed.source,
+        source: typeof it.source === 'string' ? it.source : (it.source as { '#text'?: string } | undefined)?.['#text'] || feed.source,
         published_at: Number.isNaN(parsed) ? 0 : parsed,
         tickers: tagTickers(title, watchlist),
       };
