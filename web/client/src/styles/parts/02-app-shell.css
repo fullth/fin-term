@@ -1,0 +1,15 @@
+/* 앱 셸 — 화면 전체를 세로로 채워 하단 여백 제거. topbar·cmdbar 고정, 본문이 남은 높이 차지 */
+.app-shell { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+.app-shell > .topbar, .app-shell > .topbars, .app-shell > .cmdbar { flex: none; }
+/* 주식 본문(layout3)·코인 본문은 남은 높이를 채우고 내부 스크롤 */
+.app-shell > .layout3 { flex: 1; min-height: 0; }
+.app-shell > .crypto-main { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.app-shell > .combined-main { flex: 1; min-height: 0; }
+body {
+  background: var(--bg);
+  color: var(--txt);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}

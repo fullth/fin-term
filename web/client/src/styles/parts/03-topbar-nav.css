@@ -1,0 +1,83 @@
+
+/* 상단 바 */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 7px 12px; border-bottom: 1px solid var(--border); background: var(--panel);
+}
+.brand-wrap { flex: none; display: inline-flex; align-items: center; gap: 5px; }
+.brand {
+  display: inline-flex; align-items: center; gap: 8px; border: 0; padding: 0;
+  background: transparent; color: var(--yellow); font-family: inherit; cursor: pointer; text-align: left;
+}
+.brand-logo { width: 31px; height: 31px; border-radius: 7px; }
+.brand-copy { display: grid; line-height: 1.05; }
+.brand-copy strong { font-size: 13px; letter-spacing: .06em; }
+.brand-copy small { margin-top: 4px; color: var(--dim); font-size: 8px; font-weight: 500; letter-spacing: .08em; }
+.brand:hover .brand-copy strong { color: var(--cyan); }
+/* 사용 안내 "?" 버튼 — web 표시 옆 */
+.manual-btn {
+  margin-left: 8px; width: 18px; height: 18px; border-radius: 50%;
+  border: 1px solid var(--btn-border); background: transparent; color: var(--dim);
+  font-family: var(--mono); font-size: 11px; font-weight: 700; line-height: 1; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; padding: 0;
+}
+.manual-btn:hover { border-color: var(--border-foc); color: var(--cyan); }
+/* ===== C2 네비 — 각진 박스 + 구분선 + 초록 활성, 터미널 톤 ===== */
+.modes { min-width: 0; display: flex; gap: 7px; align-items: center; justify-content: flex-end; }
+/* 버튼·팝오버 래퍼(div)도 버튼과 같은 높이로 정렬 — 높낮이 어긋남 방지 */
+.modes > .alert-btn-wrap, .modes > .aikey { display: flex; align-items: center; }
+.modes .mode-btn { height: 28px; display: inline-flex; align-items: center; line-height: 1; }
+.nav-button-group {
+  display: inline-flex; align-items: center; gap: 3px; padding: 3px;
+  border: 1px solid var(--border); border-radius: 8px; background: #080a0d;
+}
+.nav-button-group .mode-btn { border-color: transparent; }
+.nav-button-group .mode-btn:hover { border-color: var(--btn-border); }
+.nav-button-group .mode-btn.active { border-color: currentColor; }
+.display-tools { background: linear-gradient(180deg, rgba(34, 211, 238, .04), transparent), #080a0d; }
+.tool-btn { gap: 5px; }
+.tool-glyph { min-width: 14px; color: var(--dim); font-size: 11px; text-align: center; }
+.tool-btn:hover .tool-glyph, .tool-btn.active .tool-glyph { color: currentColor; }
+.mode-btn {
+  font-family: var(--mono); font-size: 12px; cursor: pointer;
+  background: transparent; color: var(--txt);
+  border: 1px solid var(--dim2, #3d444d); border-radius: 5px; padding: 2px 9px;
+  white-space: nowrap;
+}
+.mode-btn:hover { border-color: var(--cyan); color: var(--cyan); background: rgba(57,197,207,.1); }
+/* 활성 = 초록 박스 (C2) */
+.mode-btn.active {
+  color: #3fb950; border-color: #3fb950; background: rgba(63,185,80,.1); font-weight: 600;
+}
+/* 그룹 구분선 */
+.nav-sep { color: var(--dim2, #3d444d); margin: 0 2px; user-select: none; }
+/* 실시간 표시 */
+.nav-live { color: #3fb950; font-size: 12px; margin-left: 2px; }
+.nav-live.state-connecting, .nav-live.state-reconnecting { color: var(--yellow); }
+.nav-live.state-stale { color: var(--red); }
+.nav-live.state-idle { color: var(--dim); }
+.nav-menu { position: relative; }
+.nav-menu > summary { list-style: none; }
+.nav-menu > summary::-webkit-details-marker { display: none; }
+.nav-menu[open] > summary { color: var(--cyan); border-color: var(--cyan); }
+.nav-menu-pop {
+  position: absolute; top: 31px; right: 0; z-index: 80; width: 190px;
+  display: grid; gap: 5px; border: 1px solid var(--border); border-radius: 7px;
+  padding: 7px; background: #07090c; box-shadow: 0 10px 28px rgba(0,0,0,.55);
+}
+.nav-menu-item {
+  min-height: 30px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  cursor: pointer; border: 1px solid transparent; border-radius: 5px; padding: 4px 7px;
+  background: transparent; color: var(--txt); font-family: var(--mono); text-align: left;
+}
+.nav-menu-item:hover { border-color: var(--border); background: var(--accent-bg); color: var(--cyan); }
+.nav-menu-item.active { color: #3fb950; }
+.nav-menu-item span { color: var(--dim); font-size: 10px; }
+.nav-menu-pop > .mode-btn, .nav-menu-pop > .alert-btn-wrap > .mode-btn { width: 100%; min-height: 30px; justify-content: space-between; }
+/* 변동 알림 버튼 — 꺼짐도 살짝 강조, 켜짐이면 빨강으로 확실히 */
+.alert-trigger { border-color: var(--red); color: var(--red); font-weight: 600; }
+.alert-trigger:hover { border-color: var(--red); background: rgba(244, 63, 94, .10); }
+.alert-trigger.on {
+  color: var(--red); background: transparent; border-color: var(--red); font-weight: 700;
+  box-shadow: 0 0 0 1px var(--red);
+}

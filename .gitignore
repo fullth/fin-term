@@ -6,6 +6,13 @@ dist/
 # web 빌드 캐시
 web/client/tsconfig.tsbuildinfo
 
+# design-sync (claude.ai/design)
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
+
 # 환경변수 (비밀값) — 예시 파일만 추적
 .env
 .env.*

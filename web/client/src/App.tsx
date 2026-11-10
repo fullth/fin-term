@@ -17,7 +17,7 @@ import { ManualModal } from './components/ManualModal';
 import { CombinedView } from './components/CombinedView';
 import { WelcomeLanding } from './components/WelcomeLanding';
 import { INITIAL_CONNECTION, type ConnectionInfo } from './lib/connection';
-import './styles/app.css';
+import './styles/index.css';
 
 type Mode = 'combined' | 'diary';
 type BriefRunResult = { text: string | null; err: string | null; entryId?: string };

@@ -1,0 +1,39 @@
+
+/* 검색 바 */
+.searchbar { display: flex; gap: 8px; padding: 6px 14px; border-bottom: 1px solid var(--border); background: var(--panel); }
+.searchbar input {
+  flex: 1; background: var(--input-bg); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--txt); font-family: var(--mono); font-size: 13px; padding: 5px 10px;
+}
+.searchbar input:focus { outline: none; border-color: var(--border-foc); }
+.search-results { position: absolute; z-index: 10; background: var(--panel); border: 1px solid var(--border);
+  border-radius: 8px; margin-top: 4px; max-height: 260px; overflow: auto; min-width: 320px; }
+.search-results .row { padding: 4px 10px; }
+
+/* AI 키 매니저 */
+.aikey-ok { color: var(--up) !important; border-color: var(--up) !important; }
+.aikey-need { color: var(--yellow) !important; border-color: var(--yellow) !important; }
+.aikey-need-tag { font-size: 10px; color: var(--yellow); border: 1px solid var(--yellow);
+  border-radius: 4px; padding: 0 4px; margin-left: 4px; font-weight: 400; }
+.aikey-pop { position: absolute; right: 0; top: 32px; z-index: 50; width: 300px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+.aikey-title { color: var(--magenta); font-weight: 700; margin-bottom: 6px; }
+.aikey-input { width: 100%; background: var(--input-bg); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--txt); font-family: var(--mono); font-size: 12px; padding: 5px 8px; }
+.aikey-input:focus { outline: none; border-color: var(--border-foc); }
+
+/* 뉴스 필터 버튼 (watchlist 행) */
+.newsbtn { font-family: var(--mono); font-size: 10px; cursor: pointer; flex-shrink: 0;
+  background: transparent; color: var(--dim); border: 1px solid var(--border);
+  border-radius: 4px; padding: 0 5px; margin-left: 2px; }
+.newsbtn:hover { color: var(--cyan); border-color: var(--cyan); }
+.newsbtn.on { color: var(--cyan); border-color: var(--cyan); background: var(--accent-bg-strong); }
+/* 거래정지/서킷브레이커 배지 */
+.halt-badge { font-size: 10px; font-weight: 700; color: #fff; background: var(--red);
+  border-radius: 4px; padding: 1px 5px; margin-left: 4px; flex-shrink: 0; white-space: nowrap; }
+/* PWA iOS 설치 안내 말풍선 */
+.install-hint { position: absolute; right: 0; top: 34px; z-index: 50; width: 240px;
+  max-width: calc(100vw - 24px); /* 좁은 화면에서 말풍선이 뷰포트를 벗어나지 않도록 */
+  background: var(--panel); border: 1px solid var(--border-foc); border-radius: 8px;
+  padding: 10px 12px; font-size: 12px; line-height: 1.6; color: var(--txt);
+  box-shadow: 0 4px 16px rgba(0,0,0,.4); overflow-wrap: break-word; }

@@ -1,0 +1,15 @@
+
+/* 그리드 */
+.grid {
+  display: grid;
+  grid-template-columns: minmax(300px, 1fr) 2fr minmax(300px, 1fr);
+  grid-template-rows: auto 1fr;
+  grid-template-areas: "watch quote side" "watch news side";
+  gap: 10px; padding: 10px; flex: 1; min-height: 0;
+}
+.area-watch-col { grid-area: watch; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.area-watch-col > .brief-panel { flex: none; height: var(--info-h, 190px); overflow: hidden; display: flex; flex-direction: column; }
+.area-watch-col > .area-watch { flex: 1; min-height: 0; overflow: auto; }
+.area-quote { grid-area: quote; }
+.area-news { grid-area: news; }
+.area-side { grid-area: side; display: flex; flex-direction: column; gap: 10px; overflow: auto; }

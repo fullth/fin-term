@@ -1,0 +1,26 @@
+
+/* 반응형 */
+@media (max-width: 880px) {
+  /* 모바일: 코인 본문도 세로 1열로 쌓고 페이지 전체 스크롤. viewport 높이에 가두지 않는다. */
+  .app-shell { height: auto; min-height: 100vh; overflow: visible; }
+  .app-shell > .crypto-main { flex: none; height: auto; overflow: visible; }
+  .grid {
+    grid-template-columns: 1fr; grid-template-rows: none;
+    grid-template-areas: "watch" "quote" "side" "news"; height: auto; flex: none; min-height: 0;
+  }
+  .area-watch-col > .area-watch,
+  .grid > .area-watch { min-height: 320px; }
+  /* 코인 뉴스 패널 — 주식과 동일하게 화면 일부로 고정하고 내부 스크롤(아래 .area-news 규칙으로 height 지정) */
+  .grid > .area-news { flex: none; }
+  .area-side { flex-direction: column; }
+
+  /* 모바일: 뉴스는 제목 위주로 — 출처 숨기고 제목 전체 노출 */
+  .news-row { flex-wrap: wrap; row-gap: 1px; padding: 5px 6px 5px 0; }
+  .news-row .num { display: none; }
+  .news-row .src { display: none; }
+  .news-row .title {
+    flex-basis: 100%; order: 2; white-space: normal; overflow: visible;
+    text-overflow: clip; line-height: 1.4;
+  }
+  .news-row .time, .news-row .tag { order: 1; font-size: 11px; }
+}
