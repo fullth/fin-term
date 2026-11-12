@@ -4,7 +4,7 @@ import type { usePriceAlerts } from './alerts';
 import { api } from './api';
 import { INITIAL_CONNECTION, type ConnectionInfo } from './connection';
 
-// 코인 실시간 데이터 훅 — App 레벨에서 1회 호출해 CryptoView·TerminalView 가 공유한다.
+// 코인 실시간 데이터 훅 — App 레벨에서 1회 호출해 종합 화면·Terminal·Excel 이 공유한다.
 // coins 가 있을 때만 업비트 SSE 를 연결(조건부)해 불필요한 상시 연결/부하를 피한다.
 // 반환: 대시보드 시세(quotes) + 실시간 체결(live) + 뉴스 + 알림 모달용 현재가 맵(coinPrices).
 
@@ -60,12 +60,13 @@ export function useCryptoLive(
     es.addEventListener('open', () => setConnection((current) => ({ ...current, state: 'live' })));
     es.addEventListener('tick', (e) => {
       const tick = JSON.parse((e as MessageEvent).data) as UpbitTick;
+      const coin = coins.find((c) => c.upbitMarket === tick.market);
+      if (!coin) return;
       const receivedAt = Date.now();
       lastTickRef.current = receivedAt;
       setConnection((current) => ({ ...current, state: 'live', lastUpdated: receivedAt }));
       setLive((prev) => ({ ...prev, [tick.market]: tick }));
-      const sym = coins.find((c) => c.upbitMarket === tick.market)?.symbol ?? tick.market;
-      alerts.onPrice(tick.market, tick.trade_price, sym);
+      alerts.onPrice(tick.market, tick.trade_price, coin.symbol);
     });
     es.addEventListener('error', () => setConnection((current) => ({ ...current, state: 'reconnecting' })));
     const staleTimer = setInterval(() => {

@@ -7,7 +7,7 @@ import { prepareNews, type NewsView } from '../lib/news-ranking';
 const VIEWS: { value: NewsView; label: string }[] = [
   { value: 'key', label: '핵심' },
   { value: 'breaking', label: '속보' },
-  { value: 'all', label: '전체' },
+  { value: 'all', label: '최신' },
 ];
 
 export function CoinNewsStream({ news }: { news: CoinNewsItem[] }) {
@@ -21,7 +21,7 @@ export function CoinNewsStream({ news }: { news: CoinNewsItem[] }) {
           COIN NEWS <span className="sub">[{prepared.items.length}/{prepared.uniqueCount}]</span>
         </span>
         <span className="news-view-tabs" aria-label="코인 뉴스 보기 방식">
-          <select className="news-select" aria-label="코인 뉴스 정렬" value={view} onChange={(event) => setView(event.target.value as NewsView)}>
+          <select className="news-select" aria-label="코인 뉴스 보기 방식" value={view} onChange={(event) => setView(event.target.value as NewsView)}>
             {VIEWS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
           </select>
         </span>

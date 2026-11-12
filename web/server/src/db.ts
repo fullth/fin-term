@@ -42,6 +42,9 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_events_created_at ON events (created_at);
 `);
 
+// 생성 도중 프로세스가 내려가 본문 없이 남은 날짜 점유를 정리한다.
+db.exec('DELETE FROM daily_briefs WHERE text IS NULL');
+
 // 기존 DB(컬럼 없던 시절) 호환 — 없으면 추가, 이미 있으면 무시.
 for (const col of ['os', 'device', 'browser']) {
   try {
@@ -68,15 +71,6 @@ const insertVisit = db.prepare(
 // 방문 1건 기록. visitedAt 은 호출 시점 epoch ms.
 export function recordVisit(input: VisitInput, now: number): void {
   insertVisit.run({ ...input, visitedAt: now });
-}
-
-const insertEvent = db.prepare(
-  'INSERT INTO events (type, ip_hash, created_at) VALUES (?, ?, ?)',
-);
-
-// 이벤트 1건 기록 (브리핑 이용 등). createdAt 은 호출 시점 epoch ms.
-export function recordEvent(type: string, ipHash: string, now: number): void {
-  insertEvent.run(type, ipHash, now);
 }
 
 interface ReturningVisitor {
@@ -165,6 +159,10 @@ export type { VisitStats, ReturningVisitor, Breakdown, EventStat };
 
 export function claimDailyBrief(day: string): boolean {
   return db.prepare('INSERT OR IGNORE INTO daily_briefs (day) VALUES (?)').run(day).changes === 1;
+}
+// 생성에 실패한 날짜 점유를 풀어 같은 날 다시 시도할 수 있게 한다.
+export function releaseDailyBrief(day: string): void {
+  db.prepare('DELETE FROM daily_briefs WHERE day = ? AND text IS NULL').run(day);
 }
 export function saveDailyBrief(day: string, text: string, at: number): void {
   db.prepare('UPDATE daily_briefs SET text = ?, generated_at = ? WHERE day = ?').run(text, at, day);

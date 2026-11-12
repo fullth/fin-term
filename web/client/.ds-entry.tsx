@@ -5,4 +5,3 @@ export { QuotePanel } from './src/components/QuotePanel';
 export { Watchlist } from './src/components/Watchlist';
 export { NewsStream } from './src/components/NewsStream';
 export { IndicesPanel, MarketsPanel, HotPanel, BriefPanel } from './src/components/SidePanels';
-export { AlertTriggerButton } from './src/components/AlertTriggerButton';

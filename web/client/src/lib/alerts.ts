@@ -123,21 +123,25 @@ function beep() {
   }
 }
 
-export function fireAlert(title: string, body: string): void {
-  if ('Notification' in window && Notification.permission === 'granted') {
-    try {
-      // requireInteraction: 사용자가 닫기 전까지 유지 (지원 브라우저/OS 한정).
-      // OS 알림 표시 시간 자체는 운영체제가 제어하므로 코드로 늘릴 수 있는 건 이 옵션뿐.
-      new Notification(title, { body, tag: `fin-term-${title}`, icon: '/favicon.svg', requireInteraction: true });
-    } catch {
-      /* 무시 */
-    }
+// 소리 없이 OS 알림만 띄운다. 권한이 없으면 아무 일도 하지 않는다.
+export function notify(title: string, body: string): void {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  try {
+    // requireInteraction: 사용자가 닫기 전까지 유지 (지원 브라우저/OS 한정).
+    // OS 알림 표시 시간 자체는 운영체제가 제어하므로 코드로 늘릴 수 있는 건 이 옵션뿐.
+    new Notification(title, { body, tag: `fin-term-${title}`, icon: '/favicon.svg', requireInteraction: true });
+  } catch {
+    /* 무시 */
   }
+}
+
+export function fireAlert(title: string, body: string): void {
+  notify(title, body);
   beep();
 }
 
 // ── 공용 알림 훅 ──────────────────────────────────────────────────────
-// scope: 'crypto' | 'stock' (설정 키 분리). label: 알림 문구용 ("코인"/"종목").
+// scope: 'crypto' | 'stock' (설정 키 분리).
 export function usePriceAlerts(scope: string) {
   const [settings, setSettings] = useState(() => loadAlertSettings(scope));
   const [bases, setBases] = useState<Record<string, number>>(() => loadMap<number>(basesKey(scope)));
@@ -187,24 +191,6 @@ export function usePriceAlerts(scope: string) {
     }
   }, []);
 
-  const setBase = useCallback((key: string, price: number) => {
-    basesRef.current[key] = price;
-    setBases((b) => ({ ...b, [key]: price }));
-  }, []);
-
-  // 종목별 개별 임계값 설정 (null/undefined 면 오버라이드 제거 = 공통값 사용)
-  const setOverrideThreshold = useCallback((key: string, threshold: number | null) => {
-    setOverrides((o) => {
-      const next = { ...o };
-      if (threshold == null || !Number.isFinite(threshold) || threshold <= 0) {
-        delete next[key];
-      } else {
-        next[key] = { ...next[key], threshold: Math.max(0.1, threshold) };
-      }
-      return next;
-    });
-  }, []);
-
   // 모달 확인 시 일괄 커밋 — 기준가/개별임계값/공통임계값 한 번에 반영
   const applyBatch = useCallback(
     (patch: {
@@ -222,21 +208,9 @@ export function usePriceAlerts(scope: string) {
     [],
   );
 
-  // 전체 종목 기준가를 현재가로 리셋
-  const resetAllToCurrent = useCallback((rows: { key: string; price: number | null }[]) => {
-    const next: Record<string, number> = {};
-    for (const r of rows) if (r.price != null && Number.isFinite(r.price)) next[r.key] = r.price;
-    basesRef.current = { ...basesRef.current, ...next };
-    setBases((b) => ({ ...b, ...next }));
-  }, []);
-
   const toggle = useCallback(async () => {
     if (!settingsRef.current.enabled) await requestNotifyPermission();
     setSettings((s) => ({ ...s, enabled: !s.enabled }));
-  }, []);
-
-  const setThreshold = useCallback((threshold: number) => {
-    setSettings((s) => ({ ...s, threshold: Math.max(0.1, threshold) }));
   }, []);
 
   const clearHistory = useCallback(() => setHistory([]), []);
@@ -250,11 +224,7 @@ export function usePriceAlerts(scope: string) {
     history,
     clearHistory,
     onPrice,
-    setBase,
-    setOverrideThreshold,
     applyBatch,
-    resetAllToCurrent,
     toggle,
-    setThreshold,
   };
 }

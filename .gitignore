@@ -13,6 +13,9 @@ ds-bundle/
 .design-sync/learnings/
 .design-sync/node_modules
 
+# Playwright MCP 캡처
+.playwright-mcp/
+
 # 환경변수 (비밀값) — 예시 파일만 추적
 .env
 .env.*

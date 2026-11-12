@@ -40,7 +40,7 @@ export function NewsStream({ news, scope, onScopeChange, filter, onClearFilter }
               {filter} ✕
             </button>
           )}
-          <select className="news-select" aria-label="뉴스 정렬" value={view} onChange={(event) => setView(event.target.value as NewsView)}>
+          <select className="news-select" aria-label="뉴스 보기 방식" value={view} onChange={(event) => setView(event.target.value as NewsView)}>
             {VIEWS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
           </select>
           <select className="news-select" aria-label="뉴스 지역" value={scope} onChange={(event) => onScopeChange(event.target.value as NewsScope)}>
@@ -49,7 +49,7 @@ export function NewsStream({ news, scope, onScopeChange, filter, onClearFilter }
         </span>
       </div>
       {prepared.items.length === 0 && (
-        <div className="dim">{filter ? `${filter} 관련 뉴스 없음` : view === 'breaking' ? '새로운 속보가 없습니다' : 'no headlines…'}</div>
+        <div className="dim">{filter ? `${filter} 관련 뉴스 없음` : view === 'breaking' ? '새로운 속보가 없습니다' : '뉴스를 불러오는 중…'}</div>
       )}
       {prepared.items.map((n) => (
         <div key={n.id} className="news-row" onClick={() => openNews(n.url)}>

@@ -8,7 +8,7 @@
    - 11-13: 재배치 레이아웃 + 급상승 + 종합 모드
    - 14-17: 반응형(980 / 1180 / 700-종합 / 640)
    - 18-19: 업무 화면 테마 + 엑셀 위장
-   - 20-23: 시작 화면 + 안내 모달 + 터미널 + 다이어리
+   - 21-23: 안내 모달 + 터미널 + 다이어리
    반응형 블록이 섞여 있는 순서는 원본이 그렇게 배치돼 있어서다. 진짜 관심사
    격리(뷰별 CSS Module)는 후속 작업. */
 @import './parts/01-tokens.css';
@@ -30,7 +30,6 @@
 @import './parts/17-responsive-640.css';
 @import './parts/18-office-theme.css';
 @import './parts/19-excel.css';
-@import './parts/20-welcome.css';
 @import './parts/21-manual-modal.css';
 @import './parts/22-terminal.css';
 @import './parts/23-diary.css';

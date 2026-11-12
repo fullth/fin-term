@@ -4,7 +4,7 @@
   "pkg": "fin-term-client",
   "globalName": "FinTerm",
   "entry": "web/client/.ds-entry.tsx",
-  "cssEntry": "src/styles/app.css",
+  "cssEntry": "src/styles/index.css",
   "tsconfig": "tsconfig.json",
   "readmeHeader": ".design-sync/conventions.md",
   "componentSrcMap": {
@@ -15,8 +15,7 @@
     "IndicesPanel": "src/components/SidePanels.tsx",
     "MarketsPanel": "src/components/SidePanels.tsx",
     "HotPanel": "src/components/SidePanels.tsx",
-    "BriefPanel": "src/components/SidePanels.tsx",
-    "AlertTriggerButton": "src/components/AlertTriggerButton.tsx"
+    "BriefPanel": "src/components/SidePanels.tsx"
   },
   "dtsPropsFor": {
     "Sparkline": "/** intraday close values; needs >= 2 points to draw */\n  values: number[];\n  /** true = up (var(--up)) stroke, false = down (var(--down)) */\n  positive: boolean;\n  /** viewBox width, default 400 */\n  width?: number;\n  /** pixel height, default 48 */\n  height?: number;",
@@ -26,7 +25,6 @@
     "IndicesPanel": "quotes: Array<{ symbol: string; price: number | null; change_pct: number | null; error?: string }>;\n  /** symbol -> short label shown instead of the raw symbol */\n  labels: Array<{ symbol: string; label: string }>;",
     "MarketsPanel": "quotes: Array<{ symbol: string; price: number | null; change_pct: number | null; error?: string }>;\n  /** symbol -> short label shown instead of the raw symbol */\n  labels: Array<{ symbol: string; label: string }>;",
     "HotPanel": "items: Array<{\n    symbol: string;\n    name: string;\n    price: number | null;\n    change_pct: number | null;\n    market: 'KR' | 'US';\n    sector: string | null;\n    volume: number | null;\n    news: Array<{ title: string; source: string; url: string }>;\n  }>;\n  /** first response arrived — distinguishes loading from an empty (market-closed) result */\n  loaded: boolean;\n  onSelect: (sym: string) => void;",
-    "BriefPanel": "/** generated briefing text; null shows the disabled hint */\n  text: string | null;\n  loading: boolean;",
-    "AlertTriggerButton": "/** alerts are on — shows a red dot */\n  enabled: boolean;\n  onClick: () => void;"
+    "BriefPanel": "/** generated briefing text; null shows the disabled hint */\n  text: string | null;\n  loading: boolean;"
   }
 }

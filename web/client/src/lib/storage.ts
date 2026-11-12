@@ -3,8 +3,6 @@ import type { NewsScope, CoinMeta } from './types';
 
 const KEY = 'fin-term:state';
 
-export type MarketMode = 'combined' | 'stock' | 'crypto';
-
 const DEFAULT_COINS: CoinMeta[] = [
   { id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin', upbitMarket: 'KRW-BTC' },
   { id: 'ethereum', symbol: 'ETH', name: 'Ethereum', upbitMarket: 'KRW-ETH' },
@@ -19,7 +17,6 @@ interface Persisted {
   coins: CoinMeta[];
   selectedSymbol: string | null;
   selectedCoin: string | null;
-  marketMode: MarketMode;
   terminal: boolean; // 터미널 모드 on/off — 새로고침에도 유지
   officeMode: boolean; // 업무 화면 — 차분한 색과 위젯 숨김 상태 유지
 }
@@ -31,14 +28,9 @@ const DEFAULT: Persisted = {
   coins: DEFAULT_COINS,
   selectedSymbol: 'AAPL',
   selectedCoin: 'BTC',
-  marketMode: 'combined',
   terminal: false,
   officeMode: false,
 };
-
-function isMarketMode(value: unknown): value is MarketMode {
-  return value === 'combined' || value === 'stock' || value === 'crypto';
-}
 
 export function loadPersisted(): Persisted {
   try {
@@ -53,7 +45,6 @@ export function loadPersisted(): Persisted {
       coins: p.coins?.length ? p.coins : DEFAULT.coins,
       selectedSymbol: typeof p.selectedSymbol === 'string' ? p.selectedSymbol : DEFAULT.selectedSymbol,
       selectedCoin: typeof p.selectedCoin === 'string' ? p.selectedCoin : DEFAULT.selectedCoin,
-      marketMode: isMarketMode(p.marketMode) ? p.marketMode : DEFAULT.marketMode,
       terminal: p.terminal === true,
       officeMode: p.officeMode === true,
     };
@@ -70,7 +61,7 @@ export function savePersisted(p: Persisted): void {
   }
 }
 
-// 데일리 브리핑 — 마지막 생성 결과를 별도 키에 보관해 새로고침 후 복원한다.
+// 예전 버전이 마지막 브리핑을 보관하던 키 — 이력으로 옮겨 읽는 용도로만 남긴다.
 const BRIEF_KEY = 'fin-term:brief';
 // 브리핑 히스토리 — 생성한 브리핑들을 시각과 함께 누적. Diary에서 장기 조회한다.
 const BRIEF_HISTORY_KEY = 'fin-term:brief-history';
@@ -109,26 +100,6 @@ export function emptyDiaryDraft(): DiaryDraft {
   return { stance: '관망', thesis: '', plan: '', invalidation: '', tags: [], confidence: 50 };
 }
 
-export function loadStoredBrief(): string | null {
-  try {
-    const raw = localStorage.getItem(BRIEF_KEY);
-    if (!raw) return null;
-    const b = JSON.parse(raw) as { text?: string | null };
-    return b.text ?? null;
-  } catch {
-    return null;
-  }
-}
-
-export function saveStoredBrief(text: string, savedAt = new Date().toISOString()): boolean {
-  try {
-    localStorage.setItem(BRIEF_KEY, JSON.stringify({ text, savedAt }));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 // 히스토리 로드 — 최신순 배열.
 export function loadBriefHistory(): BriefEntry[] {
   try {
@@ -157,18 +128,6 @@ export function loadBriefHistory(): BriefEntry[] {
     return normalized;
   } catch {
     return [];
-  }
-}
-
-// 새 브리핑을 히스토리 맨 앞에 추가(최근 N개 유지)하고, 갱신된 배열을 반환.
-export function appendBriefHistory(text: string, at: string): { history: BriefEntry[]; saved: boolean } {
-  try {
-    const entry = { id: `brief:${at}`, text, at };
-    const next = [entry, ...loadBriefHistory().filter((item) => item.id !== entry.id)].slice(0, BRIEF_HISTORY_MAX);
-    localStorage.setItem(BRIEF_HISTORY_KEY, JSON.stringify(next));
-    return { history: next, saved: true };
-  } catch {
-    return { history: loadBriefHistory(), saved: false };
   }
 }
 

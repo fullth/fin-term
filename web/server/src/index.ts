@@ -4,12 +4,12 @@
 // 핵심 설계: 시세·뉴스는 "서버가 단일 폴링→캐시→SSE 브로드캐스트" 한다.
 // 클라이언트가 N명이어도 외부 API 호출량은 클라 수와 무관하게 일정하다.
 import express from 'express';
-import type { Request, Response } from 'express';
+import type { Request, Response, NextFunction, RequestHandler } from 'express';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { existsSync } from 'node:fs';
-import { recordVisit, getStats, claimDailyBrief, saveDailyBrief, listDailyBriefs } from './db.js';
+import { recordVisit, getStats, claimDailyBrief, releaseDailyBrief, saveDailyBrief, listDailyBriefs } from './db.js';
 import { parseUA } from './ua.js';
 import { ADMIN_HTML } from './admin-page.js';
 import { fetchQuotes } from '../../../src/sources/quote.js';
@@ -33,6 +33,33 @@ const MARKETS_INTERVAL = Number(process.env.FIN_MARKETS_INTERVAL_MS ?? 300_000);
 // 기본 관심종목 — TUI 기본값과 동일. 클라이언트가 watchlist 를 쿼리로 보내면 그걸 우선.
 const DEFAULT_WATCHLIST = ['AAPL', 'TSLA', 'NVDA', 'MSFT'];
 
+const MAX_SYMBOLS = 50;
+const SYMBOL_RE = /^[A-Z0-9.^=-]{1,20}$/;
+const UPBIT_MARKET_RE = /^KRW-[A-Z0-9]{1,15}$/;
+
+function parseSymbols(raw: unknown): string[] {
+  const symbols = String(raw ?? '')
+    .split(',')
+    .map((symbol) => symbol.trim().toUpperCase())
+    .filter((symbol) => SYMBOL_RE.test(symbol));
+  return [...new Set(symbols)].slice(0, MAX_SYMBOLS);
+}
+
+function parseUpbitMarkets(raw: unknown): string[] {
+  const markets = String(raw ?? '')
+    .split(',')
+    .map((market) => market.trim().toUpperCase())
+    .filter((market) => UPBIT_MARKET_RE.test(market));
+  return [...new Set(markets)].slice(0, MAX_SYMBOLS);
+}
+
+// Express 4 는 async 핸들러의 reject 를 에러 미들웨어로 넘기지 않아 응답이 끝나지 않는다.
+function asyncRoute(handler: (req: Request, res: Response) => Promise<unknown>): RequestHandler {
+  return (req: Request, res: Response, next: NextFunction) => {
+    handler(req, res).catch(next);
+  };
+}
+
 // 마지막 방어선 — Express 4 는 async 라우트의 reject 를 에러 미들웨어로 자동 전달하지 않는다.
 // 외부 API throw(예: 코인 검색 429)가 라우트의 try/catch 를 빠져나가도 프로세스가 죽지 않게 로깅만 한다.
 process.on('unhandledRejection', (reason) => {
@@ -50,7 +77,7 @@ app.use(express.json());
 // 로컬 개발은 Vite(5173) 와 분리 포트라 CORS 허용. 운영은 동일 출처 서빙이라 무영향.
 app.use((_req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, X-AI-Key');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
   next();
 });
 
@@ -129,11 +156,8 @@ async function refreshMarkets() {
 
 // ── REST 라우트 ───────────────────────────────────────────────────────
 // 시세 초기 로드: 공유 캐시에 있으면 그대로, 없는 심볼만 조회 (Finnhub 호출 절약).
-app.get('/api/quotes', async (req: Request, res: Response) => {
-  const symbols = String(req.query.symbols ?? '')
-    .split(',')
-    .map((s) => s.trim().toUpperCase())
-    .filter(Boolean);
+app.get('/api/quotes', asyncRoute(async (req, res) => {
+  const symbols = parseSymbols(req.query.symbols);
   const list = symbols.length ? symbols : DEFAULT_WATCHLIST;
   const missing = list.filter((s) => !quoteCache.has(s));
   if (missing.length) {
@@ -142,7 +166,7 @@ app.get('/api/quotes', async (req: Request, res: Response) => {
   }
   const quotes = list.map((s) => quoteCache.get(s) ?? { symbol: s, price: null, change: null, change_pct: null, open: null, high: null, low: null, prev_close: null, spark: [], updated_at: Date.now(), error: 'no data' });
   res.json({ quotes });
-});
+}));
 
 // 지수·마켓: 서버 공유 캐시 그대로 반환 (전역 공통)
 app.get('/api/markets', (_req, res) => {
@@ -174,9 +198,7 @@ setInterval(() => void refreshStockNews(), 60_000);
 
 app.get('/api/news', (req, res) => {
   const scope = (req.query.scope as NewsScope) ?? 'all';
-  const watchlist = String(req.query.watchlist ?? '')
-    .split(',').map((symbol) => symbol.trim().toUpperCase())
-    .filter((symbol) => /^[A-Z0-9.^=-]{1,20}$/.test(symbol)).slice(0, 100);
+  const watchlist = parseSymbols(req.query.watchlist);
   const items = [...stockNewsByFeed.values()].flat();
   const unique = new Map(items.map((item) => [item.id, item]));
   const news = [...unique.values()]
@@ -186,22 +208,30 @@ app.get('/api/news', (req, res) => {
   res.json({ news });
 });
 
-app.get('/api/detail/:symbol', async (req, res) => {
-  const detail = await fetchDetail(req.params.symbol.toUpperCase(), FINNHUB_KEY);
+app.get('/api/detail/:symbol', asyncRoute(async (req, res) => {
+  const symbol = String(req.params.symbol).toUpperCase();
+  if (!SYMBOL_RE.test(symbol)) {
+    res.status(400).json({ error: 'invalid_symbol' });
+    return;
+  }
+  const detail = await fetchDetail(symbol, FINNHUB_KEY);
   res.json({ detail });
-});
+}));
 
-app.get('/api/search', async (req, res) => {
-  const q = String(req.query.q ?? '').trim();
-  if (!q) return res.json({ results: [] });
+app.get('/api/search', asyncRoute(async (req, res) => {
+  const q = String(req.query.q ?? '').trim().slice(0, 50);
+  if (!q) {
+    res.json({ results: [] });
+    return;
+  }
   const results = await searchSymbols(q);
   res.json({ results });
-});
+}));
 
-app.get('/api/hot', async (_req, res) => {
+app.get('/api/hot', asyncRoute(async (_req, res) => {
   const items = await fetchHot();
   res.json({ items });
-});
+}));
 
 // 방문 기록 — 클라이언트가 페이지 로드 시 1회 호출. 원시 IP 미저장(해시만).
 app.post('/api/visit', (req, res) => {
@@ -227,10 +257,17 @@ app.post('/api/visit', (req, res) => {
 
 // 매일 서울 시간 7시 이후 첫 실행에서 하루 한 번 생성한다. DB에 날짜를 먼저 기록해 중복 호출을 막는다.
 const labelOf = (defs: { symbol: string; label: string }[], sym: string) => defs.find((d) => d.symbol === sym)?.label ?? sym;
+const BRIEF_RETRY_DELAY_MS = 10 * 60_000;
+let briefRetryAfter = 0;
+function releaseFailedBrief(day: string): void {
+  releaseDailyBrief(day);
+  briefRetryAfter = Date.now() + BRIEF_RETRY_DELAY_MS;
+}
 async function generateDailyBrief(): Promise<void> {
   const now = new Date();
   const seoul = new Date(now.getTime() + 9 * 60 * 60 * 1000);
   if (seoul.getUTCHours() < 7 || !process.env.ANTHROPIC_API_KEY) return;
+  if (now.getTime() < briefRetryAfter) return;
   const day = seoul.toISOString().slice(0, 10);
   if (!claimDailyBrief(day)) return;
   try {
@@ -247,10 +284,15 @@ async function generateDailyBrief(): Promise<void> {
       coins: coins.map((c) => ({ symbol: c.symbol, change_24h: c.change_24h })),
       news: news.map((n) => ({ title: n.title, source: n.source })),
     });
-    if (text) saveDailyBrief(day, text, Date.now());
-    else console.error('[daily-brief] generation failed');
+    if (text) {
+      saveDailyBrief(day, text, Date.now());
+      return;
+    }
+    console.error('[daily-brief] generation failed');
+    releaseFailedBrief(day);
   } catch (error) {
     console.error('[daily-brief] generation failed', error);
+    releaseFailedBrief(day);
   }
 }
 app.get('/api/brief', (_req, res) => res.json({ briefs: listDailyBriefs() }));
@@ -296,7 +338,7 @@ async function quoteLoop() {
   }
 }
 
-app.get('/api/stream/quotes', async (req, res) => {
+app.get('/api/stream/quotes', (req, res) => {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
@@ -305,10 +347,7 @@ app.get('/api/stream/quotes', async (req, res) => {
   });
   res.write(': connected\n\n');
 
-  const symbols = String(req.query.symbols ?? '')
-    .split(',')
-    .map((s) => s.trim().toUpperCase())
-    .filter(Boolean);
+  const symbols = parseSymbols(req.query.symbols);
   const sub: QuoteSub = { res, symbols: symbols.length ? symbols : DEFAULT_WATCHLIST };
   quoteSubs.add(sub);
   const conn: LiveConn = { ipHash: clientIpHash(req), connectedAt: Date.now() };
@@ -330,7 +369,7 @@ app.get('/api/stream/quotes', async (req, res) => {
       } catch {
         /* 무시 */
       }
-    });
+    }).catch((error) => console.error('[quotes] initial fetch failed', error));
   }
 
   // 전역 루프가 멈춰 있으면 시작
@@ -358,14 +397,17 @@ function parseCoinsParam(raw: unknown): CoinMeta[] {
     .map((part) => {
       const [id, symbol, upbitMarket] = part.split(':');
       if (!id || !symbol || !upbitMarket) return null;
-      return { id, symbol: symbol.toUpperCase(), name: symbol.toUpperCase(), upbitMarket };
+      const market = upbitMarket.toUpperCase();
+      if (!UPBIT_MARKET_RE.test(market)) return null;
+      return { id: id.slice(0, 40), symbol: symbol.toUpperCase().slice(0, 15), name: symbol.toUpperCase().slice(0, 15), upbitMarket: market };
     })
-    .filter((c): c is CoinMeta => c !== null);
+    .filter((c): c is CoinMeta => c !== null)
+    .slice(0, MAX_SYMBOLS);
   return parsed.length ? parsed : DEFAULT_COINS;
 }
 
 // ── 코인 모드 ─────────────────────────────────────────────────────────
-// CoinGecko 대시보드 (시세·변동률·스파크라인). 코인 목록은 쿼리로 받음.
+// 업비트 대시보드 (시세·변동률·스파크라인). 코인 목록은 쿼리로 받음.
 app.get('/api/crypto', async (req, res) => {
   const coins = parseCoinsParam(req.query.coins);
   try {
@@ -373,13 +415,13 @@ app.get('/api/crypto', async (req, res) => {
     upbitFeed.ensureMarkets(coins.map((c) => c.upbitMarket));
     res.json({ coins: data });
   } catch (e) {
-    res.status(502).json({ coins: [], error: 'coingecko failed' });
+    res.status(502).json({ coins: [], error: 'upbit_failed' });
   }
 });
 
-// 코인 검색 — CoinGecko ∩ 업비트 KRW 상장
+// 코인 검색 — 업비트 KRW 상장
 app.get('/api/crypto/search', async (req, res) => {
-  const q = String(req.query.q ?? '').trim();
+  const q = String(req.query.q ?? '').trim().slice(0, 50);
   if (!q) return res.json({ results: [] });
   try {
     const results = await searchCoins(q);
@@ -390,16 +432,17 @@ app.get('/api/crypto/search', async (req, res) => {
 });
 
 // 코인 뉴스 — Google News RSS
-app.get('/api/crypto/news', async (_req, res) => {
+app.get('/api/crypto/news', asyncRoute(async (_req, res) => {
   const news = await fetchCoinNews();
   res.json({ news });
-});
+}));
 
 // 업비트 실시간 체결가 SSE. 서버 단일 WS → 구독자 다중 중계.
 app.get('/api/stream/crypto', (req, res) => {
   // 쿼리로 받은 마켓을 구독 집합에 합류
-  const markets = String(req.query.markets ?? '').split(',').filter(Boolean);
-  if (markets.length) upbitFeed.ensureMarkets(markets);
+  const markets = parseUpbitMarkets(req.query.markets);
+  const subscribed = new Set(markets.length ? markets : DEFAULT_COINS.map((coin) => coin.upbitMarket));
+  upbitFeed.ensureMarkets([...subscribed]);
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
@@ -410,6 +453,7 @@ app.get('/api/stream/crypto', (req, res) => {
   const conn: LiveConn = { ipHash: clientIpHash(req), connectedAt: Date.now() };
   liveConnections.add(conn);
   const unsub = upbitFeed.subscribe((tick) => {
+    if (!subscribed.has(tick.market)) return;
     res.write(`event: tick\ndata: ${JSON.stringify(tick)}\n\n`);
   });
   req.on('close', () => {

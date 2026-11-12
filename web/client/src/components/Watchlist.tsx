@@ -18,7 +18,7 @@ export function Watchlist({ watchlist, names, quotes, selected, newsFilter, onSe
       <div className="ptitle t-yellow">
         WATCHLIST <span className="dot">●</span>
       </div>
-      {watchlist.length === 0 && <div className="dim">empty — 검색으로 추가</div>}
+      {watchlist.length === 0 && <div className="dim">관심종목이 없습니다 · 위의 + 종목 추가로 검색</div>}
       {watchlist.map((sym) => {
         const q = quotes[sym];
         const pct = q?.change_pct ?? null;

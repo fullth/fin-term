@@ -16,7 +16,8 @@ interface Props {
 type SaveStatus = 'idle' | 'dirty' | 'saved' | 'error';
 
 const STANCES: DiaryStance[] = ['관망', '매수 검토', '보유', '축소'];
-const TAGS = ['반도체', '금리', '환율', '외국인수급'];
+const TAGS = ['반도체', '금리', '환율', '외국인수급', '비트코인', '알트코인'];
+const SAVE_SHORTCUT = /Mac|iPhone|iPad/i.test(navigator.platform) ? '⌘S' : 'Ctrl+S';
 // localStorage 쓰기가 실패해도 SPA 화면 전환으로 초안이 즉시 사라지지 않게 세션 메모리에 보관한다.
 const volatileDrafts = new Map<string, DiaryDraft>();
 
@@ -60,8 +61,8 @@ function formatDate(at: string, withYear = false): string {
 function statusText(status: SaveStatus, hasNote: boolean, savedAutomatically: boolean): string {
   if (status === 'dirty') return '● 작성 중 · 자동 저장 대기';
   if (status === 'saved') return savedAutomatically ? '✓ 자동 저장됨' : '✓ 이 브라우저에 저장됨';
-  if (status === 'error') return '저장 실패 — 내용을 복사해 주세요';
-  return hasNote ? '✓ 저장된 기록' : '미저장 변경 없음';
+  if (status === 'error') return '저장 실패 — 내용을 복사해 두세요';
+  return hasNote ? '✓ 저장된 기록' : '변경 사항 없음';
 }
 
 export function DiaryView({ history }: Props) {
@@ -234,13 +235,23 @@ export function DiaryView({ history }: Props) {
     }
   };
 
+  const exportNotes = () => {
+    const saved = Object.values(notesRef.current).sort((a, b) => b.brief_at.localeCompare(a.brief_at));
+    const blob = new Blob([JSON.stringify(saved, null, 2)], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `fin-term-diary-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
   if (!entries.length) {
     return (
       <main className="diary-main diary-empty">
         <div className="diary-empty-box">
-          <span className="diary-eyebrow">market log / local only</span>
-          <h1>아직 생성된 브리핑이 없습니다</h1>
-          <p>매일 오전 7시 공개되는 브리핑을 기다려 주세요.</p>
+          <span className="diary-eyebrow">market log</span>
+          <h1>아직 공개된 브리핑이 없습니다</h1>
+          <p>브리핑은 매일 오전 7시에 공개됩니다. 공개되면 여기에서 내 판단을 함께 기록할 수 있습니다.</p>
         </div>
       </main>
     );
@@ -251,10 +262,13 @@ export function DiaryView({ history }: Props) {
       <header className="diary-hero">
         <div>
           <h1>MARKET <span>LOG</span> / AI가 본 시장과 내가 내린 판단</h1>
-          <p>생성된 brief를 고르고, 그 시점의 생각·행동·판단 무효화 기준을 함께 남깁니다.</p>
+          <p>브리핑을 고르고, 그날의 생각과 계획, 생각을 바꿀 조건을 함께 남깁니다.</p>
         </div>
         <div className="diary-hero-actions">
-          <span className="diary-local-badge">LOCAL ONLY</span>
+          <span className="diary-local-badge">이 브라우저에만 저장</span>
+          <button type="button" className="mode-btn" onClick={exportNotes} disabled={!Object.keys(notes).length} title="작성한 기록을 JSON 파일로 내려받기">
+            기록 내보내기
+          </button>
         </div>
       </header>
 
@@ -265,7 +279,7 @@ export function DiaryView({ history }: Props) {
               <span className="diary-eyebrow">brief archive</span>
               <strong>브리핑 이력</strong>
             </div>
-            <span className="diary-count">{entries.length} logs</span>
+            <span className="diary-count">{entries.length}건</span>
           </div>
           <div className="diary-history-list" onKeyDown={onHistoryKeyDown}>
             {entries.map((entry) => {
@@ -290,7 +304,7 @@ export function DiaryView({ history }: Props) {
               );
             })}
           </div>
-          <div className="diary-history-foot"><span>●</span> 기록 있음 · ○ 미작성<br />브리핑과 개인 기록은 생성 시각으로 연결</div>
+          <div className="diary-history-foot"><span>●</span> 기록 있음 · ○ 미작성<br />기록은 해당 날짜의 브리핑에 연결됩니다</div>
         </aside>
 
         <article className="diary-panel diary-brief-pane">
@@ -301,13 +315,13 @@ export function DiaryView({ history }: Props) {
             </div>
           </div>
           <div className="diary-brief-meta">
-            <div><span>CREATED</span><strong>{selected ? formatDate(selected.at, true) : '—'}</strong></div>
-            <div><span>ORIGINAL</span><strong>{selected ? `${selected.text.length.toLocaleString('ko-KR')}자` : '—'}</strong></div>
-            <div><span>MY LOG</span><strong>{selectedHasNote ? '기록됨' : '미작성'}</strong></div>
+            <div><span>공개 시각</span><strong>{selected ? formatDate(selected.at, true) : '—'}</strong></div>
+            <div><span>분량</span><strong>{selected ? `${selected.text.length.toLocaleString('ko-KR')}자` : '—'}</strong></div>
+            <div><span>내 기록</span><strong>{selectedHasNote ? '기록됨' : '미작성'}</strong></div>
           </div>
           <div className="diary-brief-scroll">
             <div className="diary-brief-document">
-              <span className="diary-brief-label">[TERMINAL BRIEF · ORIGINAL]</span>
+              <span className="diary-brief-label">[AI 브리핑 원문 · 투자 권유 아님]</span>
               <pre>{selected?.text}</pre>
             </div>
           </div>
@@ -371,7 +385,7 @@ export function DiaryView({ history }: Props) {
             </label>
 
             <label className="diary-field">
-              <span>04 / 판단 무효화 기준 <small>생각이 틀렸음을 인정할 조건</small></span>
+              <span>04 / 생각을 바꿀 조건 <small>이 판단이 틀렸다고 볼 기준</small></span>
               <input
                 type="text"
                 name="diary-invalidation"
@@ -406,7 +420,7 @@ export function DiaryView({ history }: Props) {
             </fieldset>
 
             <label className="diary-field" htmlFor="diary-confidence">
-              <span>06 / 확신도 <small>나중에 판단 편향을 되짚기 위한 값</small></span>
+              <span>06 / 확신도 <small>나중에 내 판단을 돌아볼 때 쓰는 값</small></span>
               <span className="diary-confidence-row">
                 <input
                   id="diary-confidence"
@@ -424,16 +438,16 @@ export function DiaryView({ history }: Props) {
             </label>
 
             <div className="diary-actions">
-              <span>변경 내용은 0.5초 뒤 이 브라우저에 자동 저장됩니다.</span>
-              <button type="submit" className="diary-primary-btn">기록 저장 <kbd>⌘S</kbd></button>
+              <span>입력하면 이 브라우저에 자동 저장됩니다.</span>
+              <button type="submit" className="diary-primary-btn">기록 저장 <kbd>{SAVE_SHORTCUT}</kbd></button>
             </div>
           </form>
         </aside>
       </section>
 
       <footer className="diary-footer">
-        <span>AI 관찰은 <b>magenta</b> · 내 판단은 <strong>cyan</strong>으로 분리</span>
-        <span><kbd>↑↓</kbd> 이력 이동 · <kbd>⌘S</kbd> 기록 저장 · brief ID별 로컬 저장</span>
+        <span>기록은 서버로 보내지 않습니다. 브라우저 데이터를 지우기 전에 내보내기로 보관하세요.</span>
+        <span><kbd>↑↓</kbd> 이력 이동 · <kbd>{SAVE_SHORTCUT}</kbd> 기록 저장</span>
       </footer>
     </main>
   );

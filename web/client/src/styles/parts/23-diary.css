@@ -168,3 +168,5 @@
 }
 
 /* 커피 후원 위젯 위치는 donate.ts 에서 인라인 스타일로 반응형 제어(Shadow DOM host 값을 외부 CSS 로 못 덮어서). */
+
+.diary-hero-actions .mode-btn:disabled { opacity: .45; cursor: default; }

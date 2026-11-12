@@ -67,7 +67,7 @@ function CoinWatchlist({
       <div className="ptitle t-yellow">
         COIN WATCH <span className="dot">●</span> <span className="sub">업비트</span>
       </div>
-      {coins.length === 0 && <div className="dim">검색으로 코인 추가</div>}
+      {coins.length === 0 && <div className="dim">코인이 없습니다 · 위의 + 코인 추가로 검색</div>}
       {coins.map((coin) => {
         const quote = quotes.find((item) => item.symbol === coin.symbol);
         const tick = live[coin.upbitMarket];
@@ -156,7 +156,7 @@ function CoinQuotePanel({
 const CONNECTION_LABEL: Record<ConnectionState, string> = {
   idle: '대기',
   connecting: '연결 중',
-  live: '실시간',
+  live: '수신 중',
   reconnecting: '재연결 중',
   stale: '데이터 지연',
 };

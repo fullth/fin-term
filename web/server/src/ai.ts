@@ -1,15 +1,5 @@
-// AI 헬퍼 — 클라이언트가 보낸 키(우선) 또는 서버 env 키로 Anthropic 호출.
-// sources/brief·explain 은 env 키만 보므로(TUI 용), 웹은 키 주입형으로 여기서 직접 호출한다.
-// 프롬프트는 sources 의 것과 동일 취지로 BFF 에 둔다.
+// AI 헬퍼 — 서버 env 키로 Anthropic 을 호출해 하루 한 번 공유 브리핑을 만든다.
 import Anthropic from '@anthropic-ai/sdk';
-
-const PLAIN = ' 마크다운 기호(**, #, -, ` 등)를 절대 쓰지 말고 평문으로만 작성하라. 강조가 필요하면 따옴표를 써라.';
-
-// 용어 풀이용 키 — 사용자가 보낸 헤더 키만 사용. 서버 env 로 fallback 하지 않는다(임의 질의 악용 방지).
-export function resolveUserKey(headerKey?: string): string | null {
-  const k = (headerKey ?? '').trim();
-  return k || null;
-}
 
 async function ask(apiKey: string, prompt: string, maxTokens: number, effort: 'low' | 'medium'): Promise<string | null> {
   try {
@@ -26,20 +16,10 @@ async function ask(apiKey: string, prompt: string, maxTokens: number, effort: 'l
       .join('')
       .trim();
     return text || null;
-  } catch {
+  } catch (error) {
+    console.error('[ai] request failed', error);
     return null;
   }
-}
-
-export function explainTermWith(apiKey: string, term: string): Promise<string | null> {
-  return ask(
-    apiKey,
-    `주식·금융 초보자에게 "${term}" 용어를 쉬운 한국어로 설명하라. ` +
-      `정의 한 줄, 왜 중요한지 한 줄, 간단한 예시 한 줄, 총 3~5줄. 군더더기 없이.` +
-      PLAIN,
-    400,
-    'low',
-  );
 }
 
 // 시장 전반(주식+코인) 브리핑 입력 — 개인화(관심종목) 없이 시장 데이터만.
@@ -91,27 +71,4 @@ function buildBriefPrompt(input: BriefInput): string {
 
 export function generateBriefWith(apiKey: string, input: BriefInput): Promise<string | null> {
   return ask(apiKey, buildBriefPrompt(input), 1024, 'medium');
-}
-
-// 브리핑 스트리밍 — 텍스트 델타를 onChunk 로 흘려보낸다. SSE 라우트에서 사용.
-// 반환값: 정상 완료 여부(false 면 에러). 에러도 예외 없이 false 로 알려 라우트가 이벤트로 마무리하게 한다.
-export async function streamBriefWith(
-  apiKey: string,
-  input: BriefInput,
-  onChunk: (delta: string) => void,
-): Promise<boolean> {
-  try {
-    const client = new Anthropic({ apiKey });
-    const stream = client.messages.stream({
-      model: 'claude-opus-4-8',
-      max_tokens: 1024,
-      output_config: { effort: 'medium' },
-      messages: [{ role: 'user', content: buildBriefPrompt(input) }],
-    });
-    stream.on('text', (delta) => onChunk(delta));
-    await stream.finalMessage();
-    return true;
-  } catch {
-    return false;
-  }
 }

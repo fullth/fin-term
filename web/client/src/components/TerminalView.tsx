@@ -1,15 +1,14 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { Quote, NewsItem, HotItem, LabelEntry, Detail, SearchResult, CoinMeta, CoinQuote, UpbitTick, CoinNewsItem, CoinSearchResult } from '../lib/types';
 import type { BriefEntry } from '../lib/storage';
-import { fmtPriceCompact, fmtPct, fmtChange, fmtBig, fmtTime, changeClass, arrow } from '../lib/format';
+import { fmtPriceCompact, fmtPct, fmtChange, fmtKrwChange, isKrwSymbol, fmtBig, fmtTime, changeClass, arrow } from '../lib/format';
 import { api } from '../lib/api';
 
-// 터미널 모드 — 선택한 시장에 맞는 시세와 뉴스를 개발자 콘솔처럼 한 스트림에 표시한다.
+// 터미널 모드 — 주식과 코인의 시세와 뉴스를 개발자 콘솔처럼 한 스트림에 표시한다.
 // 스트리밍 중에는 프롬프트를 숨기고, Ctrl+X로 중단하면 명령 입력이 열린다.
 // 종목과 코인 검색, 관심목록 관리, 브리핑을 키보드 또는 하단 명령 버튼으로 실행한다.
 
 interface TerminalViewProps {
-  marketMode: 'combined' | 'stock' | 'crypto';
   watchlist: string[];
   names: Record<string, string>;
   quotes: Record<string, Quote>;
@@ -18,9 +17,8 @@ interface TerminalViewProps {
   labels: { indices: LabelEntry[]; markets: LabelEntry[] };
   news: NewsItem[];
   hot: HotItem[];
-  briefState: { text: string | null; loading: boolean; err: string | null };
+  briefState: BriefState;
   briefHistory: BriefEntry[];
-  onRunBrief: (onChunk: (delta: string) => void) => Promise<{ text: string | null; err: string | null }>;
   coins: CoinMeta[];
   coinQuotes: CoinQuote[];
   coinLive: Record<string, UpbitTick>;
@@ -31,11 +29,13 @@ interface TerminalViewProps {
   onRemoveCoin: (id: string) => void;
 }
 
+type BriefState = { text: string | null; loading: boolean; err: string | null };
+
 // 스트림 블록 — 명령 에코 / 명령별 출력. 데이터는 렌더 시점에 최신 props 로 그린다.
 type Block =
   | { kind: 'cmd'; raw: string }
   | { kind: 'out'; render: 'watch' | 'idx' | 'hot' | 'help' | 'coin' | 'coinnews' }
-  | { kind: 'brief'; id: number; text: string; loading: boolean; err?: string | null; restored?: boolean; syncApp?: boolean }
+  | { kind: 'brief' } // 서버가 공유하는 오늘 브리핑 — 렌더 시점의 최신 상태를 그린다
   | { kind: 'briefHistory'; entries: BriefEntry[] }
   | { kind: 'news' } // news --tail N -f (스트리밍 여부는 streaming 상태로)
   | { kind: 'search'; q: string; results: SearchResult[]; loading?: boolean; err?: string }
@@ -45,26 +45,19 @@ type Block =
 
 const NEWS_TAIL = 5;
 
-const STOCK_HELP_LINES = [
+const HELP_LINES = [
   ['search <종목>', '종목 검색·추가', 'add <종목>', '관심목록 추가'],
-  ['watch', '관심종목 실시간', 'rm <심볼>', '관심목록 제거'],
+  ['watch', '관심종목 시세', 'rm <심볼>', '관심목록 제거'],
   ['info <심볼>', '종목 상세', 'idx', '지수·환율'],
-  ['hot', '급상승 종목', 'brief', 'AI 브리핑'],
-  ['brief history', '지난 브리핑 조회', '', ''],
+  ['hot', '급상승 종목', 'brief', '오늘의 AI 브리핑'],
+  ['brief history', '지난 브리핑 조회', 'coin rm <심볼>', '코인 목록 제거'],
   ['news', '뉴스 스트림(^X 중단)', 'clear', '화면 정리'],
   ['coin', '코인 관심목록 시세', 'coin search <이름>', '코인 검색·추가'],
-  ['coin news', '코인 뉴스', '', ''],
-];
-
-const CRYPTO_HELP_LINES = [
-  ['coin', '코인 실시간 시세', 'coin search <이름>', '코인 검색/추가'],
-  ['coin rm <심볼>', '코인 목록 제거', 'coin news', '코인 뉴스'],
-  ['brief', 'AI 시장 브리핑', 'brief history', '지난 브리핑 조회'],
-  ['help', '명령 목록', 'clear', '화면 정리'],
+  ['coin news', '코인 뉴스', 'help', '명령 목록'],
 ];
 
 // 명령 버튼 바 — 마우스로도 실행. label 은 표시, cmd 는 실행할 명령.
-const STOCK_CMD_BUTTONS: { label: string; cmd: string }[] = [
+const CMD_BUTTONS: { label: string; cmd: string }[] = [
   { label: 'watch', cmd: 'watch' },
   { label: 'idx', cmd: 'idx' },
   { label: 'hot', cmd: 'hot' },
@@ -78,110 +71,39 @@ const STOCK_CMD_BUTTONS: { label: string; cmd: string }[] = [
   { label: 'clear', cmd: 'clear' },
 ];
 
-const CRYPTO_CMD_BUTTONS: { label: string; cmd: string }[] = [
-  { label: 'coin', cmd: 'coin' },
-  { label: 'coin news', cmd: 'coin news' },
-  { label: 'coin search', cmd: 'coin search ' },
-  { label: 'brief', cmd: 'brief' },
-  { label: 'brief log', cmd: 'brief history' },
-  { label: 'help', cmd: 'help' },
-  { label: 'clear', cmd: 'clear' },
-];
+const COMPLETIONS = ['search', 'watch', 'add', 'rm', 'info', 'idx', 'news', 'hot', 'coin', 'brief', 'clear', 'help'];
 
 export function TerminalView(props: TerminalViewProps) {
-  const { marketMode, watchlist, names, quotes, indices, markets, labels, news, hot, briefState, briefHistory, onRunBrief, coins, coinQuotes, coinLive, coinNews, onAddSymbol, onRemoveSymbol, onAddCoin, onRemoveCoin } = props;
+  const { watchlist, names, quotes, indices, markets, labels, news, hot, briefState, briefHistory, coins, coinQuotes, coinLive, coinNews, onAddSymbol, onRemoveSymbol, onAddCoin, onRemoveCoin } = props;
 
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(true); // 기본: 뉴스 스트리밍 중 → 프롬프트 숨김
   const historyRef = useRef<string[]>([]);
   const hidxRef = useRef(-1);
-  const briefSeqRef = useRef(0);
-  const briefRunningRef = useRef(false);
   const seededRef = useRef(false);
   const streamRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // 진입한 시장 모드에 맞는 실시간 시세와 뉴스로 터미널을 시작한다.
+  // 오늘 브리핑과 주식·코인 시세, 뉴스로 터미널을 시작한다.
   useEffect(() => {
     if (seededRef.current) return;
     seededRef.current = true;
-    const briefBlocks: Block[] = [
-      { kind: 'cmd', raw: 'brief' },
-      {
-        kind: 'brief',
-        id: 0,
-        text: briefState.text ?? '',
-        loading: briefState.loading,
-        err: briefState.err,
-        restored: Boolean(briefState.text) && !briefState.loading,
-        syncApp: briefState.loading,
-      },
-    ];
-    if (marketMode === 'crypto') {
-      setBlocks([
-        ...briefBlocks,
-        { kind: 'cmd', raw: 'coin --live' },
-        { kind: 'out', render: 'coin' },
-        { kind: 'cmd', raw: 'coin news --tail 10 -f' },
-        { kind: 'out', render: 'coinnews' },
-      ]);
-      return;
-    }
-    if (marketMode === 'combined') {
-      setBlocks([
-        ...briefBlocks,
-        { kind: 'cmd', raw: `watch ${watchlist.join(' ')} --sse` },
-        { kind: 'out', render: 'watch' },
-        { kind: 'cmd', raw: 'coin --live' },
-        { kind: 'out', render: 'coin' },
-        { kind: 'cmd', raw: `news --tail ${NEWS_TAIL} -f` },
-        { kind: 'news' },
-        { kind: 'cmd', raw: 'coin news --tail 10 -f' },
-        { kind: 'out', render: 'coinnews' },
-      ]);
-      return;
-    }
     setBlocks([
-      ...briefBlocks,
-      { kind: 'cmd', raw: `watch ${watchlist.join(' ')} --sse` },
+      { kind: 'cmd', raw: 'brief' },
+      { kind: 'brief' },
+      { kind: 'cmd', raw: `watch ${watchlist.join(' ')}` },
       { kind: 'out', render: 'watch' },
-      { kind: 'cmd', raw: 'search 하이닉스' },
-      { kind: 'search', q: '하이닉스', results: [], loading: true },
+      { kind: 'cmd', raw: 'coin --live' },
+      { kind: 'out', render: 'coin' },
       { kind: 'cmd', raw: `news --tail ${NEWS_TAIL} -f` },
       { kind: 'news' },
+      { kind: 'cmd', raw: 'coin news --tail 10 -f' },
+      { kind: 'out', render: 'coinnews' },
     ]);
-    // 하이닉스 검색 실제 호출 → 로딩 중인 검색 블록 갱신
-    void (async () => {
-      try {
-        const { results } = await api.search('하이닉스');
-        setBlocks((prev) => prev.map((b) => (b.kind === 'search' && b.loading ? { kind: 'search', q: '하이닉스', results } : b)));
-      } catch {
-        setBlocks((prev) => prev.map((b) => (b.kind === 'search' && b.loading ? { kind: 'search', q: '하이닉스', results: [], err: '검색 실패' } : b)));
-      }
-    })();
-    // 진입 시점의 모드와 데이터로 한 번만 시딩한다. 재진입하면 컴포넌트가 다시 마운트된다.
+    // 진입 시점의 관심목록으로 한 번만 시딩한다. 재진입하면 컴포넌트가 다시 마운트된다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // 다른 화면에서 시작한 브리핑 생성 중 터미널로 들어온 경우, 해당 seed 블록만 App 상태를 따라간다.
-  useEffect(() => {
-    setBlocks((prev) => {
-      if (!prev.some((b) => b.kind === 'brief' && b.syncApp)) return prev;
-      return prev.map((b) =>
-        b.kind === 'brief' && b.syncApp
-          ? {
-              ...b,
-              text: briefState.text ?? b.text,
-              loading: briefState.loading,
-              err: briefState.err,
-              restored: false,
-              syncApp: briefState.loading,
-            }
-          : b,
-      );
-    });
-  }, [briefState.text, briefState.loading, briefState.err]);
 
   // 새 블록마다 하단으로 스크롤
   useEffect(() => {
@@ -236,49 +158,6 @@ export function TerminalView(props: TerminalViewProps) {
     }
   }, []);
 
-  // brief는 네트워크 호출을 상태 updater 밖에서 정확히 한 번 시작한다.
-  // 각 실행을 고유 id 블록에 묶어 과거 터미널 출력이 새 결과로 덮이지 않게 한다.
-  const runBrief = useCallback(
-    (raw: string) => {
-      if (briefRunningRef.current || briefState.loading) {
-        setBlocks((prev) => [
-          ...prev,
-          { kind: 'cmd', raw },
-          { kind: 'text', html: '→ 이미 AI 시장 브리핑을 생성하고 있습니다', cls: 'dim' },
-        ]);
-        return;
-      }
-
-      const id = ++briefSeqRef.current;
-      briefRunningRef.current = true;
-      setBlocks((prev) => [...prev, { kind: 'cmd', raw }, { kind: 'brief', id, text: '', loading: true }]);
-
-      void onRunBrief((delta) => {
-        setBlocks((prev) =>
-          prev.map((b) => (b.kind === 'brief' && b.id === id ? { ...b, text: b.text + delta } : b)),
-        );
-      })
-        .then(({ text, err }) => {
-          setBlocks((prev) =>
-            prev.map((b) =>
-              b.kind === 'brief' && b.id === id
-                ? { ...b, text: text ?? b.text, loading: false, err }
-                : b,
-            ),
-          );
-        })
-        .catch(() => {
-          setBlocks((prev) =>
-            prev.map((b) => (b.kind === 'brief' && b.id === id ? { ...b, loading: false, err: '생성 실패' } : b)),
-          );
-        })
-        .finally(() => {
-          briefRunningRef.current = false;
-        });
-    },
-    [briefState.loading, onRunBrief],
-  );
-
   // 명령 실행
   const run = useCallback(
     (raw: string) => {
@@ -291,7 +170,7 @@ export function TerminalView(props: TerminalViewProps) {
           setBlocks((prev) => [...prev, { kind: 'cmd', raw }, { kind: 'briefHistory', entries: [...briefHistory] }]);
           return;
         }
-        runBrief(raw);
+        setBlocks((prev) => [...prev, { kind: 'cmd', raw }, { kind: 'brief' }]);
         return;
       }
       setBlocks((prev) => {
@@ -382,7 +261,7 @@ export function TerminalView(props: TerminalViewProps) {
         }
       });
     },
-    [watchlist, coins, briefHistory, onAddSymbol, onRemoveSymbol, onRemoveCoin, runInfo, runSearch, runCoinSearch, runBrief],
+    [watchlist, coins, briefHistory, onAddSymbol, onRemoveSymbol, onRemoveCoin, runInfo, runSearch, runCoinSearch],
   );
 
   // 명령 버튼 클릭 — search 처럼 인자가 필요한 건 입력창에 채우고 커서를 끝으로, 나머지는 즉시 실행
@@ -432,10 +311,7 @@ export function TerminalView(props: TerminalViewProps) {
       }
     } else if (e.key === 'Tab') {
       e.preventDefault();
-      const cmds = marketMode === 'crypto'
-        ? ['coin', 'brief', 'clear', 'help']
-        : ['search', 'watch', 'add', 'rm', 'info', 'idx', 'news', 'hot', 'coin', 'brief', 'clear', 'help'];
-      const m = cmds.filter((c) => c.startsWith(input.trim()));
+      const m = COMPLETIONS.filter((c) => c.startsWith(input.trim()));
       if (m.length === 1) setInput(m[0] + ' ');
     }
   };
@@ -464,7 +340,8 @@ export function TerminalView(props: TerminalViewProps) {
             coinQuotes={coinQuotes}
             coinLive={coinLive}
             coinNews={coinNews}
-            marketMode={marketMode}
+            briefState={briefState}
+            briefHistory={briefHistory}
             onPick={onAddSymbol}
             onPickCoin={onAddCoin}
           />
@@ -473,7 +350,7 @@ export function TerminalView(props: TerminalViewProps) {
         {/* 스트리밍 중이면 프롬프트 대신 중단 안내 · 아니면 입력 프롬프트 */}
         {streaming ? (
           <div className="tv-streamhint">
-            <span className="tv-blink">▮</span> 실시간 스트리밍 중… <span className="k">Ctrl+X</span> 또는 <span className="k">Esc</span> 눌러 중단하고 검색
+            <span className="tv-blink">▮</span> 시세·뉴스 수신 중… <span className="k">Ctrl+X</span> 또는 <span className="k">Esc</span>를 누르면 명령을 입력할 수 있습니다
           </div>
         ) : (
           <div className="tv-inputline">
@@ -484,9 +361,7 @@ export function TerminalView(props: TerminalViewProps) {
               autoFocus
               autoComplete="off"
               spellCheck={false}
-              placeholder={marketMode === 'crypto'
-                ? '코인 명령 입력 (예: coin search 비트코인) | help 로 명령 목록'
-                : '종목명 입력 후 Enter (예: 삼성, AAPL) | help 로 명령 목록'}
+              placeholder="명령 입력 후 Enter (예: search 삼성, coin search 비트코인) | help 로 명령 목록"
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onKeyDown}
             />
@@ -497,7 +372,7 @@ export function TerminalView(props: TerminalViewProps) {
       {/* 명령 버튼 바 — 마우스로도 모든 명령 실행 */}
       <div className="tv-cmdbar" onClick={(e) => e.stopPropagation()}>
         <span className="tv-cmdbar-label">명령:</span>
-        {(marketMode === 'crypto' ? CRYPTO_CMD_BUTTONS : STOCK_CMD_BUTTONS).map((btn) => (
+        {CMD_BUTTONS.map((btn) => (
           <button key={btn.label} className="tv-cmdbtn" onClick={() => onCmdButton(btn.cmd)}>
             {btn.label}
           </button>
@@ -537,11 +412,12 @@ function BlockView(props: {
   coinQuotes: CoinQuote[];
   coinLive: Record<string, UpbitTick>;
   coinNews: CoinNewsItem[];
-  marketMode: 'combined' | 'stock' | 'crypto';
+  briefState: BriefState;
+  briefHistory: BriefEntry[];
   onPick: (sym: string, name: string) => void;
   onPickCoin: (c: CoinMeta) => void;
 }) {
-  const { b, streaming, watchlist, names, quotes, indices, markets, labels, news, hot, coins, coinQuotes, coinLive, coinNews, marketMode, onPick, onPickCoin } = props;
+  const { b, streaming, watchlist, names, quotes, indices, markets, labels, news, hot, coins, coinQuotes, coinLive, coinNews, briefState, briefHistory, onPick, onPickCoin } = props;
 
   if (b.kind === 'cmd')
     return (
@@ -552,36 +428,36 @@ function BlockView(props: {
 
   if (b.kind === 'text') return <div className={`tv-ln ${b.cls || ''}`} dangerouslySetInnerHTML={{ __html: b.html }} />;
 
-  // AI 브리핑 — SSE 델타를 현재 터미널 블록 안에 그대로 누적한다.
   if (b.kind === 'brief') {
+    const publishedAt = briefHistory.find((entry) => entry.text === briefState.text)?.at;
     return (
       <div className="tv-brief-block">
         <div className="tv-ln tv-brief-head">
-          → AI 시장 브리핑{b.restored ? <span className="dim"> · 마지막 저장본</span> : ''}
+          → 오늘의 AI 브리핑{publishedAt ? <span className="dim"> · {fmtBriefAt(publishedAt)} 기준</span> : ''}
         </div>
-        {b.text ? (
-          <div className="tv-brief">
-            {b.text}
-            {b.loading && <span className="brief-stream-cursor" aria-label="생성 중" />}
-          </div>
-        ) : b.loading ? (
+        {briefState.text ? (
+          <>
+            <div className="tv-brief">{briefState.text}</div>
+            <div className="tv-ln dim">AI가 뉴스와 시장 지표를 요약한 참고 자료이며 투자 권유가 아닙니다.</div>
+          </>
+        ) : briefState.loading ? (
           <div className="tv-ln dim" role="status" aria-live="polite">
-            <span className="tv-blink">▮</span> 시장 뉴스와 지표를 정리하는 중…
+            <span className="tv-blink">▮</span> 오늘 브리핑을 불러오는 중…
           </div>
-        ) : b.err ? null : (
-          <div className="tv-ln dim">저장된 브리핑 없음 · brief 명령으로 생성</div>
+        ) : briefState.err ? (
+          <div className="tv-ln err" role="alert">✗ {briefState.err}</div>
+        ) : (
+          <div className="tv-ln dim">아직 공개된 브리핑이 없습니다 · 매일 오전 7시 공개</div>
         )}
-        {b.err && <div className="tv-ln err" role="alert">✗ {b.err}</div>}
-        {!b.loading && b.text && !b.err && !b.restored && <div className="tv-ln tv-brief-done" role="status">✓ 브리핑 저장 완료</div>}
       </div>
     );
   }
 
   if (b.kind === 'briefHistory') {
-    if (!b.entries.length) return <div className="tv-ln dim">저장된 브리핑 이력이 없습니다</div>;
+    if (!b.entries.length) return <div className="tv-ln dim">지난 브리핑이 없습니다</div>;
     return (
       <div className="tv-brief-history">
-        <div className="tv-ln dim">→ 저장된 브리핑 {b.entries.length}건 · 항목을 눌러 펼치기</div>
+        <div className="tv-ln dim">→ 지난 브리핑 {b.entries.length}건 · 항목을 눌러 펼치기</div>
         {b.entries.map((entry, index) => (
           <details key={entry.id}>
             <summary>
@@ -598,7 +474,7 @@ function BlockView(props: {
     return (
       <>
         <div className="tv-ln dim">
-          → <span className="cyan">{watchlist.length} symbols</span> streaming (SSE) · <span className="dim">종목 클릭 = 추가</span>
+          → <span className="cyan">관심종목 {watchlist.length}개</span> · 약 1분 간격 갱신
         </div>
         <div className="tv-tbl q5 head">
           <span className="dim">SYM</span>
@@ -611,10 +487,10 @@ function BlockView(props: {
           const q = quotes[s];
           const cc = changeClass(q?.change_pct ?? null);
           return (
-            <div className="tv-pick tv-tbl q5" key={s} onClick={() => onPick(s, names[s] || '')}>
+            <div className="tv-tbl q5" key={s}>
               <span className="hl">{s}</span>
               <span>{q?.error ? 'ERR' : fmtPriceCompact(q?.price ?? null)}</span>
-              <span className={cc}>{q ? fmtChange(q.change) : '—'}</span>
+              <span className={cc}>{q ? (isKrwSymbol(s) ? fmtKrwChange(q.change) : fmtChange(q.change)) : '—'}</span>
               <span className={cc}>{q ? `${arrow(q.change_pct)}${fmtPct(q.change_pct)}` : '—'}</span>
               <span className="dim">
                 {names[s] || ''}
@@ -672,7 +548,7 @@ function BlockView(props: {
   if (b.kind === 'out' && b.render === 'help') {
     return (
       <>
-        {(marketMode === 'crypto' ? CRYPTO_HELP_LINES : STOCK_HELP_LINES).map((row, i) => (
+        {HELP_LINES.map((row, i) => (
           <div className="tv-ln dim tv-help" key={i}>
             <span className="hcmd">{row[0]}</span>
             <span>{row[1]}</span>
@@ -688,7 +564,7 @@ function BlockView(props: {
     return (
       <>
         <div className="tv-ln dim">
-          → 최근 뉴스 {NEWS_TAIL}건{streaming ? <span className="tv-live"> · ● live</span> : <span className="dim"> · 중단됨</span>}
+          → 최근 뉴스 {NEWS_TAIL}건{streaming ? <span className="tv-live"> · ● 수신 중</span> : <span className="dim"> · 중단됨</span>}
         </div>
         {news.slice(0, NEWS_TAIL).map((n) => (
           <div className="tv-nrow" key={n.id}>
@@ -731,7 +607,7 @@ function BlockView(props: {
           <div className="tv-ln">
             <span className="hl big">{fmtPriceCompact(q.price)}</span>{' '}
             <span className={cc}>
-              {arrow(q.change_pct)} {fmtChange(q.change)} ({fmtPct(q.change_pct)})
+              {arrow(q.change_pct)} {isKrwSymbol(b.symbol) ? fmtKrwChange(q.change) : fmtChange(q.change)} ({fmtPct(q.change_pct)})
             </span>
           </div>
         )}
@@ -785,7 +661,7 @@ function BlockView(props: {
     return (
       <>
         <div className="tv-ln dim">
-          → <span className="cyan">{coins.length} coins</span> streaming (업비트) · <span className="dim">클릭 = 유지</span>
+          → <span className="cyan">코인 {coins.length}개</span> · 업비트 실시간
         </div>
         <div className="tv-tbl q4c head">
           <span className="dim">SYM</span>
@@ -798,7 +674,7 @@ function BlockView(props: {
           const r = rateOf(c);
           const cc = changeClass(r);
           return (
-            <div className="tv-pick tv-tbl q4c" key={c.id} onClick={() => onPickCoin(c)}>
+            <div className="tv-tbl q4c" key={c.id}>
               <span className="hl">{c.symbol}</span>
               <span>{p == null ? '—' : `₩${p.toLocaleString('ko-KR')}`}</span>
               <span className={cc}>{r == null ? '—' : `${arrow(r)}${fmtPct(r)}`}</span>
@@ -815,7 +691,7 @@ function BlockView(props: {
     return (
       <>
         <div className="tv-ln dim">
-          → 코인 뉴스{streaming ? <span className="tv-live"> | ● live</span> : <span className="dim"> | 중단됨</span>}
+          → 코인 뉴스{streaming ? <span className="tv-live"> · ● 수신 중</span> : <span className="dim"> · 중단됨</span>}
         </div>
         {coinNews.slice(0, 10).map((n) => (
           <div className="tv-nrow" key={n.id}>

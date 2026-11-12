@@ -6,6 +6,21 @@ export function fmtPrice(n: number | null): string {
   return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// 원화로 거래되는 국내 종목(.KS/.KQ)은 소수점 없이 표기한다.
+export function isKrwSymbol(symbol: string): boolean {
+  return /\.(KS|KQ)$/i.test(symbol);
+}
+
+export function fmtKrwPrice(n: number | null): string {
+  if (n == null) return '—';
+  return n.toLocaleString('ko-KR', { maximumFractionDigits: 0 });
+}
+
+export function fmtKrwChange(n: number | null): string {
+  if (n == null) return '—';
+  return `${n > 0 ? '+' : ''}${n.toLocaleString('ko-KR', { maximumFractionDigits: 0 })}`;
+}
+
 export function fmtPriceCompact(n: number | null): string {
   if (n == null) return '—';
   const digits = Math.abs(n) >= 1000 ? 0 : 2;

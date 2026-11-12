@@ -52,7 +52,7 @@ export function bootDonate(): void {
   window.addEventListener('resize', apply);
   window.addEventListener('orientationchange', apply);
 
-  // stealth(엑셀·업무·시작화면)에서 CSS 로 숨겼다가 풀 때, 채널톡이 걸어둔 인라인
+  // stealth(엑셀·업무 화면)에서 CSS 로 숨겼다가 풀 때, 채널톡이 걸어둔 인라인
   // display:none 이 남아 위젯이 영영 안 보이는 경우가 있어 주기적으로 복구한다.
   setInterval(() => {
     const el = document.getElementById('smtc-root');

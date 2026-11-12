@@ -5,9 +5,11 @@
 [![node](https://img.shields.io/node/v/fin-term.svg)](https://www.npmjs.com/package/fin-term)
 [![license](https://img.shields.io/npm/l/fin-term.svg)](https://github.com/fullth/fin-term/blob/master/LICENSE)
 
-블룸버그 터미널 스타일의 TUI와 웹 페이지를 구현하였습니다.  
-실시간 시세 + 영문/한글 뉴스 스트림을 한 화면에 확인할 수 있습니다.
-주식모드 / 코인모드 두 가지 모드가 존재합니다.
+주식과 코인 시세, 영문/한글 뉴스를 한 화면에서 보는 블룸버그 터미널 스타일 도구입니다.  
+터미널에서 실행하는 TUI와 브라우저에서 쓰는 웹 버전이 있습니다.
+
+- **TUI** (`npx fin-term`): 주식 모드와 코인 모드를 오가며 사용합니다. 이 문서가 다루는 내용입니다.
+- **웹** ([web/README.md](web/README.md)): 주식과 코인을 한 화면에 나란히 보여주고, 매일 오전 7시 AI 브리핑, 투자일지, Excel 위장 화면을 제공합니다.
 
 ## 대시보드 화면 - 주식/코인
 **API 키 없이 바로 동작**합니다.

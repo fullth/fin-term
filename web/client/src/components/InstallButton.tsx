@@ -49,7 +49,7 @@ export function InstallButton() {
     return (
       <div className="alert-btn-wrap" style={{ position: 'relative' }}>
         <button className="mode-btn" title="홈 화면에 추가" onClick={() => setShowIosHint((v) => !v)}>
-          install
+          앱 설치
         </button>
         {showIosHint && (
           <div className="install-hint">
@@ -73,7 +73,7 @@ export function InstallButton() {
         setDeferred(null);
       }}
     >
-      install
+      앱 설치
     </button>
   );
 }

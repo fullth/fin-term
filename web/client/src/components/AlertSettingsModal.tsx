@@ -17,7 +17,7 @@ interface Props {
   onToggle: () => void;
   // 확인 시 일괄 커밋
   onApply: (patch: { threshold?: number; bases?: Record<string, number>; overrides?: Record<string, AlertOverride> }) => void;
-  history: AlertEvent[]; // 이번 세션 알림 이력 (페이지 닫으면 소멸)
+  history: AlertEvent[]; // 최근 알림 이력 (브라우저에 보관)
   onClearHistory: () => void;
 }
 
@@ -171,7 +171,7 @@ export function AlertSettingsModal({ settings, bases, overrides, rows, fmt, onCl
         <>
           <div className="alert-modal-list">
             {history.length === 0 && (
-              <div className="dim" style={{ fontSize: 12 }}>아직 발생한 알림이 없습니다 (페이지를 닫으면 이력은 초기화됩니다)</div>
+              <div className="dim" style={{ fontSize: 12 }}>아직 발생한 알림이 없습니다</div>
             )}
             {history.map((e) => (
               <div key={e.id} className="alert-hist-row">
@@ -185,7 +185,7 @@ export function AlertSettingsModal({ settings, bases, overrides, rows, fmt, onCl
             ))}
           </div>
           <div className="alert-modal-footer">
-            <span className="dim" style={{ fontSize: 11 }}>이번 세션 알림 이력 · 최대 {50}건</span>
+            <span className="dim" style={{ fontSize: 11 }}>최근 알림 50건까지 이 브라우저에 보관됩니다</span>
             <div style={{ display: 'flex', gap: 8 }}>
               {history.length > 0 && <button className="newsbtn" onClick={onClearHistory}>지우기</button>}
               <button className="newsbtn on" onClick={onClose}>닫기</button>
